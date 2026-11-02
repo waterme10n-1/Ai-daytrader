@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Daytrader</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%231c1712'/%3E%3Ctext x='16' y='22' text-anchor='middle' font-size='13' fill='%23f3eee6' font-family='Georgia'%3EDT%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,560;9..144,640&family=Outfit:wght@380;500;640&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #e8e1d4;
+    --bg-2: #f7f3eb;
+    --ink: #1c1712;
+    --muted: #665e54;
+    --line: #d8d0c3;
+    --accent: #1d4636;
+    --good: #1c6b43;
+    --bad: #9d342c;
+    --paper: #1c446c;
+    --live: #8d2c2c;
+    --sim: #8a5710;
+    --chip: #efe7da;
+    --shadow: 0 16px 40px rgba(70, 48, 16, 0.06);
+    color-scheme: light;
+  }
+  html[data-theme="dark"] {
+    --bg: #121410;
+    --bg-2: #1c1f1a;
+    --ink: #f3eee6;
+    --muted: #b7ae9f;
+    --line: #32382e;
+    --accent: #e0c27a;
+    --good: #8fd0aa;
+    --bad: #f0a49c;
+    --paper: #a9c8ea;
+    --live: #f0a49c;
+    --sim: #e6c98a;
+    --chip: #262b22;
+    --shadow: none;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Outfit", "Avenir Next", "Segoe UI", sans-serif;
+    color: var(--ink);
+    background:
+      radial-gradient(900px 420px at 0% -10%, rgba(196, 161, 90, 0.22), transparent 55%),
+      var(--bg);
+    line-height: 1.45;
+  }
+  button, input { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .wrap { width: min(1140px, calc(100% - 28px)); margin: 0 auto; }
+  header {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    align-items: flex-end;
+    padding: 28px 0 8px;
+  }
+  .brand { display: flex; gap: 14px; align-items: center; }
+  .mark {
+    width: 46px; height: 46px;
+    display: grid; place-items: center;
+    border: 1.5px solid var(--ink);
+    font-family: "Fraunces", Georgia, serif;
+    font-weight: 640;
+    letter-spacing: 0.04em;
+  }
+  h1 { font-family: "Fraunces", Georgia, serif; font-weight: 560; font-size: 1.7rem; margin: 0; letter-spacing: -0.02em; }
+  .brand p, .lede { margin: 2px 0 0; color: var(--muted); }
+  .clock { text-align: right; }
+  .clock strong { display: block; font-variant-numeric: tabular-nums; font-size: 1.05rem; }
+  .clock span, .engine-line { color: var(--muted); font-size: 0.92rem; }
+  .theme {
+    margin-top: 8px;
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 4px 12px;
+  }
+  .hero { display: flex; justify-content: space-between; gap: 18px; align-items: flex-end; padding: 18px 0 8px; flex-wrap: wrap; }
+  .badge {
+    display: inline-block;
+    border: 2px solid currentColor;
+    padding: 8px 14px 6px;
+    font-family: "Fraunces", Georgia, serif;
+    font-size: clamp(1.7rem, 4vw, 2.8rem);
+    letter-spacing: 0.12em;
+    line-height: 1;
+    transform: rotate(-1.4deg);
+  }
+  .badge.paper { color: var(--paper); }
+  .badge.live { color: var(--live); }
+  .badge.sim { color: var(--sim); }
+  .views { display: flex; gap: 6px; background: var(--chip); padding: 4px; border-radius: 999px; }
+  .views button { border: 0; background: transparent; border-radius: 999px; padding: 6px 12px; }
+  .views button[aria-pressed="true"] { background: var(--bg-2); box-shadow: var(--shadow); }
+  .alerts { display: grid; gap: 8px; margin: 12px 0; }
+  .alert { padding: 10px 12px; border-left: 3px solid var(--accent); background: var(--bg-2); }
+  .alert.warning { border-color: var(--sim); }
+  .alert.error { border-color: var(--bad); }
+  .alert.info { border-color: var(--paper); }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0 4px; }
+  .actions button, .unlock button {
+    border: 1px solid var(--ink);
+    background: var(--bg-2);
+    border-radius: 8px;
+    padding: 8px 12px;
+  }
+  .actions button:disabled { opacity: 0.55; cursor: progress; }
+  #kill { color: var(--live); border-color: var(--live); }
+  #simulate { background: var(--accent); color: #f7f3eb; border-color: var(--accent); }
+  html[data-theme="dark"] #simulate { color: #1c1712; }
+  .help { flex-basis: 100%; color: var(--muted); font-size: 0.92rem; margin: 0; }
+  .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 16px 0; }
+  .kpi { background: var(--bg-2); padding: 12px 14px 10px; box-shadow: var(--shadow); min-height: 92px; }
+  .kpi span { display: block; color: var(--muted); font-size: 0.78rem; letter-spacing: 0.06em; text-transform: uppercase; }
+  .kpi b { display: block; margin-top: 6px; font-family: "Fraunces", Georgia, serif; font-size: 1.55rem; font-weight: 560; font-variant-numeric: tabular-nums; letter-spacing: -0.03em; }
+  .kpi em { font-style: normal; color: var(--muted); font-size: 0.82rem; }
+  .up { color: var(--good); }
+  .down { color: var(--bad); }
+  .split { display: grid; grid-template-columns: 1.6fr 1fr; gap: 12px; }
+  section.card, .split article {
+    background: var(--bg-2);
+    padding: 14px 16px 16px;
+    margin: 12px 0;
+    box-shadow: var(--shadow);
+  }
+  h2 { font-family: "Fraunces", Georgia, serif; font-weight: 560; font-size: 1.25rem; margin: 0 0 10px; }
+  .empty { color: var(--muted); margin: 8px 0; }
+  svg.chart { width: 100%; height: auto; display: block; }
+  .axis { fill: var(--muted); font-size: 11px; font-family: "Outfit", sans-serif; }
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th { text-align: left; font-size: 0.72rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+  td, th { padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  .table-wrap { overflow-x: auto; max-height: 460px; }
+  details summary { cursor: pointer; color: var(--accent); }
+  .checklist { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+  .checklist li { display: grid; grid-template-columns: 22px 1fr auto; gap: 8px; align-items: baseline; padding: 6px 0; border-bottom: 1px solid var(--line); }
+  .tick { font-weight: 640; }
+  .checklist .ok .tick { color: var(--good); }
+  .checklist .bad .tick { color: var(--bad); }
+  .unlock { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; }
+  .unlock input { flex: 1 1 260px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+  code.phrase { font-family: "Outfit", monospace; background: var(--chip); padding: 1px 6px; }
+  .toast { min-height: 1.2em; color: var(--muted); }
+  .settings { display: grid; grid-template-columns: 220px 1fr; gap: 4px 12px; margin: 0; }
+  .settings dt { color: var(--muted); }
+  .settings dd { margin: 0; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chips span { background: var(--chip); padding: 2px 8px; border-radius: 999px; font-size: 0.88rem; }
+  footer { color: var(--muted); padding: 8px 0 36px; font-size: 0.88rem; }
+  @media (max-width: 860px) {
+    header, .hero { align-items: flex-start; flex-direction: column; }
+    .clock { text-align: left; }
+    .kpis, .split, .settings { grid-template-columns: 1fr 1fr; }
+    .settings { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 560px) {
+    .kpis { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <div class="mark">DT</div>
+      <div>
+        <h1>AI Daytrader</h1>
+        <p>Åbning og lukning · SPY, QQQ, IWM og de store enkeltaktier</p>
+      </div>
+    </div>
+    <div class="clock">
+      <strong id="clock">—</strong>
+      <span id="market">Marked</span>
+      <div>
+        <button class="theme" id="theme" type="button">Mørk</button>
+        <button class="theme" id="logout" type="button" hidden>Log ud</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="hero">
+    <div>
+      <div id="badge" class="badge paper">PAPIRPENGE</div>
+      <p class="engine-line" id="engine-line"></p>
+    </div>
+    <div class="views" role="tablist" aria-label="Bog">
+      <button type="button" data-book="sim" aria-pressed="false">Simulering</button>
+      <button type="button" data-book="paper" aria-pressed="false">Papir</button>
+      <button type="button" data-book="live" aria-pressed="false">Live</button>
+    </div>
+  </div>
+
+  <div id="alerts" class="alerts"></div>
+
+  <div class="actions">
+    <button id="kill" type="button">Nødstop</button>
+    <button id="resume" type="button">Genoptag handel</button>
+    <button id="simulate" type="button">Simulér én dag</button>
+    <button id="to-paper" type="button" hidden>Tilbage til papirpenge</button>
+    <p class="help" id="sim-help">Kører en hel børsdag gennem den rigtige motor med syntetiske kurser og regelbaseret analyse. Syntetiske resultater siger intet om rigtig performance.</p>
+  </div>
+  <p class="toast" id="toast" role="status"></p>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="split">
+    <article>
+      <h2>Egenkapital</h2>
+      <div id="chart"></div>
+    </article>
+    <article>
+      <h2>Åbne positioner</h2>
+      <div id="positions"></div>
+    </article>
+  </div>
+
+  <section class="card">
+    <h2>Krav før rigtige penge</h2>
+    <p class="lede">Alle punkter skal være opfyldt. Simulerede dage og handler tæller ikke.</p>
+    <ul class="checklist" id="checklist"></ul>
+    <form class="unlock" id="unlock-form">
+      <label for="phrase">Skriv præcis: <code class="phrase" id="phrase-label">JEG FORSTÅR AT JEG KAN TABE RIGTIGE PENGE</code></label>
+      <input id="phrase" name="phrase" autocomplete="off" spellcheck="false" placeholder="Bekræftelsessætning">
+      <button type="submit">Lås op for rigtige penge</button>
+    </form>
+    <p class="toast" id="unlock-msg"></p>
+  </section>
+
+  <section class="card">
+    <h2>Handelsjournal</h2>
+    <div class="table-wrap" id="journal"></div>
+  </section>
+
+  <section class="card">
+    <h2>AI-beslutninger</h2>
+    <p id="summary" class="lede"></p>
+    <div class="table-wrap" id="decisions"></div>
+  </section>
+
+  <section class="card">
+    <h2>Hændelseslog</h2>
+    <div class="table-wrap" id="events"></div>
+  </section>
+
+  <section class="card">
+    <h2>Indstillinger</h2>
+    <p class="lede">Kun til læsning. Nøgler vises ikke.</p>
+    <dl class="settings" id="settings"></dl>
+  </section>
+
+  <footer id="footer"></footer>
+</div>
+<script>
+const SETUP = { orb: "Åbningsudbrud", close: "Lukkemomentum" };
+const SIDE = { long: "Lang", short: "Kort" };
+const WINDOW = { open: "Åbning", close: "Lukning" };
+const OUTCOME = { taken: "Sendt", skipped: "Sprunget over", blocked: "Blokeret", pending: "Afventer" };
+const DECISION = { take: "Tag", skip: "Spring over" };
+const SOURCE = { rules: "Kun regler", claude: "Claude" };
+const EXIT = { stop: "Stop", target: "Mål", flatten: "Fladet ud", close: "Lukket" };
+const REGIME = { trending_up: "Trend op", trending_down: "Trend ned", choppy: "Hakket", event_risk: "Begivenhedsrisiko" };
+const BOOKS = { sim: "SIMULERING", paper: "PAPIRPENGE", live: "RIGTIGE PENGE" };
+
+let state = null;
+let book = null;
+let fingerprint = "";
+
+const moneyFmt = new Intl.NumberFormat("da-DK", { style: "currency", currency: "USD" });
+const pctFmt = new Intl.NumberFormat("da-DK", { style: "percent", minimumFractionDigits: 1, maximumFractionDigits: 1 });
+
+function esc(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+}
+function money(value) {
+  if (value == null || Number.isNaN(Number(value))) return "—";
+  return moneyFmt.format(Number(value));
+}
+function pct(value) {
+  if (value == null || Number.isNaN(Number(value))) return "—";
+  return pctFmt.format(Number(value));
+}
+function signed(value) {
+  if (value == null || Number.isNaN(Number(value))) return "—";
+  const text = money(value);
+  return Number(value) > 0 ? "+" + text.replace(/^\+/, "") : text;
+}
+function tone(value) {
+  if (value == null || Number(value) === 0) return "";
+  return Number(value) > 0 ? "up" : "down";
+}
+function factor(kpis) {
+  if (!kpis) return "—";
+  if (kpis.profit_factor_infinite) return "∞";
+  if (kpis.profit_factor == null) return "—";
+  return new Intl.NumberFormat("da-DK", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(kpis.profit_factor);
+}
+function shortDate(value) {
+  if (!value || value === "Start") return "Start";
+  const parts = String(value).split("-");
+  if (parts.length !== 3) return value;
+  return parts[2] + "." + parts[1];
+}
+function clockText() {
+  return new Intl.DateTimeFormat("da-DK", {
+    timeZone: "America/New_York",
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).format(new Date()) + " ET";
+}
+
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  localStorage.setItem("daytrader-theme", theme);
+  document.getElementById("theme").textContent = theme === "dark" ? "Lys" : "Mørk";
+}
+
+function chart(points) {
+  if (!points || !points.length) {
+    return '<p class="empty">Ingen afsluttede dage endnu. Kør en simulering, eller lad motoren køre en rigtig handelsdag.</p>';
+  }
+  const width = 720;
+  const height = 250;
+  const padL = 78;
+  const padR = 12;
+  const padT = 16;
+  const padB = 32;
+  const values = points.map((point) => point.equity);
+  let min = Math.min(...values);
+  let max = Math.max(...values);
+  if (max - min < 1) {
+    min -= 25;
+    max += 25;
+  }
+  const pad = (max - min) * 0.12;
+  min -= pad;
+  max += pad;
+  const span = max - min || 1;
+  const innerW = width - padL - padR;
+  const innerH = height - padT - padB;
+  const x = (index) => padL + (points.length === 1 ? innerW / 2 : (innerW * index) / (points.length - 1));
+  const y = (value) => padT + ((max - value) / span) * innerH;
+  const line = points.map((point, index) => `${index ? "L" : "M"}${x(index).toFixed(1)},${y(point.equity).toFixed(1)}`).join(" ");
+  const lastX = x(points.length - 1).toFixed(1);
+  const base = (padT + innerH).toFixed(1);
+  const area = `${line} L${lastX},${base} L${x(0).toFixed(1)},${base} Z`;
+  const grids = [0, 0.5, 1].map((step) => {
+    const value = min + (max - min) * (1 - step);
+    const yy = y(value);
+    return `<line x1="${padL}" y1="${yy.toFixed(1)}" x2="${width - padR}" y2="${yy.toFixed(1)}" stroke="currentColor" stroke-opacity="0.15"/>
+      <text class="axis" x="4" y="${(yy + 4).toFixed(1)}">${esc(new Intl.NumberFormat("da-DK", { maximumFractionDigits: 0 }).format(value))}</text>`;
+  }).join("");
+  const labels = points.map((point, index) => {
+    if (points.length > 8 && index % 2 && index !== points.length - 1) return "";
+    return `<text class="axis" text-anchor="middle" x="${x(index).toFixed(1)}" y="${height - 8}">${esc(shortDate(point.date))}</text>`;
+  }).join("");
+  const end = points[points.length - 1].equity;
+  const start = points[0].equity;
+  const stroke = end >= start ? "var(--good)" : "var(--bad)";
+  return `<svg class="chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="Egenkapitalkurve">
+    <path d="${area}" fill="${stroke}" fill-opacity="0.12"></path>
+    ${grids}
+    <path d="${line}" fill="none" stroke="${stroke}" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"></path>
+    ${labels}
+  </svg>`;
+}
+
+function render(data) {
+  state = data;
+  if (!book) book = data.default_book || "paper";
+  const stamp = book + JSON.stringify(data);
+  if (stamp === fingerprint) return;
+  fingerprint = stamp;
+  const current = data.books[book] || data.books.paper;
+  const kpis = current.kpis;
+  document.getElementById("badge").textContent = BOOKS[book] || book;
+  document.getElementById("badge").className = "badge " + book;
+  const engineNames = { paper: "papirpenge", live: "rigtige penge", sim: "simulering" };
+  document.getElementById("engine-line").textContent = "Motoren står i " + (engineNames[data.mode] || data.mode) + ".";
+  document.querySelectorAll(".views button").forEach((button) => {
+    button.setAttribute("aria-pressed", button.dataset.book === book ? "true" : "false");
+  });
+  const market = data.market || {};
+  document.getElementById("market").textContent = "Marked: " + (market.label || "ukendt");
+  document.getElementById("to-paper").hidden = data.mode !== "live";
+
+  const alerts = (data.alerts || []).slice();
+  if (book === "sim") {
+    alerts.unshift({ level: "warning", text: data.disclaimer });
+  }
+  document.getElementById("alerts").innerHTML = alerts.map((alert) => (
+    `<div class="alert ${esc(alert.level)}">${esc(alert.text)}</div>`
+  )).join("");
+
+  const lastDate = (current.equity_curve || []).filter((point) => point.date !== "Start").slice(-1)[0];
+  const tiles = [
+    ["Egenkapital", money(kpis.equity), ""],
+    ["Dagens resultat", signed(kpis.today_pnl), lastDate ? lastDate.date : ""],
+    ["Nettoresultat", signed(kpis.net_pnl), "lukkede handler"],
+    ["Gevinstprocent", kpis.win_rate == null ? "—" : pct(kpis.win_rate), ""],
+    ["Profitfaktor", factor(kpis), ""],
+    ["Maks. drawdown", pct(kpis.max_drawdown || 0), ""],
+    ["Handler", String(kpis.trades ?? 0), "lukkede"],
+    ["Handelsdage", String(kpis.trading_days ?? 0), ""],
+  ];
+  document.getElementById("kpis").innerHTML = tiles.map(([label, value, note], index) => {
+    const colored = index === 1 || index === 2;
+    const raw = index === 1 ? kpis.today_pnl : kpis.net_pnl;
+    return `<div class="kpi"><span>${esc(label)}</span><b class="${colored ? tone(raw) : ""}">${esc(value)}</b>${note ? `<em>${esc(note)}</em>` : ""}</div>`;
+  }).join("");
+
+  document.getElementById("chart").innerHTML = chart(current.equity_curve);
+  const positions = data.positions || [];
+  if (!positions.length) {
+    document.getElementById("positions").innerHTML = `<p class="empty">Ingen åbne positioner. Alt lukkes kl. 15:50, og intet holdes overnight.</p>${data.position_note ? `<p class="empty">${esc(data.position_note)}</p>` : ""}`;
+  } else {
+    document.getElementById("positions").innerHTML = `<div class="table-wrap"><table><thead><tr><th>Symbol</th><th>Side</th><th>Antal</th><th>Indgang</th><th>Kurs</th><th>Urealiseret</th></tr></thead><tbody>${
+      positions.map((row) => `<tr><td>${esc(row.symbol)}</td><td>${esc(SIDE[row.side] || row.side)}</td><td>${esc(row.qty)}</td><td>${esc(money(row.avg_entry))}</td><td>${esc(money(row.market_price))}</td><td class="${tone(row.unrealized_pl)}">${esc(signed(row.unrealized_pl))}</td></tr>`).join("")
+    }</tbody></table></div>`;
+  }
+
+  const items = (data.unlock && data.unlock.items) || [];
+  document.getElementById("checklist").innerHTML = items.map((item) => (
+    `<li class="${item.ok ? "ok" : "bad"}"><span class="tick">${item.ok ? "✓" : "·"}</span><span>${esc(item.label)}</span><em>${esc(item.detail)}</em></li>`
+  )).join("");
+  if (data.settings && data.settings.confirmation_phrase) {
+    document.getElementById("phrase-label").textContent = data.settings.confirmation_phrase;
+  }
+
+  const trades = current.trades || [];
+  document.getElementById("journal").innerHTML = trades.length ? `<table><thead><tr><th>Dag</th><th>Symbol</th><th>Side</th><th>Antal</th><th>Indgang</th><th>Udgang</th><th>Resultat</th><th>Setup</th><th></th></tr></thead><tbody>${
+    trades.map((row) => `<tr>
+      <td>${esc(row.trading_day)}</td>
+      <td>${esc(row.symbol)}</td>
+      <td>${esc(SIDE[row.side] || row.side)}</td>
+      <td>${esc(row.qty)}</td>
+      <td>${esc(money(row.entry_price))}</td>
+      <td>${row.exit_price == null ? "Åben" : esc(money(row.exit_price))}<div class="engine-line">${esc(EXIT[row.exit_reason] || row.exit_reason || "")}</div></td>
+      <td class="${tone(row.pnl)}">${row.pnl == null ? "—" : esc(signed(row.pnl))}</td>
+      <td>${esc(SETUP[row.setup] || row.setup)}<div class="engine-line">${esc(WINDOW[row.window] || row.window)} · ${esc(row.confidence ?? "—")}</div></td>
+      <td><details><summary>Begrundelse</summary><p>${esc(row.reasoning || "Ingen tekst.")}</p></details></td>
+    </tr>`).join("")
+  }</tbody></table>` : '<p class="empty">Ingen handler i denne bog endnu.</p>';
+
+  const decisions = current.decisions || [];
+  const latest = decisions[0];
+  document.getElementById("summary").textContent = latest
+    ? `${REGIME[latest.regime] || latest.regime || "Regime ukendt"}. ${latest.market_summary || ""}`
+    : "Ingen vurderinger endnu.";
+  document.getElementById("decisions").innerHTML = decisions.length ? `<table><thead><tr><th>Tid</th><th>Symbol</th><th>Vindue</th><th>Kilde</th><th>Beslutning</th><th>Sikkerhed</th><th>Udfald</th><th>Årsag</th></tr></thead><tbody>${
+    decisions.map((row) => `<tr>
+      <td>${esc((row.created_at || "").replace("T", " ").slice(0, 16))}</td>
+      <td>${esc(row.symbol)}</td>
+      <td>${esc(WINDOW[row.window] || row.window)}</td>
+      <td>${esc(SOURCE[row.source] || row.source)}</td>
+      <td>${esc(DECISION[row.decision] || row.decision)}</td>
+      <td>${esc(row.confidence ?? "—")}</td>
+      <td>${esc(OUTCOME[row.outcome] || row.outcome || "—")}</td>
+      <td>${esc(row.block_reason || row.reasoning || "")}</td>
+    </tr>`).join("")
+  }</tbody></table>` : '<p class="empty">Ingen AI-beslutninger i denne bog.</p>';
+
+  const events = data.events || [];
+  document.getElementById("events").innerHTML = events.length ? `<table><thead><tr><th>Tid</th><th>Niveau</th><th>Hændelse</th></tr></thead><tbody>${
+    events.map((row) => `<tr><td>${esc((row.ts || "").replace("T", " ").slice(0, 16))}</td><td>${esc(row.level)}</td><td>${esc(row.message)}${row.details ? `<div class="engine-line">${esc(row.details)}</div>` : ""}</td></tr>`).join("")
+  }</tbody></table>` : '<p class="empty">Loggen er tom.</p>';
+
+  const settings = data.settings || {};
+  const rows = [
+    ["Univers", (settings.universe || []).join(", ")],
+    ["Marked", settings.market_proxy || "SPY"],
+    ["Datafeed", settings.data_feed || "iex"],
+    ["Papir-endepunkt", settings.paper_endpoint || ""],
+    ["Live-endepunkt", settings.live_endpoint || ""],
+    ["Risiko pr. handel", pct(settings.risk_per_trade_pct)],
+    ["Dagligt tab", pct(settings.max_daily_loss_pct)],
+    ["Maks. handler/dag", settings.max_trades_per_day],
+    ["Maks. åbne positioner", settings.max_open_positions],
+    ["Min. sikkerhed", settings.min_confidence],
+    ["Min. gevinst/risiko", settings.min_reward_risk],
+    ["Notional-loft", pct(settings.max_notional_pct)],
+    ["Købekraft", pct(settings.buying_power_pct)],
+    ["Model", settings.model],
+    ["Websøgning", settings.web_search_tool],
+    ["Indsats", settings.effort],
+    ["Server-fallback", settings.fallbacks],
+    ["ALLOW_LIVE", settings.allow_live ? "ja" : "nej"],
+    ["Live-loft", money(settings.live_max_capital)],
+    ["Papirnøgler", settings.paper_keys_present ? "sat" : "mangler"],
+    ["Live-nøgler", settings.live_keys_present ? "sat" : "mangler"],
+    ["Claude-nøgle", settings.ai_configured ? "sat" : "mangler"],
+    ["Telegram", settings.telegram_configured ? "sat" : "fra"],
+    ["Åbningsvindue", settings.open_window],
+    ["Lukkevindue", settings.close_window],
+    ["Fladning", settings.flatten_time],
+  ];
+  document.getElementById("settings").innerHTML = rows.map(([label, value]) => `<dt>${esc(label)}</dt><dd>${esc(value)}</dd>`).join("");
+  document.getElementById("footer").textContent = data.disclaimer || "";
+}
+
+function csrfToken() {
+  const match = document.cookie.match(/(?:^|; )dt_csrf=([^;]*)/);
+  return match ? decodeURIComponent(match[1]) : "";
+}
+
+async function refresh() {
+  try {
+    const response = await fetch("/api/status", { cache: "no-store", credentials: "same-origin" });
+    if (response.status === 401) {
+      window.location.assign("/login");
+      return;
+    }
+    if (!response.ok) throw new Error("status");
+    render(await response.json());
+  } catch (error) {
+    document.getElementById("toast").textContent = "Kunne ikke hente status. Prøver igen om 10 sekunder.";
+  }
+}
+
+function detail(body) {
+  if (!body) return "Handlingen fejlede.";
+  if (typeof body.detail === "string") return body.detail;
+  return "Handlingen fejlede.";
+}
+
+async function post(url, payload) {
+  const response = await fetch(url, {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken() },
+    body: payload ? JSON.stringify(payload) : "{}",
+  });
+  if (response.status === 401) {
+    window.location.assign("/login");
+    throw new Error("Log ind for at fortsætte.");
+  }
+  let body = {};
+  try { body = await response.json(); } catch (error) { body = {}; }
+  if (!response.ok) throw new Error(detail(body));
+  return body;
+}
+
+if (csrfToken()) document.getElementById("logout").hidden = false;
+document.getElementById("logout").addEventListener("click", async () => {
+  try {
+    await post("/logout");
+  } catch (error) {
+    /* 303 eller 401 sender os videre */
+  }
+  window.location.assign("/login");
+});
+document.getElementById("theme").addEventListener("click", () => {
+  applyTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
+  fingerprint = "";
+  if (state) render(state);
+});
+document.querySelectorAll(".views button").forEach((button) => {
+  button.addEventListener("click", () => {
+    book = button.dataset.book;
+    fingerprint = "";
+    if (state) render(state);
+  });
+});
+document.getElementById("kill").addEventListener("click", async () => {
+  try {
+    render(await post("/api/kill"));
+    document.getElementById("toast").textContent = "Nødstop er aktivt.";
+  } catch (error) {
+    document.getElementById("toast").textContent = error.message;
+  }
+});
+document.getElementById("resume").addEventListener("click", async () => {
+  try {
+    render(await post("/api/resume"));
+    document.getElementById("toast").textContent = "Nødstop er ophævet.";
+  } catch (error) {
+    document.getElementById("toast").textContent = error.message;
+  }
+});
+document.getElementById("simulate").addEventListener("click", async () => {
+  const button = document.getElementById("simulate");
+  button.disabled = true;
+  button.textContent = "Simulerer dagen…";
+  document.getElementById("toast").textContent = "Kører en hel dag gennem motoren…";
+  try {
+    const body = await post("/api/simulate");
+    book = "sim";
+    fingerprint = "";
+    render(body.status);
+    const result = body.result || {};
+    document.getElementById("toast").textContent = `${result.trading_day || "Dag"}: ${result.note || "Simuleret"}. ${result.trades ?? 0} handler, resultat ${money(result.pnl)}.`;
+  } catch (error) {
+    document.getElementById("toast").textContent = error.message;
+  } finally {
+    button.disabled = false;
+    button.textContent = "Simulér én dag";
+  }
+});
+document.getElementById("to-paper").addEventListener("click", async () => {
+  try {
+    const body = await post("/api/paper");
+    fingerprint = "";
+    render(body.status || body);
+    document.getElementById("toast").textContent = "Tilbage på papirpenge.";
+  } catch (error) {
+    document.getElementById("toast").textContent = error.message;
+  }
+});
+document.getElementById("unlock-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const phrase = document.getElementById("phrase").value;
+  try {
+    const body = await post("/api/live/unlock", { phrase });
+    fingerprint = "";
+    book = "live";
+    render(body.status);
+    document.getElementById("unlock-msg").textContent = body.message || "Live er slået til.";
+  } catch (error) {
+    document.getElementById("unlock-msg").textContent = error.message;
+  }
+});
+
+const queryTheme = new URLSearchParams(location.search).get("theme");
+const storedTheme = localStorage.getItem("daytrader-theme");
+const preferred = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+applyTheme(queryTheme === "dark" || queryTheme === "light" ? queryTheme : (storedTheme || preferred));
+document.getElementById("clock").textContent = clockText();
+setInterval(() => { document.getElementById("clock").textContent = clockText(); }, 1000);
+refresh();
+setInterval(refresh, 10000);
+</script>
+</body>
+</html>
