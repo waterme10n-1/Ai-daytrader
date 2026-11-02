@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Memebot · AI Daytrader</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%231c1712'/%3E%3Ctext x='16' y='22' text-anchor='middle' font-size='13' fill='%23f3eee6' font-family='Georgia'%3EMB%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,560;9..144,640&family=Outfit:wght@380;500;640&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #e8e1d4; --bg-2: #f7f3eb; --ink: #1c1712; --muted: #665e54; --line: #d8d0c3;
+    --accent: #1d4636; --good: #1c6b43; --bad: #9d342c; --paper: #1c446c; --live: #8d2c2c;
+    --warn: #8a5710; --chip: #efe7da; --shadow: 0 16px 40px rgba(70, 48, 16, 0.06);
+    color-scheme: light;
+  }
+  html[data-theme="dark"] {
+    --bg: #121410; --bg-2: #1c1f1a; --ink: #f3eee6; --muted: #b7ae9f; --line: #32382e;
+    --accent: #e0c27a; --good: #8fd0aa; --bad: #f0a49c; --paper: #a9c8ea; --live: #f0a49c;
+    --warn: #e6c98a; --chip: #262b22; --shadow: none;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: "Outfit", "Avenir Next", "Segoe UI", sans-serif; color: var(--ink); line-height: 1.45;
+    background: radial-gradient(900px 420px at 100% -10%, rgba(196, 161, 90, 0.2), transparent 55%), var(--bg);
+  }
+  a { color: var(--accent); }
+  button, input { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  button:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .wrap { width: min(1180px, calc(100% - 32px)); margin: 0 auto; }
+  header { display: flex; justify-content: space-between; gap: 16px; align-items: flex-end; padding: 28px 0 8px; flex-wrap: wrap; }
+  .brand { display: flex; gap: 14px; align-items: center; }
+  .mark { width: 46px; height: 46px; display: grid; place-items: center; border: 1.5px solid var(--ink); font-family: "Fraunces", Georgia, serif; font-weight: 640; }
+  h1 { font-family: "Fraunces", Georgia, serif; font-weight: 560; font-size: 1.7rem; margin: 0; letter-spacing: -0.02em; }
+  .brand p, .lede { margin: 2px 0 0; color: var(--muted); }
+  .top-links { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .pill { background: transparent; border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; text-decoration: none; color: var(--ink); }
+  .hero { display: flex; justify-content: space-between; gap: 18px; align-items: flex-end; padding: 16px 0 6px; flex-wrap: wrap; }
+  .badge { display: inline-block; border: 2px solid currentColor; padding: 8px 14px 6px; font-family: "Fraunces", Georgia, serif; font-size: clamp(1.6rem, 4vw, 2.6rem); letter-spacing: 0.12em; line-height: 1; transform: rotate(-1.4deg); }
+  .badge.paper { color: var(--paper); }
+  .badge.live { color: var(--live); }
+  .muted { color: var(--muted); font-size: 0.92rem; }
+  .alerts { display: grid; gap: 8px; margin: 12px 0; }
+  .alert { padding: 10px 12px; border-left: 3px solid var(--accent); background: var(--bg-2); }
+  .alert.warning { border-color: var(--warn); }
+  .alert.error { border-color: var(--bad); }
+  .alert.info { border-color: var(--paper); }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0 4px; }
+  .btn { border: 1px solid var(--ink); background: var(--bg-2); border-radius: 8px; padding: 8px 12px; }
+  .btn.danger { color: var(--live); border-color: var(--live); }
+  .btn.primary { background: var(--accent); color: #f7f3eb; border-color: var(--accent); }
+  html[data-theme="dark"] .btn.primary { color: #1c1712; }
+  .btn.small { padding: 3px 9px; font-size: 0.86rem; }
+  .toast { min-height: 1.2em; color: var(--muted); margin: 4px 0; }
+  .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 14px 0; }
+  .kpi { background: var(--bg-2); padding: 12px 14px 10px; box-shadow: var(--shadow); min-height: 88px; }
+  .kpi span { display: block; color: var(--muted); font-size: 0.76rem; letter-spacing: 0.06em; text-transform: uppercase; }
+  .kpi b { display: block; margin-top: 6px; font-family: "Fraunces", Georgia, serif; font-size: 1.5rem; font-weight: 560; font-variant-numeric: tabular-nums; letter-spacing: -0.03em; }
+  .kpi em { font-style: normal; color: var(--muted); font-size: 0.82rem; }
+  .up { color: var(--good); }
+  .down { color: var(--bad); }
+  .split { display: grid; grid-template-columns: 1.5fr 1fr; gap: 12px; }
+  .card { background: var(--bg-2); padding: 14px 16px 16px; margin: 12px 0; box-shadow: var(--shadow); min-width: 0; }
+  h2 { font-family: "Fraunces", Georgia, serif; font-weight: 560; font-size: 1.25rem; margin: 0 0 10px; }
+  h3 { font-size: 0.95rem; margin: 14px 0 6px; color: var(--muted); font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; }
+  .empty { color: var(--muted); margin: 8px 0; }
+  svg.chart { width: 100%; height: auto; display: block; }
+  .axis { fill: var(--muted); font-size: 11px; font-family: "Outfit", sans-serif; }
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th { text-align: left; font-size: 0.72rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+  td, th { padding: 7px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  .table-wrap { overflow-x: auto; max-height: 480px; }
+  details summary { cursor: pointer; color: var(--accent); }
+  .meter { height: 12px; background: var(--chip); border-radius: 999px; overflow: hidden; margin: 8px 0 6px; }
+  .meter i { display: block; height: 100%; background: var(--accent); border-radius: 999px; }
+  .goal-row { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .tag { display: inline-block; background: var(--chip); padding: 1px 8px; border-radius: 999px; font-size: 0.82rem; white-space: nowrap; }
+  .tag.ok { color: var(--good); }
+  .tag.no { color: var(--bad); }
+  .weights { display: grid; gap: 4px; }
+  .weight { display: grid; grid-template-columns: minmax(120px, 220px) 1fr 64px; gap: 8px; align-items: center; font-size: 0.9rem; }
+  .bar { position: relative; height: 10px; background: var(--chip); border-radius: 999px; }
+  .bar .zero { position: absolute; left: 50%; top: -2px; bottom: -2px; width: 1px; background: var(--muted); }
+  .bar .fill { position: absolute; top: 0; bottom: 0; border-radius: 999px; }
+  .bar .start { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--ink); opacity: 0.45; }
+  .lessons { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+  .lessons li { padding: 8px 10px; background: var(--bg); border-left: 3px solid var(--line); }
+  .lessons li.claude { border-color: var(--accent); }
+  .lessons li.parameter { border-color: var(--warn); }
+  .checklist { list-style: none; padding: 0; margin: 0; display: grid; gap: 4px; }
+  .checklist li { display: grid; grid-template-columns: 22px 1fr auto; gap: 8px; align-items: baseline; padding: 6px 0; border-bottom: 1px solid var(--line); }
+  .checklist .ok .tick { color: var(--good); font-weight: 640; }
+  .checklist .bad .tick { color: var(--bad); }
+  .unlock { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; }
+  .unlock input { flex: 1 1 260px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+  code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.86em; background: var(--chip); padding: 1px 5px; border-radius: 4px; }
+  .settings { display: grid; grid-template-columns: 240px 1fr; gap: 4px 12px; margin: 0; }
+  .settings dt { color: var(--muted); }
+  .settings dd { margin: 0; overflow-wrap: anywhere; }
+  .filters { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+  .filters button { border: 1px solid var(--line); background: transparent; border-radius: 999px; padding: 3px 10px; }
+  .filters button[aria-pressed="true"] { background: var(--chip); border-color: var(--ink); }
+  footer { color: var(--muted); padding: 8px 0 36px; font-size: 0.88rem; }
+  @media (max-width: 900px) {
+    .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .split { grid-template-columns: 1fr; }
+    .settings { grid-template-columns: 1fr; }
+    .weight { grid-template-columns: 1fr 1fr 56px; }
+  }
+  @media (max-width: 480px) {
+    .kpis { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <div class="mark">MB</div>
+      <div>
+        <h1>Memebot</h1>
+        <p>Solana-memecoins · rug-tjek, X-research, copy-trading og læring</p>
+      </div>
+    </div>
+    <div class="top-links">
+      <a class="pill" href="/">Aktier</a>
+      <button class="pill" id="theme" type="button">Mørk</button>
+      <button class="pill" id="logout" type="button" hidden>Log ud</button>
+    </div>
+  </header>
+
+  <div class="hero">
+    <div>
+      <div id="badge" class="badge paper">PAPIRPENGE</div>
+      <p class="muted" id="engine-line">Henter status…</p>
+    </div>
+  </div>
+
+  <div id="alerts" class="alerts"></div>
+
+  <div class="actions">
+    <button class="btn danger" id="kill" type="button">Nødstop (sælg alt)</button>
+    <button class="btn" id="resume" type="button">Genoptag</button>
+    <button class="btn primary" id="scan" type="button">Scan nu</button>
+    <button class="btn" id="to-paper" type="button" hidden>Tilbage til papirpenge</button>
+  </div>
+  <p class="toast" id="toast" role="status"></p>
+
+  <div class="kpis" id="kpis"></div>
+
+  <section class="card">
+    <h2>Mål: betal for Claude Max</h2>
+    <div id="goal"></div>
+  </section>
+
+  <div class="split">
+    <section class="card">
+      <h2>Egenkapital</h2>
+      <div id="chart"></div>
+    </section>
+    <section class="card">
+      <h2>Åbne positioner</h2>
+      <div id="positions"></div>
+    </section>
+  </div>
+
+  <section class="card">
+    <h2>Hvorfor købte eller skippede botten?</h2>
+    <p class="lede">Hver kandidat, botten har set på, og det trin den faldt ved. Klik på et symbol for at se grafen på DexScreener.</p>
+    <div class="filters" id="cand-filters"></div>
+    <div class="table-wrap" id="candidates"></div>
+  </section>
+
+  <section class="card">
+    <h2>Handelsjournal</h2>
+    <div class="table-wrap" id="journal"></div>
+  </section>
+
+  <section class="card">
+    <h2>Hvad botten har lært</h2>
+    <p class="lede">Efter hver lukket handel flytter botten vægten på de signaler, der virkede eller svigtede. Den sorte streg er startværdien.</p>
+    <div class="split">
+      <div>
+        <h3>Lektioner</h3>
+        <ul class="lessons" id="lessons"></ul>
+      </div>
+      <div>
+        <h3>Signalvægte</h3>
+        <div class="weights" id="weights"></div>
+        <h3>Kilder</h3>
+        <div class="table-wrap" id="sources"></div>
+      </div>
+    </div>
+    <h3>Strategiparametre (justeres inden for faste grænser)</h3>
+    <div class="table-wrap" id="params"></div>
+  </section>
+
+  <section class="card">
+    <h2>Krav før rigtige penge</h2>
+    <p class="lede">Botten handler kun med rigtige penge, når papirhandlen med rigtige kurser har vist et overskud. Alle punkter skal være opfyldt.</p>
+    <ul class="checklist" id="checklist"></ul>
+    <form class="unlock" id="unlock-form">
+      <label for="phrase">Skriv præcis: <code id="phrase-label"></code></label>
+      <input id="phrase" autocomplete="off" spellcheck="false" placeholder="Bekræftelsessætning">
+      <button class="btn" type="submit">Slå rigtige penge til</button>
+    </form>
+    <p class="toast" id="unlock-msg"></p>
+  </section>
+
+  <section class="card">
+    <h2>Hændelseslog</h2>
+    <div class="table-wrap" id="events"></div>
+  </section>
+
+  <section class="card">
+    <h2>Indstillinger</h2>
+    <p class="lede">Kun til læsning. Ændres i miljøvariablerne. Nøgler vises aldrig.</p>
+    <dl class="settings" id="settings"></dl>
+  </section>
+
+  <footer>Memecoins er ekstremt risikable. De fleste nye tokens går mod nul, og papirresultater er ingen garanti. Sæt kun penge ind, du kan tåle at tabe.</footer>
+</div>
+<script>
+const STAGES = { marked: "Markedsfilter", rug: "Rug-tjek", score: "Score", rute: "Exit-rute", claude: "Claude", risiko: "Risiko", "køb": "Køb", "købt": "Købt" };
+const KIND = { handel: "Handel", parameter: "Parameter", claude: "Claude" };
+let state = null;
+let fingerprint = "";
+let stageFilter = "alle";
+
+const usd = new Intl.NumberFormat("da-DK", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const usd4 = new Intl.NumberFormat("da-DK", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 4 });
+const pctFmt = new Intl.NumberFormat("da-DK", { style: "percent", minimumFractionDigits: 0, maximumFractionDigits: 1 });
+const num = new Intl.NumberFormat("da-DK", { maximumFractionDigits: 2 });
+
+function esc(v) { return String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+function money(v) { return v == null || Number.isNaN(Number(v)) ? "—" : usd.format(Number(v)); }
+function money4(v) { return v == null || Number.isNaN(Number(v)) ? "—" : usd4.format(Number(v)); }
+function signed(v) { if (v == null || Number.isNaN(Number(v))) return "—"; const t = money(v); return Number(v) > 0 ? "+" + t : t; }
+function pct(v) { return v == null || Number.isNaN(Number(v)) ? "—" : pctFmt.format(Number(v)); }
+function spct(v) { if (v == null) return "—"; const t = pct(v); return Number(v) > 0 ? "+" + t : t; }
+function tone(v) { if (v == null || Number(v) === 0) return ""; return Number(v) > 0 ? "up" : "down"; }
+function time(v) { if (!v) return "—"; const d = new Date(v); return Number.isNaN(d.getTime()) ? v : d.toLocaleString("da-DK", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }); }
+function short(addr) { return addr ? addr.slice(0, 4) + "…" + addr.slice(-4) : ""; }
+function link(url, text) { return url && /^https:\/\//.test(url) ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(text)}</a>` : esc(text); }
+
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  try { localStorage.setItem("daytrader-theme", theme); } catch (e) {}
+  document.getElementById("theme").textContent = theme === "dark" ? "Lys" : "Mørk";
+}
+
+function chart(points, bankroll) {
+  if (!points || points.length < 2) return '<p class="empty">Kurven tegnes, når botten har kørt lidt. Der gemmes et punkt hvert 5. minut.</p>';
+  const w = 720, h = 240, pl = 64, pr = 12, pt = 14, pb = 28;
+  const values = points.map((p) => Number(p.equity));
+  let min = Math.min(...values, bankroll), max = Math.max(...values, bankroll);
+  if (max - min < 0.5) { min -= 0.5; max += 0.5; }
+  const pad = (max - min) * 0.1; min -= pad; max += pad;
+  const iw = w - pl - pr, ih = h - pt - pb;
+  const x = (i) => pl + (iw * i) / (points.length - 1);
+  const y = (v) => pt + ((max - v) / (max - min)) * ih;
+  const line = points.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(Number(p.equity)).toFixed(1)}`).join(" ");
+  const area = `${line} L${x(points.length - 1).toFixed(1)},${(pt + ih).toFixed(1)} L${pl},${(pt + ih).toFixed(1)} Z`;
+  const end = values[values.length - 1];
+  const stroke = end >= bankroll ? "var(--good)" : "var(--bad)";
+  const grid = [0, 0.5, 1].map((s) => { const v = min + (max - min) * (1 - s); return `<line x1="${pl}" x2="${w - pr}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}" stroke="currentColor" stroke-opacity="0.12"/><text class="axis" x="4" y="${(y(v) + 4).toFixed(1)}">${esc(usd.format(v))}</text>`; }).join("");
+  const base = `<line x1="${pl}" x2="${w - pr}" y1="${y(bankroll).toFixed(1)}" y2="${y(bankroll).toFixed(1)}" stroke="currentColor" stroke-dasharray="4 4" stroke-opacity="0.45"/>`;
+  const first = time(points[0].ts), last = time(points[points.length - 1].ts);
+  return `<svg class="chart" viewBox="0 0 ${w} ${h}" role="img" aria-label="Egenkapital over tid">
+    <path d="${area}" fill="${stroke}" fill-opacity="0.1"></path>${grid}${base}
+    <path d="${line}" fill="none" stroke="${stroke}" stroke-width="2.2" stroke-linejoin="round"></path>
+    <text class="axis" x="${pl}" y="${h - 6}">${esc(first)}</text><text class="axis" text-anchor="end" x="${w - pr}" y="${h - 6}">${esc(last)}</text>
+  </svg><p class="muted">Stiplet linje: startbeløbet (${esc(money(bankroll))}).</p>`;
+}
+
+function render(data) {
+  state = data;
+  const stamp = stageFilter + JSON.stringify(data);
+  if (stamp === fingerprint) return;
+  fingerprint = stamp;
+  const k = data.kpis, s = data.settings, e = data.engine;
+  const badge = document.getElementById("badge");
+  badge.textContent = data.mode === "live" ? "RIGTIGE PENGE" : "PAPIRPENGE";
+  badge.className = "badge " + (data.mode === "live" ? "live" : "paper");
+  const parts = [];
+  if (e.last_tick) parts.push("Sidste runde " + time(e.last_tick));
+  if (e.last_scan_at) parts.push("sidste scanning " + time(e.last_scan_at));
+  if (e.sol_usd) parts.push("SOL " + money(e.sol_usd));
+  if (data.mode === "live" && e.wallet) parts.push("wallet " + short(e.wallet) + (e.wallet_sol != null ? ` (${num.format(e.wallet_sol)} SOL)` : ""));
+  const scan = e.last_scan || {};
+  if (scan.discovered != null) parts.push(`seneste scanning: ${scan.discovered} fundet, ${scan.market_ok ?? 0} bestod marked, ${scan.rug_ok ?? 0} bestod rug-tjek, ${scan.bought ?? 0} købt`);
+  document.getElementById("engine-line").textContent = parts.join(" · ");
+  document.getElementById("to-paper").hidden = data.mode !== "live";
+
+  const alerts = (data.alerts || []).slice();
+  (scan.errors || []).slice(0, 3).forEach((text) => alerts.push({ level: "warning", text: "Datakilde: " + text }));
+  document.getElementById("alerts").innerHTML = alerts.map((a) => `<div class="alert ${esc(a.level)}">${esc(a.text)}</div>`).join("");
+
+  const pf = k.profit_factor_infinite ? "∞" : (k.profit_factor == null ? "—" : num.format(k.profit_factor));
+  const tiles = [
+    ["Egenkapital", money(k.equity), `start ${money(k.bankroll)}`, null],
+    ["Resultat i alt", signed(k.total_pnl), `realiseret ${signed(k.realized)}`, k.total_pnl],
+    ["I dag (UTC)", signed(k.today_pnl), "inkl. åbne positioner", k.today_pnl],
+    ["Efter AI-udgifter", signed(k.net_after_ai), `AI i alt ${money4(k.ai_total)}`, k.net_after_ai],
+    ["Gevinstprocent", k.win_rate == null ? "—" : pct(k.win_rate), `${k.trades} lukkede handler`, null],
+    ["Profitfaktor", pf, `bedste ${signed(k.best)} · værste ${signed(k.worst)}`, null],
+    ["Åbne positioner", String(k.open), `i spil ${money(k.deployed)}`, null],
+    ["AI i dag", money4(k.ai_today), s.ai_configured ? `budget tilbage ${money(k.ai_budget_left)}` : "Claude er slået fra", null],
+  ];
+  document.getElementById("kpis").innerHTML = tiles.map(([label, value, note, raw]) => `<div class="kpi"><span>${esc(label)}</span><b class="${raw == null ? "" : tone(raw)}">${esc(value)}</b><em>${esc(note)}</em></div>`).join("");
+
+  const g = data.goal;
+  const progress = Math.max(0, Math.min(1, g.progress || 0));
+  document.getElementById("goal").innerHTML = `
+    <div class="goal-row"><span>Denne måned: <b class="${tone(g.month_net)}">${esc(signed(g.month_net))}</b> netto (handler ${esc(signed(g.month_realized))} minus AI ${esc(money4(g.month_ai))})</span><span>Mål ${esc(money(g.target))} pr. måned</span></div>
+    <div class="meter" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(progress * 100)}" aria-label="Fremskridt mod målet"><i style="width:${(progress * 100).toFixed(1)}%"></i></div>
+    <p class="muted">${esc(pct(progress))} af målet. Fremskrevet med det nuværende tempo: ${esc(signed(g.projection))} for hele måneden. ${data.mode === "paper" ? "Det er papirpenge, så målet tæller først rigtigt, når botten handler live." : ""} At tjene ${esc(money(g.target))} om måneden på ${esc(money(k.bankroll))} kræver mere end ${esc(num.format(g.target / k.bankroll * 100))} % afkast pr. måned. Regn med, at det ikke lykkes.</p>`;
+
+  document.getElementById("chart").innerHTML = chart(data.equity_curve, k.bankroll);
+
+  const positions = data.positions || [];
+  document.getElementById("positions").innerHTML = positions.length ? `<div class="table-wrap"><table><thead><tr><th>Token</th><th>Indsat</th><th>Nu</th><th>Top</th><th>Holdt</th><th></th></tr></thead><tbody>${
+    positions.map((p) => `<tr>
+      <td>${link(p.pair_url, p.symbol)}<div class="muted">${esc(p.source)}${p.partial ? " · delsalg taget" : ""}</div></td>
+      <td>${esc(money(p.cost_usd))}</td>
+      <td class="${tone(p.change_pct)}">${esc(spct(p.change_pct))}<div class="muted">${esc(signed(p.unrealized_usd))}</div></td>
+      <td>${esc(spct(p.peak_pct))}</td>
+      <td>${esc(p.minutes ?? "—")} min.</td>
+      <td><button class="btn small" data-sell="${esc(p.id)}" type="button">Sælg</button></td>
+    </tr>`).join("")
+  }</tbody></table></div>` : '<p class="empty">Ingen åbne positioner lige nu. Botten køber kun, når et token består alle tjek.</p>';
+
+  const stages = ["alle", "købt", "marked", "rug", "score", "rute", "claude", "risiko"];
+  document.getElementById("cand-filters").innerHTML = stages.map((st) => `<button type="button" data-stage="${st}" aria-pressed="${st === stageFilter}">${esc(st === "alle" ? "Alle" : STAGES[st] || st)}</button>`).join("");
+  const cands = (data.candidates || []).filter((c) => stageFilter === "alle" || c.stage === stageFilter);
+  document.getElementById("candidates").innerHTML = cands.length ? `<table><thead><tr><th>Tid</th><th>Token</th><th>Kilde</th><th>Trin</th><th>Score</th><th>Begrundelse</th></tr></thead><tbody>${
+    cands.map((c) => `<tr>
+      <td>${esc(time(c.ts))}</td>
+      <td>${link(c.pair_url, c.symbol || short(c.mint))}</td>
+      <td>${esc(c.source)}</td>
+      <td><span class="tag ${c.passed ? "ok" : "no"}">${esc(STAGES[c.stage] || c.stage)}</span></td>
+      <td>${c.score == null ? "—" : esc(num.format(c.score))}</td>
+      <td>${esc(c.reason)}</td>
+    </tr>`).join("")
+  }</tbody></table>` : '<p class="empty">Ingen kandidater endnu. Den første scanning kører inden for et minut.</p>';
+
+  const trades = data.trades || [];
+  document.getElementById("journal").innerHTML = trades.length ? `<table><thead><tr><th>Lukket</th><th>Token</th><th>Kilde</th><th>Indsat</th><th>Resultat</th><th>Top</th><th>Udgang</th><th></th></tr></thead><tbody>${
+    trades.map((t) => `<tr>
+      <td>${esc(time(t.closed_at))}</td>
+      <td>${link(t.pair_url, t.symbol)}</td>
+      <td>${esc(t.source)}</td>
+      <td>${esc(money(t.cost_usd))}</td>
+      <td class="${tone(t.pnl_usd)}">${esc(signed(t.pnl_usd))}<div class="muted">${esc(spct(t.pnl_pct))}</div></td>
+      <td>${esc(spct(t.peak_pct))}</td>
+      <td>${esc(t.exit_reason)}</td>
+      <td><details><summary>Hvorfor</summary><p>${esc(t.reasoning || "")}</p>${t.signatures && t.signatures.length ? `<p>${t.signatures.map((sig) => link("https://solscan.io/tx/" + sig, "Solscan " + short(sig))).join(" · ")}</p>` : ""}</details></td>
+    </tr>`).join("")
+  }</tbody></table>` : '<p class="empty">Ingen lukkede handler endnu.</p>';
+
+  const lessons = data.lessons || [];
+  document.getElementById("lessons").innerHTML = lessons.length ? lessons.map((l) => `<li class="${esc(l.kind)}"><span class="tag">${esc(KIND[l.kind] || l.kind)}</span> <span class="muted">${esc(time(l.ts))}</span><div>${esc(l.text)}</div></li>`).join("") : '<li>Ingen lektioner endnu. De kommer efter de første lukkede handler.</li>';
+
+  const weights = (data.model && data.model.weights) || [];
+  const scale = (v) => 50 + Math.max(-3, Math.min(3, v)) / 3 * 50;
+  document.getElementById("weights").innerHTML = weights.map((wt) => {
+    const a = scale(0), b = scale(wt.weight);
+    const left = Math.min(a, b), width = Math.abs(b - a);
+    const color = wt.weight >= 0 ? "var(--good)" : "var(--bad)";
+    return `<div class="weight"><span>${esc(wt.label)}</span><div class="bar"><span class="zero"></span><span class="fill" style="left:${left}%;width:${width}%;background:${color}"></span><span class="start" style="left:${scale(wt.start)}%"></span></div><span class="${tone(wt.weight)}">${esc(num.format(wt.weight))}</span></div>`;
+  }).join("") + `<p class="muted">${esc(data.model.updates)} opdateringer fra lukkede handler.</p>`;
+
+  const sources = data.sources || [];
+  document.getElementById("sources").innerHTML = sources.length ? `<table><thead><tr><th>Kilde</th><th>Handler</th><th>Gevinst%</th><th>Resultat</th><th></th></tr></thead><tbody>${
+    sources.map((r) => `<tr><td>${esc(r.label)}</td><td>${esc(r.trades)}</td><td>${esc(r.win_rate == null ? "—" : pct(r.win_rate))}</td><td class="${tone(r.pnl)}">${esc(signed(r.pnl))}</td><td>${r.muted ? '<span class="tag no">slået fra</span>' : ""}</td></tr>`).join("")
+  }</tbody></table>` : '<p class="empty">Ingen data endnu.</p>';
+
+  document.getElementById("params").innerHTML = `<table><thead><tr><th>Parameter</th><th>Nu</th><th>Start</th><th>Grænser</th></tr></thead><tbody>${
+    (data.params || []).map((p) => `<tr><td>${esc(p.label)}</td><td>${p.value !== p.default ? "<b>" : ""}${esc(num.format(p.value))}${p.value !== p.default ? "</b>" : ""}</td><td>${esc(num.format(p.default))}</td><td class="muted">${esc(num.format(p.bounds[0]))} – ${esc(num.format(p.bounds[1]))}</td></tr>`).join("")
+  }</tbody></table>`;
+
+  const items = (data.unlock && data.unlock.items) || [];
+  document.getElementById("checklist").innerHTML = items.map((i) => `<li class="${i.ok ? "ok" : "bad"}"><span class="tick">${i.ok ? "✓" : "·"}</span><span>${esc(i.label)}</span><em>${esc(i.detail)}</em></li>`).join("");
+  document.getElementById("phrase-label").textContent = (data.unlock && data.unlock.phrase) || "";
+
+  const events = data.events || [];
+  document.getElementById("events").innerHTML = events.length ? `<table><thead><tr><th>Tid</th><th>Niveau</th><th>Hændelse</th></tr></thead><tbody>${
+    events.map((r) => `<tr><td>${esc(time(r.ts))}</td><td>${esc(r.level)}</td><td>${esc(r.message)}${r.details ? `<div class="muted">${esc(r.details)}</div>` : ""}</td></tr>`).join("")
+  }</tbody></table>` : '<p class="empty">Loggen er tom.</p>';
+
+  const rows = [
+    ["Bankroll (loft)", money(s.bankroll_usd)],
+    ["Pr. handel", money(s.position_usd)],
+    ["Maks. åbne", s.max_open],
+    ["Maks. køb pr. dag", s.max_trades_per_day],
+    ["Dagligt tabsstop", pct(s.daily_loss_pct) + " af bankroll"],
+    ["Samlet tabsstop", pct(s.max_drawdown_pct) + " af bankroll"],
+    ["SOL-reserve til gebyrer", s.sol_reserve + " SOL"],
+    ["Slippage", s.slippage_bps / 100 + " %"],
+    ["Prioritetsgebyr", s.priority_fee_lamports + " lamports"],
+    ["Scanning / overvågning", `${s.scan_seconds} s / ${s.monitor_seconds} s`],
+    ["Claude", s.ai_configured ? `${s.ai_model} · indsats ${s.ai_effort} · ${money(s.ai_daily_budget_usd)}/dag` : "fra"],
+    ["X API", s.x_configured ? `til (${s.x_daily_requests} søgninger/dag)` : "fra"],
+    ["Fulgte wallets", (s.copy_wallets || []).map(short).join(", ") || "ingen"],
+    ["Wallet-nøgle", s.wallet_configured ? "sat" : "ikke sat"],
+    ["MEME_ALLOW_LIVE", s.allow_live ? "ja" : "nej"],
+    ["Solana RPC", s.rpc_is_public ? "offentlig (langsom)" : "egen"],
+    ["Jupiter", s.jupiter_url],
+  ];
+  document.getElementById("settings").innerHTML = rows.map(([a, b]) => `<dt>${esc(a)}</dt><dd>${esc(b)}</dd>`).join("");
+}
+
+function csrfToken() { const m = document.cookie.match(/(?:^|; )dt_csrf=([^;]*)/); return m ? decodeURIComponent(m[1]) : ""; }
+
+async function refresh() {
+  try {
+    const r = await fetch("/api/meme/status", { cache: "no-store", credentials: "same-origin" });
+    if (r.status === 401) { location.assign("/login"); return; }
+    if (!r.ok) { const b = await r.json().catch(() => ({})); throw new Error(b.detail || "status"); }
+    render(await r.json());
+  } catch (err) {
+    document.getElementById("toast").textContent = "Kunne ikke hente status: " + err.message + ". Prøver igen om 10 sekunder.";
+  }
+}
+
+async function post(url, payload) {
+  const r = await fetch(url, { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken() }, body: JSON.stringify(payload || {}) });
+  if (r.status === 401) { location.assign("/login"); throw new Error("Log ind for at fortsætte."); }
+  const body = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(typeof body.detail === "string" ? body.detail : "Handlingen fejlede.");
+  return body;
+}
+
+function say(text) { document.getElementById("toast").textContent = text; }
+
+document.getElementById("kill").addEventListener("click", async () => {
+  if (!confirm("Sælg alle positioner og stop nye køb?")) return;
+  try { fingerprint = ""; render(await post("/api/meme/kill")); say("Nødstop er aktivt."); } catch (err) { say(err.message); }
+});
+document.getElementById("resume").addEventListener("click", async () => {
+  try { fingerprint = ""; render(await post("/api/meme/resume")); say("Genoptaget."); } catch (err) { say(err.message); }
+});
+document.getElementById("scan").addEventListener("click", async () => {
+  try { await post("/api/meme/scan"); say("Scanning bestilt. Resultatet dukker op om lidt."); setTimeout(refresh, 4000); } catch (err) { say(err.message); }
+});
+document.getElementById("to-paper").addEventListener("click", async () => {
+  if (!confirm("Sælg alle live-positioner og gå tilbage til papirpenge?")) return;
+  try { fingerprint = ""; const b = await post("/api/meme/paper"); render(b.status); say("Tilbage på papirpenge."); } catch (err) { say(err.message); }
+});
+document.getElementById("positions").addEventListener("click", async (ev) => {
+  const id = ev.target && ev.target.dataset ? ev.target.dataset.sell : null;
+  if (!id || !confirm("Sælg positionen nu?")) return;
+  try { fingerprint = ""; render(await post("/api/meme/sell", { id: Number(id) })); say("Solgt."); } catch (err) { say(err.message); }
+});
+document.getElementById("cand-filters").addEventListener("click", (ev) => {
+  const st = ev.target && ev.target.dataset ? ev.target.dataset.stage : null;
+  if (!st) return;
+  stageFilter = st; fingerprint = ""; if (state) render(state);
+});
+document.getElementById("unlock-form").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  try {
+    const b = await post("/api/meme/live/unlock", { phrase: document.getElementById("phrase").value });
+    fingerprint = ""; render(b.status);
+    document.getElementById("unlock-msg").textContent = b.message;
+  } catch (err) { document.getElementById("unlock-msg").textContent = err.message; }
+});
+if (csrfToken()) document.getElementById("logout").hidden = false;
+document.getElementById("logout").addEventListener("click", async () => { try { await post("/logout"); } catch (e) {} location.assign("/login"); });
+document.getElementById("theme").addEventListener("click", () => { applyTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark"); });
+
+let stored = null;
+try { stored = localStorage.getItem("daytrader-theme"); } catch (e) {}
+const query = new URLSearchParams(location.search).get("theme");
+applyTheme(query === "dark" || query === "light" ? query : (stored || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")));
+refresh();
+setInterval(refresh, 10000);
+</script>
+</body>
+</html>

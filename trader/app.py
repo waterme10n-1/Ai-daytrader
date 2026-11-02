@@ -35,17 +35,31 @@ from trader.auth import (
 from trader.broker import BrokerError
 from trader.config import Settings
 from trader.engine import TradingEngine
+from trader.meme.config import MemeSettings
 
 STATIC = Path(__file__).resolve().parent / "static" / "index.html"
+MEME_STATIC = Path(__file__).resolve().parent / "static" / "meme.html"
 
 
 class PhraseBody(BaseModel):
     phrase: str = ""
 
 
-def create_app(engine: TradingEngine | None = None, settings: Settings | None = None) -> FastAPI:
+class IdBody(BaseModel):
+    id: int
+
+
+def create_app(
+    engine: TradingEngine | None = None,
+    settings: Settings | None = None,
+    meme_engine=None,
+    meme_settings: MemeSettings | None = None,
+) -> FastAPI:
     chosen = settings or Settings.from_env()
-    holder = {"engine": engine, "settings": chosen}
+    holder = {"engine": engine, "settings": chosen, "meme": meme_engine, "meme_settings": meme_settings}
+    # Memebotten startes automatisk i produktion. Når en aktiemotor sprøjtes ind (tests), kun hvis
+    # en memebot eller dens indstillinger også gives med.
+    auto_meme = engine is None or meme_settings is not None
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -54,11 +68,24 @@ def create_app(engine: TradingEngine | None = None, settings: Settings | None = 
         holder["engine"] = eng
         app.state.engine = eng
         app.state.settings = holder["settings"]
+        meme = holder["meme"]
+        if meme is None and auto_meme:
+            meme_cfg = holder["meme_settings"] or MemeSettings.from_env()
+            if meme_cfg.enabled:
+                from trader.meme.engine import MemeEngine
+
+                meme = MemeEngine(meme_cfg, main_settings=holder["settings"])
+        holder["meme"] = meme
+        app.state.meme = meme
         eng.start()
+        if meme is not None:
+            meme.start()
         try:
             yield
         finally:
             eng.stop()
+            if meme is not None:
+                meme.stop()
 
     app = FastAPI(title="AI Daytrader", lifespan=lifespan)
     app.state.settings = chosen
@@ -159,6 +186,59 @@ def create_app(engine: TradingEngine | None = None, settings: Settings | None = 
     @app.get("/api/status")
     def status() -> dict:
         return current().status()
+
+    def meme():
+        engine_ = getattr(app.state, "meme", None)
+        if engine_ is None:
+            raise HTTPException(status_code=404, detail="Memebotten er slået fra (MEME_ENABLED=false).")
+        return engine_
+
+    @app.get("/meme")
+    def meme_page() -> FileResponse:
+        return FileResponse(
+            MEME_STATIC,
+            media_type="text/html; charset=utf-8",
+            headers={"Cache-Control": "no-cache"},
+        )
+
+    @app.get("/api/meme/status")
+    def meme_status() -> dict:
+        return meme().status()
+
+    @app.post("/api/meme/kill")
+    def meme_kill() -> dict:
+        meme().kill()
+        return meme().status()
+
+    @app.post("/api/meme/resume")
+    def meme_resume() -> dict:
+        meme().resume()
+        return meme().status()
+
+    @app.post("/api/meme/scan")
+    def meme_scan() -> dict:
+        meme().request_scan()
+        return {"ok": True}
+
+    @app.post("/api/meme/sell")
+    def meme_sell(body: IdBody) -> dict:
+        try:
+            meme().sell_position(body.id)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return meme().status()
+
+    @app.post("/api/meme/live/unlock")
+    def meme_unlock(body: PhraseBody) -> dict:
+        ok, message = meme().request_live(body.phrase)
+        if not ok:
+            raise HTTPException(status_code=400, detail=message)
+        return {"ok": True, "message": message, "status": meme().status()}
+
+    @app.post("/api/meme/paper")
+    def meme_paper() -> dict:
+        meme().return_to_paper()
+        return {"ok": True, "status": meme().status()}
 
     @app.post("/api/kill")
     def kill() -> dict:

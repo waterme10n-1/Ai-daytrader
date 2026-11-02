@@ -112,3 +112,79 @@ Skaler ikke tjenesten til mere end ét replika. Et nyt replika ville åbne sin e
 ```bash
 pytest
 ```
+
+---
+
+# Memebot (Solana-memecoins)
+
+Memebotten kører i samme proces som aktiemotoren, 24/7, og har sit eget dashboard på `/meme` (link øverst på forsiden). Den starter **altid på papirpenge**: rigtige kurser fra DexScreener og rigtige quotes fra Jupiter, men ingen transaktioner.
+
+## Ærlige forventninger
+
+- Claude Max koster 100 eller 200 USD om måneden. Fra 15 USD kræver det over 650 % afkast hver måned. Det sker næsten aldrig. Regn med, at indsatsen kan gå tabt.
+- De fleste nye memecoins går mod nul, og mange er decideret svindel. Rug-tjekkene fanger de klassiske fælder, ikke alle.
+- Claude-API'et betales separat fra et Max-abonnement. Hosting på Railway koster også et par dollars om måneden. Dashboardet trækker AI-udgifterne fra resultatet, så du ser det reelle tal.
+- Papirresultater er bedre end virkeligheden: rigtige handler kan fejle, blive front-runnet eller få dårligere pris.
+
+## Hvad botten gør
+
+Hvert minut:
+
+1. **Finder kandidater** fra Jupiter (trending og organisk score), DexScreener (boosts og nye profiler) og køb fra wallets, du følger.
+2. **Markedsfiltre**: likviditet, volumen, antal handler, alder, markedsværdi, ikke overophedet, flere købere end sælgere, ikke på en bonding curve.
+3. **Rug-tjek** via RugCheck og Jupiter: mint- og freeze authority skal være slået fra, ingen "danger"-risici, begrænset ejerkoncentration, udvikleren må ikke sidde på store beholdninger. Kan RugCheck ikke svare, købes der ikke.
+4. **Exit-tjek**: botten beder Jupiter om en købs- og en salgspris. Kan tokenet ikke sælges igen, eller koster frem og tilbage mere end 8 %, købes der ikke (honeypot- og tynd-pool-filter).
+5. **Score**: en lille læringsmodel vægter signalerne (købspres, likviditet, organisk handel, sociale links, X-omtale, copy-signal, rug-risiko m.fl.).
+6. **Claude** (hvis nøgle og budget er sat) søger på X, nyheder og fora efter røde flag: falske konti, koordineret shill, kopier af kendte tokens, rug-historik. Claude kan kun sige nej. Claude kan aldrig tvinge et køb igennem eller ændre risikogrænserne.
+7. **Risiko**: højst `MEME_POSITION_USD` pr. handel, aldrig mere end `MEME_BANKROLL_USD` i alt, højst `MEME_MAX_OPEN` åbne og `MEME_MAX_TRADES_PER_DAY` køb om dagen.
+
+Hvert 15. sekund overvåges åbne positioner: stop-loss (-25 %), halvdelen sælges ved +60 %, trailing stop 25 % fra toppen, salg hvis likviditeten trækkes (rug-alarm), hvis intet sker, eller hvis den fulgte trader sælger. Tomme token-konti lukkes, så rent-depositummet kommer tilbage.
+
+## Sådan lærer den
+
+- Efter hver lukket handel flyttes vægtene på de signaler, der bar handlen (op ved gevinst, ned ved tab). Dashboardet viser vægtene og en lektion pr. handel.
+- Hver 5. handel justeres filtrene ud fra mønstre: mange rugs giver strengere rug-krav, mange stop-loss giver krav om mere likviditet og mindre jagt på toppe, og så videre.
+- En gang i døgnet gennemgår Claude de seneste handler og skriver lektioner, som bruges i næste research. Claude må foreslå ændringer af filtrene, men kun inden for faste grænser.
+- Kilder og fulgte wallets, der taber over tid, bliver automatisk slået fra.
+- Positionsstørrelse, bankroll og tabsgrænser kan hverken læringen eller Claude ændre.
+
+## Tabsgrænser
+
+- Dagligt tab på `MEME_DAILY_LOSS_PCT` af bankroll (standard 25 %): ingen nye køb resten af døgnet (UTC). Åbne positioner beholder deres stop.
+- Samlet tab på `MEME_MAX_DRAWDOWN_PCT` (standard 50 %): alt sælges, og botten står stille, indtil du trykker **Genoptag**.
+- **Nødstop** sælger alt med det samme.
+
+## Fra papir til rigtige penge
+
+Alle punkter skal være opfyldt, og de tjekkes i koden:
+
+- mindst 20 lukkede papirhandler, fordelt på mindst 3 dage
+- papirresultat over 0 og profitfaktor mindst 1,2
+- `MEME_ALLOW_LIVE=true`
+- `SOLANA_PRIVATE_KEY` kan læses
+- du skriver præcis `JEG FORSTÅR AT JEG KAN TABE HELE INDSATSEN` på `/meme`
+
+### Sådan sætter du wallet'en op (vigtigt)
+
+1. Opret en **ny konto** i Phantom (Konti → Tilføj/forbind → Opret ny konto). Brug aldrig din hovedkonto.
+2. Send kun det beløb, botten må tabe, til den nye konto: fx 15 USD i SOL plus ca. 0,03 SOL til gebyrer og depositum for token-konti.
+3. Vis den private nøgle for **kun den konto** (Indstillinger → Administrer konti → kontoen → Vis privat nøgle). Del aldrig din recovery-sætning (seed phrase). Den giver adgang til alle dine konti.
+4. Sæt nøglen som hemmelig variabel `SOLANA_PRIVATE_KEY` hos Railway. Indsæt den aldrig i en chat, en fil i repoet eller en besked. Nøglen bruges kun til at signere lokalt i botten og vises aldrig i dashboardet.
+5. Opret en gratis nøgle hos [helius.dev](https://www.helius.dev) og sæt `SOLANA_RPC_URL=https://mainnet.helius-rpc.com/?api-key=...`. Den offentlige RPC er for langsom til at handle sikkert.
+
+Botten bruger højst `MEME_BANKROLL_USD` i alt, også hvis du sender flere penge til kontoen. Knappen **Tilbage til papirpenge** sælger alle live-positioner.
+
+## Valgfrie tilføjelser
+
+- **Claude-research**: `ANTHROPIC_API_KEY` og `MEME_AI_DAILY_BUDGET_USD` (standard 0,50 USD om dagen). Standardmodellen er `claude-opus-5-5` med indsats `medium` og websøgning. Er budgettet brugt, kører botten videre på regler. Vil du bruge en billigere model, kan du sætte `MEME_ANTHROPIC_MODEL`. Ældre modeller skal muligvis have `MEME_ANTHROPIC_WEB_SEARCH_TOOL=web_search_20250305`.
+- **X API**: `X_BEARER_TOKEN` fra developer.x.com (betalt). Botten søger efter kontraktadressen og tickeren og måler, hvor mange forskellige konti der skriver om tokenet. `X_DAILY_REQUESTS` begrænser forbruget.
+- **Copy-trading**: `MEME_COPY_WALLETS=adresse1,adresse2`. Find kandidater på fx GMGN, Birdeye eller Kolscan, og tjek selv deres historik. Første gang botten ser en wallet, husker den kun, hvor den er nået til; gamle handler kopieres aldrig. Et køb fra en fulgt wallet skal stadig bestå alle tjek ovenfor.
+- **Telegram**: samme `TELEGRAM_BOT_TOKEN` og `TELEGRAM_CHAT_ID` som aktiemotoren. Du får besked ved køb, salg, tabsgrænser og fejl.
+
+## Kør 24/7
+
+Lokalt: `python run.py` og åbn [http://127.0.0.1:8741/meme](http://127.0.0.1:8741/meme). Computeren skal så være tændt hele tiden.
+
+På Railway: følg afsnittet *Udgiv på Railway* ovenfor. Memebotten gemmer sin database i `/data/meme.db` på samme volume. Tilføj de `MEME_*`-variabler, du vil ændre. Alle har fornuftige standarder, så botten kører på papir uden ekstra opsætning.
+
+Datakilder: DexScreener, RugCheck og Jupiter (`lite-api.jup.ag`) kræver ingen nøgle. Hvis Jupiter lukker lite-api, så opret en gratis nøgle på portal.jup.ag og sæt `JUPITER_API_URL=https://api.jup.ag` og `JUPITER_API_KEY`.

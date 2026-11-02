@@ -2,6 +2,8 @@
 
 Lokal daytrader til likvide amerikanske aktier og ETF'er. Dansk brugerflade, papirpenge først, og en simulator der kører en hel dag gennem den samme motor.
 
+**Memebot** (`/meme`): en 24/7-bot til Solana-memecoins med rug-tjek (RugCheck, Jupiter), exit-rute-tjek, valgfri X- og Claude-research, copy-trading af udvalgte wallets og en model, der lærer af hver lukket handel. Den starter på papirpenge med rigtige kurser og kan først handle med rigtige penge fra en separat Phantom-konto, når papirresultatet er positivt. Se afsnittet *Memebot* i [LÆS_MIG.md](LÆS_MIG.md).
+
 Fuld opsætning af Alpaca-papirnøgler og Anthropic står i [LÆS_MIG.md](LÆS_MIG.md).
 
 ```bash
