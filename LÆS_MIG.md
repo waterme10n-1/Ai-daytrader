@@ -113,6 +113,12 @@ Skaler ikke tjenesten til mere end ét replika. Et nyt replika ville åbne sin e
 pytest
 ```
 
+Testene kører med falske datakilder og en falsk Solana-kæde, så de kræver hverken nøgler eller netværk. Der er også en stresstest, der kører memebotten gennem tilfældige markeder med pumps, dumps, rugs, nedbrud i datakilderne og tilfældige knaptryk, og efter hver runde tjekker, at regnskabet stemmer, og at ingen grænse er brudt:
+
+```bash
+python tests/meme_soak.py 50 250 hard
+```
+
 ---
 
 # Memebot (Solana-memecoins)

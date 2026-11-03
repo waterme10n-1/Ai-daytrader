@@ -1682,7 +1682,15 @@ document.addEventListener("click", (ev) => {
   else if (t.dataset.jf) { journalFilter = t.dataset.jf; render(state); }
   else if (t.dataset.range) { range = t.dataset.range; document.querySelectorAll("#range button").forEach((b) => b.setAttribute("aria-pressed", b.dataset.range === range ? "true" : "false")); render(state); }
   else if (t.dataset.row) { const id = Number(t.dataset.row); expanded.has(id) ? expanded.delete(id) : expanded.add(id); render(state); }
-  else if (t.dataset.sell) { if (confirm(`Sælg ${t.dataset.symbol} nu?`)) act(() => post("/api/meme/sell", { id: Number(t.dataset.sell) }), `${t.dataset.symbol} er solgt`); }
+  else if (t.dataset.sell) {
+    const sym = t.dataset.symbol;
+    if (confirm(`Sælg ${sym} nu?`)) act(async () => {
+      const b = await post("/api/meme/sell", { id: Number(t.dataset.sell) });
+      if (b.sell === "queued") toast("", `${sym} sælges om få sekunder`, "Botten er midt i en runde og sælger lige efter.");
+      else toast("up", `${sym} er solgt`, "");
+      return b;
+    });
+  }
   else if (t.dataset.block) { if (confirm(`Bloker ${t.dataset.symbol || "tokenet"}? Botten køber det aldrig.`)) act(() => post("/api/meme/blacklist", { mint: t.dataset.block, symbol: t.dataset.symbol, action: "block" }), "Tokenet er blokeret"); }
   else if (t.dataset.unblock) act(() => post("/api/meme/blacklist", { mint: t.dataset.unblock, action: "unblock" }), "Blokeringen er fjernet");
   else if (t.dataset.unfollow) { if (confirm("Stop med at følge denne wallet?")) act(() => post("/api/meme/wallets", { wallet: t.dataset.unfollow, action: "remove" }), "Wallet fjernet"); }
@@ -1857,7 +1865,13 @@ bindDailyHover();
   if (p.on) p.on("accountChanged", (pk) => { phantomAddr = pk ? pk.toString() : null; refreshWallet(true); if (state) renderWalletCards(state); });
 })();
 refresh();
-setInterval(refresh, 8000);
+// Hurtig opdatering, når siden er åben. Kun hvert minut, når fanen ligger i baggrunden (sparer data på mobil).
+let lastPoll = 0;
+setInterval(() => {
+  const wait = document.hidden ? 60000 : 8000;
+  if (Date.now() - lastPoll >= wait - 50) { lastPoll = Date.now(); refresh(); }
+}, 1000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden && Date.now() - lastPoll > 3000) { lastPoll = Date.now(); refresh(); } });
 </script>
 </body>
 </html>

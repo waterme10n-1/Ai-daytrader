@@ -339,3 +339,23 @@ def test_status_has_chart_data_and_levels():
     assert status["levels"]["stop_loss_pct"] == pytest.approx(0.25)
     funnel = status["engine"]["last_scan"]
     assert funnel["rug_ok"] >= funnel["scored"]
+
+
+def test_status_is_gzip_compressed(tmp_path, monkeypatch):
+    import dataclasses
+
+    from trader.app import create_app
+
+    engine, dex, rug, _jup, _notes = make_engine()
+    monkeypatch.setattr(engine, "start", lambda: None)
+    monkeypatch.setattr(engine, "stop", lambda: None)
+    for index in range(30):
+        _arm(dex, rug, mint=f"Mint{index}" + "z" * 30, symbol=f"T{index}")
+    engine.tick(force_scan=True)
+    settings = dataclasses.replace(Settings.from_env(), db_path=str(tmp_path / "t.db"), host="127.0.0.1", app_username="", app_password="", app_password_hash="", session_secret="")
+    stock = TradingEngine(settings=settings, db=Database(settings.db_path))
+    with TestClient(create_app(engine=stock, settings=settings, meme_engine=engine)) as client:
+        response = client.get("/api/meme/status", headers={"Accept-Encoding": "gzip"})
+        assert response.status_code == 200
+        assert response.headers.get("content-encoding") == "gzip"
+        assert response.json()["mode"] == "paper"

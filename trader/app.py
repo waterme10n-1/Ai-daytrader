@@ -8,6 +8,7 @@ from pathlib import Path
 from urllib.parse import parse_qs
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from pydantic import BaseModel
 
@@ -130,6 +131,8 @@ def create_app(
     app.state.settings = chosen
     app.state.login_guard = LoginGuard()
     app.add_middleware(AuthMiddleware)
+    # Dashboardet henter status ofte. Komprimering gør svaret ca. 9 gange mindre (vigtigt på mobil).
+    app.add_middleware(GZipMiddleware, minimum_size=2000)
 
     def current() -> TradingEngine:
         return app.state.engine
@@ -283,10 +286,12 @@ def create_app(
     @app.post("/api/meme/sell")
     def meme_sell(body: IdBody) -> dict:
         try:
-            meme().sell_position(body.id)
+            result = meme().sell_position(body.id)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
-        return meme().status()
+        status = meme().status()
+        status["sell"] = result
+        return status
 
     @app.post("/api/meme/pause")
     def meme_pause(body: PauseBody) -> dict:

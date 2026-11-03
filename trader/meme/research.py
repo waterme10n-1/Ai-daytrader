@@ -34,6 +34,8 @@ PRICES: tuple[tuple[str, float, float], ...] = (
 SEARCH_COST = 0.01
 ESTIMATED_RESEARCH_COST = 0.20
 ESTIMATED_REVIEW_COST = 0.10
+# Botten passer ikke sine positioner, mens den venter på Claude. Derfor en fast grænse pr. kald.
+RESEARCH_TIMEOUT_SECONDS = 45.0
 
 
 def price_for(model: str) -> tuple[float, float]:
@@ -190,7 +192,7 @@ class MemeResearcher:
         response = None
         container: str | None = None
         try:
-            for _attempt in range(5):
+            for _attempt in range(3):
                 kwargs: dict = {
                     "model": self.settings.ai_model,
                     "max_tokens": 16000,
@@ -201,7 +203,7 @@ class MemeResearcher:
                     "output_config": {"effort": self.settings.ai_effort},
                     "fallbacks": self.settings.ai_fallbacks,
                     "betas": ["server-side-fallback-2026-07-01"],
-                    "timeout": 120.0,
+                    "timeout": RESEARCH_TIMEOUT_SECONDS,
                 }
                 if container:
                     kwargs["container"] = container
@@ -252,7 +254,7 @@ class MemeResearcher:
                 output_config={"effort": self.settings.ai_effort},
                 fallbacks=self.settings.ai_fallbacks,
                 betas=["server-side-fallback-2026-07-01"],
-                timeout=120.0,
+                timeout=RESEARCH_TIMEOUT_SECONDS,
             )
         except Exception as exc:
             logger.warning("Claude-gennemgang fejlede: %s", exc)

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import time
 import random
 from datetime import datetime, timedelta, timezone
 
@@ -369,3 +370,159 @@ def test_telegram_ignores_other_chats():
     assert "Egenkapital" in bot.handle_update({"message": {"chat": {"id": 4242}, "text": "/status@memebot"}})
     assert bot.handle_update({"message": {"chat": {"id": 4242}, "text": "hej"}}) is None
     bot._client.close()
+
+
+def test_drawdown_halt_sells_everything_and_blocks_until_resume():
+    engine, dex, rug, _jup, notes = make_engine(meme_fakes.settings(daily_loss_pct=0.9, max_drawdown_pct=0.5, max_trades_per_day=20))
+    mints = [f"Crash{i}" + "x" * 30 for i in range(5)]
+
+    def buy_and_crash(mint):
+        dex.pairs[mint] = raw_pair(mint)
+        dex.boosts.append(mint)
+        rug.reports[mint] = safe_report()
+        engine.tick(force_scan=True)
+        dex.set_price(mint, 0.00005)  # -95 % i ét hug
+
+    for mint in mints[:2]:
+        buy_and_crash(mint)
+    engine.tick()
+    assert engine.store.get_state("halt_dd:paper") is None  # 5,8 USD tabt, grænsen er 7,5
+    buy_and_crash(mints[2])
+    dex.pairs[mints[3]] = raw_pair(mints[3])
+    dex.boosts.append(mints[3])
+    rug.reports[mints[3]] = safe_report()
+    engine.tick(force_scan=True)
+    assert engine.store.get_state("halt_dd:paper") == "1"
+    assert engine.store.open_positions("paper") == []
+    assert any("Samlet tab" in text for text in notes)
+    engine.tick(force_scan=True)
+    assert engine.store.open_positions("paper") == []  # ingen nye køb
+    engine.resume()
+    from trader.meme.learning import Model
+
+    engine.model = Model()  # modellen har lært af de tre tab; her testes kun, at køb er tilladt igen
+    dex.pairs[mints[4]] = raw_pair(mints[4])
+    dex.boosts.append(mints[4])
+    rug.reports[mints[4]] = safe_report()
+    engine.tick(force_scan=True)
+    assert engine.store.open_positions("paper")  # målt fra nu efter Genoptag
+
+
+def test_kill_keeps_retrying_failed_sells():
+    engine, dex, rug, jup, _notes = make_engine()
+    _arm(dex, rug)
+    engine.tick(force_scan=True)
+    jup.no_route.add(MINT)
+    engine.kill()
+    assert len(engine.store.open_positions("paper")) == 1  # salget fejlede
+    jup.no_route.clear()
+    engine.tick()
+    assert engine.store.open_positions("paper") == []
+    assert engine.store.closed_positions("paper")[0]["exit_reason"] == "kill"
+
+
+def test_blocking_a_held_token_sells_it():
+    from solders.keypair import Keypair
+
+    engine, dex, rug, _jup, _notes = make_engine()
+    mint = str(Keypair().pubkey())
+    _arm(dex, rug, mint=mint)
+    engine.tick(force_scan=True)
+    assert len(engine.store.open_positions("paper")) == 1
+    engine.block_token(mint, "MEME")
+    assert engine.store.open_positions("paper") == []
+
+
+class SlowResearcher:
+    """Claude, der tænker længe. Imens trykker brugeren på nødstop."""
+
+    def __init__(self, engine_ref):
+        self.engine_ref = engine_ref
+        self.started = __import__("threading").Event()
+        self.release = __import__("threading").Event()
+
+    def available(self, estimate=0.2):
+        return True
+
+    def budget_left(self):
+        return 1.0
+
+    def research(self, payload, lessons):
+        from trader.meme.research import Verdict
+
+        self.started.set()
+        self.release.wait(10)
+        return Verdict("buy", 90, [], ["fint"], "", "Ser godt ud.", 0.05)
+
+    def daily_review(self, trades, params):
+        return None
+
+
+def test_kill_and_pause_work_during_a_long_round():
+    import threading
+
+    holder = {}
+    researcher = SlowResearcher(holder)
+    engine, dex, rug, _jup, _notes = make_engine(researcher=researcher)
+    _arm(dex, rug)
+    worker = threading.Thread(target=lambda: engine.tick(force_scan=True))
+    worker.start()
+    assert researcher.started.wait(5)
+    started = time.monotonic()
+    engine.kill()
+    assert time.monotonic() - started < 5  # knappen hænger ikke
+    assert engine.kill_switch
+    researcher.release.set()
+    worker.join(10)
+    assert engine.store.open_positions("paper") == []  # Claude sagde køb, men nødstoppet vandt
+    reasons = [row["reason"] for row in engine.store.recent_candidates("paper")]
+    assert any("Nødstop eller pause" in reason for reason in reasons)
+
+
+def test_manual_sell_and_settings_do_not_wait_for_a_long_round():
+    import threading
+
+    researcher = SlowResearcher({})
+    engine, dex, rug, _jup, _notes = make_engine(researcher=researcher)
+    _arm(dex, rug)
+    researcher.release.set()
+    engine.tick(force_scan=True)  # første køb uden ventetid
+    first = engine.store.open_positions("paper")[0]
+    researcher.release.clear()
+    researcher.started.clear()
+    second = "Second11111"
+    _arm(dex, rug, mint=second, symbol="TWO")
+    worker = threading.Thread(target=lambda: engine.tick(force_scan=True))
+    worker.start()
+    assert researcher.started.wait(5)
+    started = time.monotonic()
+    assert engine.sell_position(first["id"]) == "queued"
+    engine.update_sniper({"take_profit_pct": 2.0})
+    engine.pause(True)
+    assert time.monotonic() - started < 5
+    assert engine.sniper.take_profit_pct == 2.0
+    researcher.release.set()
+    worker.join(10)
+    assert engine.store.get_position(first["id"])["status"] == "closed"  # solgt lige efter research
+    assert [row["mint"] for row in engine.store.open_positions("paper")] == []  # pausen stoppede det nye køb
+
+
+def test_positions_are_checked_right_after_research():
+    import threading
+
+    researcher = SlowResearcher({})
+    engine, dex, rug, _jup, _notes = make_engine(researcher=researcher)
+    _arm(dex, rug)
+    researcher.release.set()
+    engine.tick(force_scan=True)
+    held = engine.store.open_positions("paper")[0]
+    researcher.release.clear()
+    researcher.started.clear()
+    _arm(dex, rug, mint="Second11111", symbol="TWO")
+    worker = threading.Thread(target=lambda: engine.tick(force_scan=True))
+    worker.start()
+    assert researcher.started.wait(5)
+    dex.set_price(MINT, 0.0006)  # styrtdyk mens Claude tænker
+    researcher.release.set()
+    worker.join(10)
+    assert engine.store.get_position(held["id"])["exit_reason"] == "stop_loss"

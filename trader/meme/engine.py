@@ -8,6 +8,7 @@ Hver scanning (MEME_SCAN_SECONDS): find kandidater, filtrér, rug-tjek, score, s
 from __future__ import annotations
 
 import calendar
+import dataclasses
 import logging
 import threading
 import time
@@ -94,6 +95,7 @@ SHADOW_MARKED_PER_SCAN = 2
 SHADOW_LEARN_RATE = 0.3
 SHADOW_OPTIMIZER_STAGES = {"købt", "risiko", "claude"}
 INSIDER_CHECK_SECONDS = 60
+KILL_LOCK_SECONDS = 3.0
 WALLET_CACHE_SECONDS = 20
 EXIT_FAILURE_LIMIT = 6
 MISSING_PRICE_LIMIT = 20
@@ -239,6 +241,7 @@ class MemeEngine:
         self._last_insider_check = 0.0
         self._shadow_misses: dict[int, int] = {}
         self._optimizer_cache: tuple[tuple, float, dict] | None = None
+        self._sell_queue: set[int] = set()
         self._missing_price: dict[int, int] = {}
         self._copy_sells: set[tuple[str, str]] = set()
         self.last_tick: str | None = None
@@ -473,6 +476,16 @@ class MemeEngine:
         self.store.add_event("trade", f"Gevinst på {excess:.2f} USD ({sol:.4f} SOL) er sendt til din Phantom.", signature)
         self._notify(f"Gevinst på {excess:.2f} USD er sendt til din Phantom.")
 
+    def _refresh_wallet_sol(self, wallet) -> None:
+        """Opdater den viste SOL-saldo efter en rigtig handel."""
+        if self.mode != "live" or not hasattr(wallet, "public_key") or not wallet.public_key:
+            return
+        try:
+            self._wallet_sol = wallet.sol_balance()
+            self._wallet_sol_at = time.time()
+        except SourceError:
+            pass
+
     def _wallet_pubkey(self) -> tuple[str, str]:
         """(pubkey, fejl). Aldrig selve nøglen."""
         if not self.settings.private_key:
@@ -572,6 +585,19 @@ class MemeEngine:
         if not positions:
             self._copy_sells.clear()
             return
+        if self._sell_queue:
+            queued, self._sell_queue = set(self._sell_queue), set()
+            for pos in positions:
+                if int(pos["id"]) in queued:
+                    self._sell(pos, 1.0, "manual", "Solgt manuelt fra dashboardet.", wallet, sol_usd)
+            positions = self.store.open_positions(self.mode)
+            if not positions:
+                return
+        if self.kill_switch or self.store.get_state(f"halt_dd:{self.mode}", "0") == "1":
+            # Et salg kan fejle under nødstop. Bliv ved med at prøve, indtil alt er solgt eller skrevet af.
+            for pos in positions:
+                self._sell(pos, 1.0, "kill", "Nødstop: prøver at sælge igen.", wallet, sol_usd)
+            return
         mints = [row["mint"] for row in positions]
         pairs: dict[str, PairInfo] = {}
         try:
@@ -646,6 +672,7 @@ class MemeEngine:
                     loads(pos["signatures"], []),
                 )
             return False
+        self._refresh_wallet_sol(wallet)
         sold = min(remaining, fill.token_raw or amount)
         left = remaining - sold
         proceeds = float(pos["proceeds_usd"]) + fill.usd
@@ -695,12 +722,24 @@ class MemeEngine:
         )
         self._notify(f"Lukket {pos['symbol']} ({label}): {pnl:+.2f} USD ({pnl_pct * 100:+.0f} %).")
 
-    def sell_position(self, position_id: int) -> None:
-        with self._lock:
+    def sell_position(self, position_id: int) -> str:
+        pos = self.store.get_position(position_id)
+        if pos is None or pos["status"] != "open" or pos["mode"] != self.mode:
+            raise ValueError("Positionen findes ikke eller er allerede lukket.")
+        if not self._lock.acquire(timeout=KILL_LOCK_SECONDS):
+            # Botten er midt i en lang runde. Salget lægges i kø og sker i næste runde.
+            self._sell_queue.add(int(position_id))
+            self._wake.set()
+            self.store.add_event("info", f"{pos['symbol']} sælges, så snart botten er færdig med sin runde.")
+            return "queued"
+        try:
             pos = self.store.get_position(position_id)
-            if pos is None or pos["status"] != "open" or pos["mode"] != self.mode:
-                raise ValueError("Positionen findes ikke eller er allerede lukket.")
+            if pos is None or pos["status"] != "open":
+                raise ValueError("Positionen er allerede lukket.")
             self._sell(pos, 1.0, "manual", "Solgt manuelt fra dashboardet.", self._wallet(), self._sol_price())
+            return "sold"
+        finally:
+            self._lock.release()
 
     def _sell_all(self, mode: str, kind: str, reason: str) -> None:
         wallet = self._paper if mode == "paper" else self._wallet()
@@ -1445,38 +1484,39 @@ class MemeEngine:
     def update_sniper(self, changes: dict) -> None:
         if not isinstance(changes, dict):
             raise ValueError("Ugyldige indstillinger.")
-        with self._lock:
-            notes = []
-            for key, value in changes.items():
-                if key in SNIPER_BOOLS:
-                    new = bool(value)
-                elif key in SNIPER_BOUNDS:
-                    try:
-                        new = clamp_sniper(key, float(value), self.settings.position_usd)
-                    except (TypeError, ValueError) as exc:
-                        raise ValueError(f"{SNIPER_LABELS.get(key, key)} skal være et tal.") from exc
-                else:
-                    continue
-                old = getattr(self.sniper, key)
-                if old != new:
-                    setattr(self.sniper, key, new)
-                    notes.append(SNIPER_LABELS.get(key, key))
-            if not notes:
-                return
-            self._save_sniper()
-            self.store.add_event(
-                "info",
-                f"Sniper-indstillinger ændret: {', '.join(notes)}. Gælder også åbne snipes.",
-                f"Mål +{self.sniper.take_profit_pct * 100:.0f} %, stop -{self.sniper.stop_loss_pct * 100:.0f} %, "
-                f"{self.sniper.position_usd:.2f} USD pr. snipe.",
-            )
+        # Byg en ny kopi og skift den ind på én gang: ingen halve ændringer, og ingen ventetid på runden.
+        updated = dataclasses.replace(self.sniper)
+        notes = []
+        for key, value in changes.items():
+            if key in SNIPER_BOOLS:
+                new = bool(value)
+            elif key in SNIPER_BOUNDS:
+                try:
+                    new = clamp_sniper(key, float(value), self.settings.position_usd)
+                except (TypeError, ValueError) as exc:
+                    raise ValueError(f"{SNIPER_LABELS.get(key, key)} skal være et tal.") from exc
+            else:
+                continue
+            if getattr(updated, key) != new:
+                setattr(updated, key, new)
+                notes.append(SNIPER_LABELS.get(key, key))
+        if not notes:
+            return
+        self.sniper = updated
+        self._optimizer_cache = None
+        self._save_sniper()
+        self.store.add_event(
+            "info",
+            f"Sniper-indstillinger ændret: {', '.join(notes)}. Gælder også åbne snipes.",
+            f"Mål +{self.sniper.take_profit_pct * 100:.0f} %, stop -{self.sniper.stop_loss_pct * 100:.0f} %, "
+            f"{self.sniper.position_usd:.2f} USD pr. snipe.",
+        )
 
     def reset_sniper(self) -> None:
-        with self._lock:
-            enabled = self.sniper.enabled
-            self.sniper = sniper_from({"enabled": enabled}, self.settings)
-            self._save_sniper()
-            self.store.add_event("info", "Sniper-indstillingerne er sat tilbage til standard.")
+        self.sniper = sniper_from({"enabled": self.sniper.enabled}, self.settings)
+        self._optimizer_cache = None
+        self._save_sniper()
+        self.store.add_event("info", "Sniper-indstillingerne er sat tilbage til standard.")
 
     def _sniper_status(self, closed: list[dict], open_rows: list[dict], day: str) -> dict:
         defaults = sniper_from({}, self.settings)
@@ -1571,6 +1611,8 @@ class MemeEngine:
         verdict: Verdict | None = None
         if (not sniping or self.sniper.use_claude) and self.researcher.available():
             verdict = self.researcher.research(self._ai_payload(cand, buy_quote, sell_quote), self._lessons_text())
+            # Research kan tage tid. Tjek straks de åbne positioner, så et stop-loss ikke venter.
+            self._monitor(wallet, sol_usd)
             if verdict is not None:
                 cand["features"]["ai_view"] = verdict.view
                 cand["score"] = self.model.score(cand["features"])
@@ -1579,6 +1621,10 @@ class MemeEngine:
                     self._record(cand, "claude", False, f"Claude: skip ({verdict.confidence}). {flags or verdict.summary}", cand["score"], cand["features"])
                     return False
 
+        if self.kill_switch or self.paused:
+            # Nødstop eller pause kan være trykket, mens Claude researchede.
+            self._record(cand, "risiko", False, "Nødstop eller pause blev slået til, før købet nåede at gå igennem.", cand["score"], cand["features"])
+            return False
         fill = wallet.buy(cand["mint"], decision.size_usd, sol_usd, strategy=strategy)
         if not fill.ok:
             if fill.fee_usd:
@@ -1587,6 +1633,7 @@ class MemeEngine:
             self._record(cand, "køb", False, f"Købet fejlede: {fill.error}", cand["score"], cand["features"])
             self.store.add_event("warning", f"Køb af {pair.symbol} fejlede: {fill.error}")
             return False
+        self._refresh_wallet_sol(wallet)
         drivers = [FEATURES[name][0].lower() for name, value in self.model.contributions(cand["features"]) if value > 0.05][:3]
         if sniping:
             token = cand.get("token")
@@ -1707,30 +1754,37 @@ class MemeEngine:
 
     # ------------------------------------------------------------------ styring
     def kill(self) -> None:
-        with self._lock:
-            self.kill_switch = True
-            self.store.set_state("kill_switch", "1")
-            self.store.add_event("warning", "Nødstop: alle positioner sælges, og nye køb er blokeret.")
-            self._notify("Nødstop aktiveret. Alle positioner sælges.")
-            self._sell_all(self.mode, "kill", "Nødstop.")
+        # Flaget sættes med det samme, også midt i en lang runde, så intet nyt bliver købt.
+        self.kill_switch = True
+        self.store.set_state("kill_switch", "1")
+        self.store.add_event("warning", "Nødstop: alle positioner sælges, og nye køb er blokeret.")
+        self._notify("Nødstop aktiveret. Alle positioner sælges.")
+        self._wake.set()
+        if self._lock.acquire(timeout=KILL_LOCK_SECONDS):
+            try:
+                self._sell_all(self.mode, "kill", "Nødstop.")
+            finally:
+                self._lock.release()
+        else:
+            # Runden er optaget (fx Claude-research). Næste runde sælger alt, se _monitor.
+            self.store.add_event("info", "Botten var midt i en runde. Positionerne sælges, så snart den er færdig.")
 
     def resume(self) -> None:
-        with self._lock:
-            self.kill_switch = False
-            self.store.set_state("kill_switch", "0")
-            totals = self._totals()
-            self.store.set_state(f"dd_reset:{self.mode}", repr(totals["total_pnl"]))
-            self.store.set_state(f"halt_dd:{self.mode}", "0")
-            self.store.add_event("info", "Genoptaget. Drawdown måles fra nu. Dagens tabsgrænse gælder stadig.")
+        totals = self._totals()
+        self.store.set_state(f"dd_reset:{self.mode}", repr(totals["total_pnl"]))
+        self.store.set_state(f"halt_dd:{self.mode}", "0")
+        self.kill_switch = False
+        self.store.set_state("kill_switch", "0")
+        self.store.add_event("info", "Genoptaget. Drawdown måles fra nu. Dagens tabsgrænse gælder stadig.")
 
     def pause(self, paused: bool) -> None:
-        with self._lock:
-            self.paused = bool(paused)
-            self.store.set_state("paused", "1" if self.paused else "0")
-            if self.paused:
-                self.store.add_event("info", "Nye køb er sat på pause. Åbne positioner passes stadig.")
-            else:
-                self.store.add_event("info", "Pausen er ophævet. Botten køber igen, når noget består alle tjek.")
+        # Ingen lås: pausen skal virke med det samme, også midt i en runde.
+        self.paused = bool(paused)
+        self.store.set_state("paused", "1" if self.paused else "0")
+        if self.paused:
+            self.store.add_event("info", "Nye køb er sat på pause. Åbne positioner passes stadig.")
+        else:
+            self.store.add_event("info", "Pausen er ophævet. Botten køber igen, når noget består alle tjek.")
 
     def _extra_wallets(self) -> list[str]:
         value = self.store.get_json("copy_wallets_extra", [])
@@ -1797,6 +1851,15 @@ class MemeEngine:
         rows.append({"mint": mint, "symbol": symbol.strip()[:24] or "?", "ts": now_iso()})
         self.store.set_json("blacklist", rows[-500:])
         self.store.add_event("info", f"{symbol or mint[:6]} er blokeret. Botten køber det aldrig.")
+        with self._lock:
+            held = [row for row in self.store.open_positions(self.mode) if row["mint"] == mint]
+            if held:
+                try:
+                    sol_usd = self._sol_price()
+                except SourceError:
+                    return
+                for pos in held:
+                    self._sell(pos, 1.0, "manual", "Du blokerede tokenet, så botten sælger det.", self._wallet(), sol_usd)
 
     def unblock_token(self, mint: str) -> None:
         rows = [row for row in self._blacklist() if row["mint"] != mint.strip()]
