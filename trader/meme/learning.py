@@ -13,7 +13,14 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from trader.meme.clients import PairInfo, RugReport, TokenInfo, XBuzz
-from trader.meme.config import PARAM_LABELS, StrategyParams, clamp_param
+from trader.meme.config import (
+    PARAM_LABELS,
+    SNIPER_LABELS,
+    SniperSettings,
+    StrategyParams,
+    clamp_param,
+    clamp_sniper,
+)
 
 FEATURES: dict[str, tuple[str, float]] = {
     # navn: (dansk forklaring, startvægt)
@@ -164,6 +171,7 @@ EXIT_LABELS = {
     "rug_no_route": "ingen exit-rute (sandsynligvis rug)",
     "stop_loss": "stop-loss",
     "take_profit": "delvis gevinst",
+    "target": "gevinstmålet nået",
     "trailing": "trailing stop",
     "time": "tidsgrænse",
     "stale": "intet skete",
@@ -257,3 +265,33 @@ def source_stats(closed: list[dict]) -> dict[str, dict[str, Any]]:
         entry["win_rate"] = entry["wins"] / entry["trades"] if entry["trades"] else None
         entry["muted"] = entry["trades"] >= 6 and (entry["win_rate"] or 0) < 0.3 and entry["pnl"] < 0
     return stats
+
+
+def adapt_sniper(cfg: SniperSettings, recent: list[dict]) -> list[str]:
+    """Strammer sniperens filtre efter rugs og mange stop-loss. Rører aldrig mål, stop eller beløb."""
+    if len(recent) < 5:
+        return []
+    window = recent[-10:]
+    rugs = sum(1 for row in window if str(row.get("exit_reason") or "").startswith("rug"))
+    stops = sum(1 for row in window if row.get("exit_reason") == "stop_loss")
+    notes: list[str] = []
+
+    def move(name: str, value: float, why: str) -> None:
+        old = getattr(cfg, name)
+        new = clamp_sniper(name, value)
+        if abs(new - old) < 1e-9:
+            return
+        setattr(cfg, name, new)
+        notes.append(f"Sniper · {SNIPER_LABELS.get(name, name)}: {_fmt(old)} → {_fmt(new)} ({why}).")
+
+    if rugs >= 2:
+        why = f"{rugs} rugs i de seneste {len(window)} snipes"
+        move("min_liquidity_usd", cfg.min_liquidity_usd * 1.25, why)
+        move("min_holders", cfg.min_holders + 10, why)
+        move("max_top10_pct", cfg.max_top10_pct - 3.0, why)
+        move("min_age_seconds", cfg.min_age_seconds + 30.0, why)
+    elif stops >= 5:
+        why = f"{stops} stop-loss i de seneste {len(window)} snipes"
+        move("min_holders", cfg.min_holders + 5, why)
+        move("min_liquidity_usd", cfg.min_liquidity_usd * 1.1, why)
+    return notes

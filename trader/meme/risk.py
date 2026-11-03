@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from trader.meme.config import MemeSettings, StrategyParams
+from trader.meme.config import MemeSettings, SniperSettings, StrategyParams
 
 MIN_POSITION_USD = 1.0
 
@@ -30,7 +30,19 @@ class EntryDecision:
     reason: str
 
 
-def evaluate_entry(ctx: EntryContext, settings: MemeSettings) -> EntryDecision:
+def evaluate_entry(
+    ctx: EntryContext,
+    settings: MemeSettings,
+    *,
+    position_usd: float | None = None,
+    max_open: int | None = None,
+    max_trades: int | None = None,
+    label: str = "",
+) -> EntryDecision:
+    position_usd = settings.position_usd if position_usd is None else min(position_usd, settings.position_usd)
+    max_open = settings.max_open if max_open is None else max_open
+    max_trades = settings.max_trades_per_day if max_trades is None else max_trades
+
     def no(reason: str) -> EntryDecision:
         return EntryDecision(False, 0.0, reason)
 
@@ -42,12 +54,12 @@ def evaluate_entry(ctx: EntryContext, settings: MemeSettings) -> EntryDecision:
         return no(f"Dagens tab har ramt {settings.daily_loss_pct * 100:.0f} % af bankroll. Pause til i morgen (UTC).")
     if ctx.mint in ctx.open_mints:
         return no("Der er allerede en position i tokenet.")
-    if ctx.open_count >= settings.max_open:
-        return no(f"Maks. {settings.max_open} åbne positioner.")
-    if ctx.trades_today >= settings.max_trades_per_day:
-        return no(f"Maks. {settings.max_trades_per_day} køb i dag er nået.")
+    if ctx.open_count >= max_open:
+        return no(f"Maks. {max_open} åbne {label}positioner.")
+    if ctx.trades_today >= max_trades:
+        return no(f"Maks. {max_trades} {label}køb i dag er nået.")
     room = settings.bankroll_usd - ctx.deployed
-    size = min(settings.position_usd, ctx.cash, room, max(0.0, ctx.equity) * 0.4)
+    size = min(position_usd, ctx.cash, room, max(0.0, ctx.equity) * 0.4)
     if size < MIN_POSITION_USD:
         return no(f"For lidt fri kapital ({max(0.0, size):.2f} USD). Gebyrer ville spise handlen.")
     return EntryDecision(True, round(size, 4), "Godkendt af risikomotoren.")
@@ -110,4 +122,43 @@ def exit_decision(
         return ExitDecision(True, 1.0, "time", f"Holdt i {minutes_held:.0f} min. Tidsgrænsen er nået.")
     if minutes_held >= params.stale_minutes and ratio < 1.05 and not partial_taken:
         return ExitDecision(True, 1.0, "stale", f"Intet skete på {minutes_held:.0f} min. ({(ratio - 1) * 100:+.0f} %).")
+    return HOLD
+
+
+MOONBAG_TRAIL = 0.3
+
+
+def sniper_exit_decision(
+    *,
+    ratio: float,
+    peak_ratio: float,
+    minutes_held: float,
+    partial_taken: bool,
+    liquidity_entry: float | None,
+    liquidity_now: float | None,
+    cfg: SniperSettings,
+) -> ExitDecision:
+    """Sniperens udgange: dit gevinstmål, stop-loss, rug-alarm og tidsgrænse."""
+    if liquidity_entry and liquidity_now is not None and liquidity_now < liquidity_entry * 0.4:
+        return ExitDecision(
+            True,
+            1.0,
+            "rug_liquidity",
+            f"Likviditeten faldt fra ${liquidity_entry:,.0f} til ${liquidity_now:,.0f}. Sælger alt (rug-alarm).",
+        )
+    if ratio <= 1.0 - cfg.stop_loss_pct:
+        return ExitDecision(True, 1.0, "stop_loss", f"Stop-loss: {(ratio - 1) * 100:.0f} %.")
+    if not partial_taken and ratio >= 1.0 + cfg.take_profit_pct:
+        fraction = 1.0 if cfg.sell_fraction >= 0.999 else cfg.sell_fraction
+        rest = "" if fraction >= 1.0 else f" Resten ({(1 - fraction) * 100:.0f} %) følger toppen."
+        return ExitDecision(
+            True,
+            fraction,
+            "target",
+            f"Gevinstmålet på +{cfg.take_profit_pct * 100:.0f} % er nået ({(ratio - 1) * 100:+.0f} %).{rest}",
+        )
+    if partial_taken and (ratio <= peak_ratio * (1.0 - MOONBAG_TRAIL) or ratio <= 1.0):
+        return ExitDecision(True, 1.0, "trailing", f"Resten sælges: {(ratio / peak_ratio - 1) * 100:.0f} % fra toppen.")
+    if minutes_held >= cfg.max_hold_minutes:
+        return ExitDecision(True, 1.0, "time", f"Holdt i {minutes_held:.0f} min. Tidsgrænsen er nået.")
     return HOLD

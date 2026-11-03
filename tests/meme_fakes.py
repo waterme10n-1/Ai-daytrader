@@ -125,6 +125,7 @@ class FakeJup:
         self.sol = sol_usd
         self.no_route: set[str] = set()
         self.quotes = 0
+        self.recent: list = []
 
     def sol_usd(self) -> float:
         return self.sol
@@ -136,7 +137,10 @@ class FakeJup:
         return []
 
     def token_infos(self, mints):
-        return {}
+        return {token.mint: token for token in self.recent if token.mint in mints}
+
+    def recent_tokens(self, limit=60):
+        return list(self.recent)
 
     def _price(self, mint: str) -> float:
         return float(self.dex.pairs[mint]["priceUsd"])

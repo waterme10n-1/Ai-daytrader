@@ -161,9 +161,9 @@
 
   /* Toolbar og faner */
   .toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
-  .tabs { display: flex; gap: 4px; padding: 4px; border-radius: 14px; background: var(--surface); border: 1px solid var(--border); overflow-x: auto; scrollbar-width: none; max-width: 100%; }
+  .tabs { display: flex; gap: 2px; padding: 4px; border-radius: 14px; background: var(--surface); border: 1px solid var(--border); overflow-x: auto; scrollbar-width: none; max-width: 100%; }
   .tabs::-webkit-scrollbar { display: none; }
-  .tab { border: 0; background: transparent; padding: 7px 13px; border-radius: 10px; color: var(--text-2); font-weight: 500; font-size: 0.9rem; display: inline-flex; gap: 7px; align-items: center; white-space: nowrap; }
+  .tab { border: 0; background: transparent; padding: 7px 10px; border-radius: 10px; color: var(--text-2); font-weight: 500; font-size: 0.9rem; display: inline-flex; gap: 7px; align-items: center; white-space: nowrap; }
   .tab:hover { color: var(--text); }
   .tab[aria-selected="true"] { background: var(--accent-soft); color: var(--accent); }
   .tab .count { background: var(--raised); color: var(--text-2); border-radius: 999px; padding: 0 7px; font-size: 0.75rem; }
@@ -298,6 +298,32 @@
   .kv b { font-weight: 600; font-size: 0.9rem; overflow-wrap: anywhere; }
   kbd { font-family: ui-monospace, Menlo, monospace; font-size: 0.78rem; padding: 1px 6px; border-radius: 6px; border: 1px solid var(--border-strong); background: var(--surface-2); }
 
+  /* Sniper */
+  .switch { position: relative; width: 46px; height: 26px; border-radius: 999px; border: 1px solid var(--border-strong); background: var(--raised); padding: 0; flex: none; }
+  .switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: var(--muted); transition: transform 0.2s, background 0.2s; }
+  .switch[aria-checked="true"] { background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
+  .switch[aria-checked="true"]::after { transform: translateX(20px); background: var(--accent); }
+  .sn-grid { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); }
+  .mini-stats { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
+  .mini-stats div { background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; }
+  .mini-stats > div > span { display: block; font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  .mini-stats b { font-size: 1.1rem; }
+  .target-big { font-size: clamp(2.4rem, 6vw, 3.4rem); font-weight: 700; line-height: 1; background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .presets { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0; }
+  .presets button { border: 1px solid var(--border); background: var(--surface-2); border-radius: 999px; padding: 4px 12px; font-size: 0.84rem; font-weight: 600; color: var(--text-2); }
+  .presets button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); border-color: color-mix(in srgb, var(--accent) 50%, transparent); }
+  .field { display: grid; gap: 7px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .field:last-child { border-bottom: 0; }
+  .field-top { display: flex; justify-content: space-between; gap: 10px; align-items: center; font-size: 0.88rem; }
+  .field-top b { font-size: 1rem; }
+  .field input[type="range"] { width: 100%; accent-color: var(--accent); }
+  .field input[type="number"] { width: 130px; height: 36px; border-radius: 10px; border: 1px solid var(--border-strong); background: var(--surface-2); padding: 0 10px; }
+  .field .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 0.84rem; }
+  .preview { margin-top: 14px; padding: 12px 14px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--border); font-size: 0.88rem; display: grid; gap: 5px; }
+  .preview .row { display: flex; justify-content: space-between; gap: 12px; }
+  .savebar { display: flex; gap: 8px; align-items: center; justify-content: flex-end; flex-wrap: wrap; }
+  .dirty { color: var(--warn); font-size: 0.86rem; margin-right: auto; display: inline-flex; gap: 6px; align-items: center; }
+
   /* Toasts */
   .toasts { position: fixed; right: 16px; bottom: 16px; display: grid; gap: 8px; z-index: 50; width: min(360px, calc(100% - 32px)); }
   .toast { display: grid; grid-template-columns: 34px 1fr; gap: 10px; align-items: center; padding: 12px 14px; border-radius: 14px; background: var(--surface); border: 1px solid var(--border-strong); box-shadow: 0 14px 40px rgba(0, 0, 0, 0.3); animation: slidein 0.25s ease; font-size: 0.88rem; }
@@ -322,6 +348,8 @@
     .search { margin-left: 0; width: 100%; }
     .search input { width: 100%; }
     .wallet-row { grid-template-columns: 1fr 1fr; }
+    .sn-grid { grid-template-columns: minmax(0, 1fr); }
+    .mini-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   }
   @media (max-width: 560px) {
     .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -330,6 +358,7 @@
     .goal-top { flex-direction: column; align-items: flex-start; }
     .list-row { grid-template-columns: 1fr 1fr 30px 64px; }
     .hide-sm { display: none; }
+    .mini-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   }
 </style>
 </head>
@@ -418,6 +447,37 @@
     <div class="pos-grid" id="positions"></div>
   </section>
 
+  <section class="panel grid" id="panel-sniper" role="tabpanel" hidden>
+    <div class="card">
+      <div class="card-head">
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><h2 id="sniper-title"></h2><button class="switch" id="sniper-switch" type="button" role="switch" aria-checked="false" aria-label="Sniper til eller fra"></button><span class="muted" id="sniper-state" style="font-size:0.88rem"></span></div>
+        <span class="muted" id="sniper-when" style="font-size:0.86rem"></span>
+      </div>
+      <div class="mini-stats num" id="sniper-stats"></div>
+      <div class="chips" id="sniper-scan" style="margin-top:12px"></div>
+    </div>
+    <div class="grid sn-grid">
+      <div class="card">
+        <div class="card-head"><h2 id="sniper-goal-title"></h2><span class="muted" style="font-size:0.84rem">Gælder også åbne snipes</span></div>
+        <div id="sniper-goal"></div>
+        <div class="preview num" id="sniper-preview"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2 id="sniper-filter-title"></h2><span class="chip warn">læring = kan strammes automatisk</span></div>
+        <div id="sniper-filters"></div>
+      </div>
+    </div>
+    <div class="card savebar">
+      <span class="dirty" id="sniper-dirty" hidden></span>
+      <button class="btn" type="button" id="sniper-reset">Nulstil til standard</button>
+      <button class="btn primary" type="button" id="sniper-save">Gem indstillinger</button>
+    </div>
+    <div class="card">
+      <div class="card-head"><h2 id="sniper-seen-title"></h2><span class="muted" style="font-size:0.86rem">Helt nye tokens, og hvorfor de blev købt eller sprunget over</span></div>
+      <div class="table-wrap" id="sniper-seen"></div>
+    </div>
+  </section>
+
   <section class="panel card" id="panel-radar" role="tabpanel" hidden>
     <div class="card-head"><h2 id="radar-title"></h2><span class="muted">Alle tokens botten har set på, og hvor de faldt fra</span></div>
     <div class="filters"><div id="radar-filters" style="display:contents"></div><label class="search"><svg class="i sm" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><input id="radar-search" type="search" placeholder="Søg symbol eller adresse" aria-label="Søg i radaren"></label></div>
@@ -489,7 +549,7 @@
     <div class="card">
       <div class="card-head"><h2 id="keys-title"></h2></div>
       <div class="kv">
-        <div><span>Skift fane</span><b><kbd>1</kbd> – <kbd>7</kbd></b></div>
+        <div><span>Skift fane</span><b><kbd>1</kbd> – <kbd>8</kbd></b></div>
         <div><span>Scan nu</span><b><kbd>S</kbd></b></div>
         <div><span>Pause / fortsæt køb</span><b><kbd>P</kbd></b></div>
         <div><span>Søg i radaren</span><b><kbd>/</kbd></b></div>
@@ -541,20 +601,23 @@ const ICONS = {
   keyboard: '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M6 9h.01M10 9h.01M14 9h.01M18 9h.01M6 13h.01M18 13h.01M8 17h8"/>',
   sliders: '<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M2 14h4M10 8h4M18 16h4"/>',
   search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+  target: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+  save: '<path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/><path d="M7 3v4a1 1 0 0 0 1 1h7"/>',
 };
 function icon(name, cls) { return `<svg class="i${cls ? " " + cls : ""}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ""}</svg>`; }
 
 const TABS = [
   ["oversigt", "Oversigt", "grid"],
   ["positioner", "Positioner", "coins"],
+  ["sniper", "Sniper", "target"],
   ["radar", "Radar", "radar"],
   ["journal", "Journal", "book"],
   ["laering", "Læring", "brain"],
   ["wallets", "Wallets", "wallet"],
   ["krav", "Indstillinger", "shield"],
 ];
-const STAGES = { "købt": "Købt", marked: "Markedsfilter", rug: "Rug-tjek", score: "Score", rute: "Exit-rute", claude: "Claude", risiko: "Risiko", "køb": "Køb fejlede" };
-const STAGE_CLASS = { "købt": "ok", rug: "rug", claude: "claude", risiko: "risiko", rute: "rute" };
+const STAGES = { "købt": "Købt", sniper: "Sniper-filter", marked: "Markedsfilter", rug: "Rug-tjek", score: "Score", rute: "Exit-rute", claude: "Claude", risiko: "Risiko", "køb": "Køb fejlede" };
+const STAGE_CLASS = { "købt": "ok", rug: "rug", claude: "claude", risiko: "risiko", rute: "rute", sniper: "risiko" };
 const KIND = { handel: "Handel", parameter: "Parameter", claude: "Claude" };
 
 const fmtMoney = new Intl.NumberFormat("da-DK", { style: "currency", currency: "USD", currencyDisplay: "narrowSymbol", minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -645,7 +708,7 @@ function setTab(name, push) {
   if (push && location.hash !== "#" + name) history.replaceState(null, "", "#" + name);
 }
 function renderTabs(data) {
-  const counts = { positioner: (data.positions || []).length, journal: data.kpis.trades, wallets: (data.copy_wallets || []).length };
+  const counts = { positioner: (data.positions || []).length, sniper: data.sniper ? data.sniper.stats.open : 0, journal: data.kpis.trades, wallets: (data.copy_wallets || []).length };
   const html = TABS.map(([id, label, ic], i) => `<button class="tab" role="tab" type="button" data-tab="${id}" aria-selected="${id === active}" title="Tast ${i + 1}">${icon(ic, "sm")}${esc(label)}${counts[id] ? `<span class="count">${counts[id]}</span>` : ""}</button>`).join("");
   put("tabs", html);
 }
@@ -865,8 +928,10 @@ function renderKpis(data) {
   put("kpis", tiles.map(([l, v, sub, extra]) => `<div class="card kpi"><div class="label">${esc(l)}</div><div class="v display num">${esc(v)}</div><div class="s">${esc(sub)}</div>${extra}</div>`).join(""));
 }
 function renderActions(data) {
-  document.getElementById("scan").innerHTML = icon("scan", "sm") + "Scan nu";
-  document.getElementById("pause").innerHTML = data.paused ? icon("play", "sm") + "Fortsæt køb" : icon("pause", "sm") + "Pause køb";
+  document.getElementById("scan").innerHTML = icon("scan", "sm") + "Scan";
+  document.getElementById("scan").title = "Scan nu (S)";
+  document.getElementById("pause").innerHTML = data.paused ? icon("play", "sm") + "Fortsæt" : icon("pause", "sm") + "Pause";
+  document.getElementById("pause").title = data.paused ? "Fortsæt nye køb (P)" : "Sæt nye køb på pause. Åbne positioner passes stadig (P)";
   document.getElementById("kill").innerHTML = data.kill_switch ? icon("play", "sm") + "Genoptag" : icon("stop", "sm") + "Nødstop";
   document.getElementById("kill").dataset.mode = data.kill_switch || data.halted_drawdown ? "resume" : "kill";
   document.getElementById("kill").className = "btn " + (data.kill_switch || data.halted_drawdown ? "" : "danger");
@@ -875,7 +940,7 @@ function renderActions(data) {
 }
 function renderOverview(data) {
   const scan = data.engine.last_scan || {};
-  document.getElementById("funnel-title").innerHTML = icon("funnel") + "Seneste scanning";
+  document.getElementById("funnel-title").innerHTML = icon("funnel") + "Seneste scanning" + (data.sniper ? ` <button class="chip ${data.sniper.enabled ? "accent" : ""}" type="button" data-goto="sniper" style="border:0;cursor:pointer">${icon("target", "sm")}Sniper ${data.sniper.enabled ? "til · mål " + spct(data.sniper.settings.take_profit_pct) : "fra"}</button>` : "");
   document.getElementById("funnel-when").textContent = data.engine.last_scan_at ? ago(data.engine.last_scan_at) : "venter på første scanning";
   const steps = [["Fundet", scan.discovered], ["Ikke set for nylig", scan.fresh], ["Bestod markedsfiltre", scan.market_ok], ["Bestod rug-tjek", scan.rug_ok], ["Høj nok score", scan.scored], ["Købt", scan.bought]];
   const top = Math.max(1, scan.discovered || 0);
@@ -928,7 +993,7 @@ function rangeMeter(p) {
     [`stop`, stop, `Stop ${spct(stop)}`],
     [`entry`, 0, "Købt"],
   ];
-  if (tp != null) marks.push(["tp", tp, `Delsalg ${spct(tp)}`]);
+  if (tp != null) marks.push(["tp", tp, `${p.strategy === "sniper" ? "Mål" : "Delsalg"} ${spct(tp)}`]);
   if (trail != null) marks.push(["trail", trail, `Trail ${spct(trail)}`]);
   return `<div class="range" aria-label="Kurs ${esc(spct(now))} mellem stop ${esc(spct(stop))} og mål">
     <div class="track"></div>
@@ -944,7 +1009,7 @@ function renderPositions(data) {
     const hold = p.max_hold_minutes ? Math.min(1, (p.minutes || 0) / p.max_hold_minutes) : 0;
     return `<article class="card">
       <div class="pos-head">
-        <div><div class="sym display">${esc(p.symbol)}</div><div class="muted" style="font-size:0.82rem">${esc(p.name || "")} · ${esc(p.source)}${p.partial ? ' · <span class="up">delsalg taget</span>' : ""}</div>${tokenLinks(p.mint, p.pair_url)}</div>
+        <div><div class="sym display">${esc(p.symbol)}${p.strategy === "sniper" ? ' <span class="chip accent" style="vertical-align:middle">' + icon("target", "sm") + "Sniper</span>" : ""}</div><div class="muted" style="font-size:0.82rem">${esc(p.name || "")} · ${esc(p.source)}${p.partial ? ' · <span class="up">delsalg taget</span>' : ""}</div>${tokenLinks(p.mint, p.pair_url)}</div>
         <div><div class="pnl-big display num ${tone(p.change_pct)}">${esc(spct(p.change_pct))}</div><div class="num ${tone(p.unrealized_usd)}" style="text-align:right;font-size:0.86rem">${esc(signed(p.unrealized_usd))}</div></div>
       </div>
       ${rangeMeter(p)}
@@ -1071,6 +1136,131 @@ function renderKrav(data) {
   document.getElementById("keys-title").innerHTML = icon("keyboard") + "Genveje";
 }
 
+/* ---------- Sniper ---------- */
+let sniperDraft = null;
+let sniperDirty = false;
+let sniperKey = "";
+const TP_PRESETS = [0.25, 0.5, 1, 2, 3, 5];
+const UNIT = { pct: "%", usd: "$", min: "min.", sec: "sek.", int: "" };
+function snFields(data) { const m = {}; for (const f of data.sniper.fields) m[f.name] = f; return m; }
+function toUi(f, v) { return f.kind === "pct" ? Math.round(v * 1000) / 10 : v; }
+function fromUi(f, v) { return f.kind === "pct" ? v / 100 : v; }
+function numberField(f, step) {
+  const v = toUi(f, sniperDraft[f.name]);
+  const lo = toUi(f, f.bounds[0]), hi = toUi(f, f.bounds[1]);
+  const def = toUi(f, f.default);
+  return `<div class="field"><div class="field-top"><span>${esc(f.label)}${f.learnable ? ' <span class="chip warn">læring</span>' : ""}</span></div>
+    <div class="row"><input type="number" min="${lo}" max="${hi}" step="${step}" value="${esc(v)}" data-sf="${f.name}" aria-label="${esc(f.label)}"><span class="muted">${esc(UNIT[f.kind] || "")} · ${esc(fmtNum.format(lo))}–${esc(fmtNum.format(hi))}${v !== def ? ` · standard ${esc(fmtNum.format(def))}` : ""}</span></div></div>`;
+}
+function sliderField(f, step, show) {
+  const v = toUi(f, sniperDraft[f.name]);
+  const lo = toUi(f, f.bounds[0]), hi = toUi(f, f.bounds[1]);
+  return `<div class="field"><div class="field-top"><span>${esc(f.label)}</span><b class="num" data-show="${f.name}">${esc(show(sniperDraft[f.name]))}</b></div>
+    <input type="range" min="${lo}" max="${hi}" step="${step}" value="${esc(v)}" data-sf="${f.name}" aria-label="${esc(f.label)}"></div>`;
+}
+function boolField(f) {
+  return `<div class="field"><div class="field-top"><span>${esc(f.label)}</span><button class="switch" type="button" role="switch" aria-checked="${sniperDraft[f.name] ? "true" : "false"}" data-sb="${f.name}" aria-label="${esc(f.label)}"></button></div></div>`;
+}
+const SHOW = {
+  take_profit_pct: (v) => spct(v),
+  sell_fraction: (v) => (v >= 0.999 ? "Sælg alt" : `${pct(v)} sælges, resten følger toppen`),
+  stop_loss_pct: (v) => spct(-v),
+};
+function renderSniperForm(data) {
+  const f = snFields(data);
+  const tpValue = sniperDraft.take_profit_pct;
+  put("sniper-goal", `
+    <div class="label">Sælg når gevinsten er</div>
+    <div class="target-big display num" data-show="take_profit_pct">${esc(spct(tpValue))}</div>
+    <div class="presets" id="tp-presets">${TP_PRESETS.map((v) => `<button type="button" data-tp="${v}" aria-pressed="${Math.abs(v - tpValue) < 1e-9}">${esc(spct(v))}</button>`).join("")}</div>
+    <input type="range" min="${toUi(f.take_profit_pct, f.take_profit_pct.bounds[0])}" max="${toUi(f.take_profit_pct, f.take_profit_pct.bounds[1])}" step="5" value="${esc(toUi(f.take_profit_pct, tpValue))}" data-sf="take_profit_pct" aria-label="Gevinstmål i procent" style="width:100%;accent-color:var(--accent)">
+    ${sliderField(f.sell_fraction, 5, SHOW.sell_fraction)}
+    ${sliderField(f.stop_loss_pct, 1, SHOW.stop_loss_pct)}
+    ${numberField(f.position_usd, 0.5)}
+    ${numberField(f.max_hold_minutes, 5)}`);
+  put("sniper-filters", [
+    numberField(f.min_age_seconds, 10),
+    numberField(f.max_age_minutes, 1),
+    numberField(f.min_liquidity_usd, 500),
+    numberField(f.min_holders, 1),
+    numberField(f.max_top10_pct, 1),
+    boolField(f.require_socials),
+    boolField(f.use_claude),
+  ].join(""));
+}
+function renderPreview() {
+  if (!sniperDraft) return;
+  const size = Number(sniperDraft.position_usd), tp = Number(sniperDraft.take_profit_pct), frac = Number(sniperDraft.sell_fraction), sl = Number(sniperDraft.stop_loss_pct);
+  const win = size * tp * frac;
+  const loss = size * sl;
+  const breakeven = sl / (tp + sl);
+  put("sniper-preview", `
+    <div class="row"><span class="muted">Køb pr. snipe</span><b>${esc(money(size))}</b></div>
+    <div class="row"><span class="muted">Ved målet (${esc(spct(tp))})</span><b class="up">${esc(signed(win))}${frac < 0.999 ? " + resten" : ""}</b></div>
+    <div class="row"><span class="muted">Ved stop-loss (${esc(spct(-sl))})</span><b class="down">${esc(signed(-loss))}</b></div>
+    <div class="row"><span class="muted">For at gå i nul skal målet rammes i mindst</span><b>${esc(pct(breakeven))} af snipes</b></div>
+    <span class="muted" style="font-size:0.8rem">Før gebyrer og slippage. De fleste nye tokens rammer aldrig målet.</span>`);
+  document.getElementById("sniper-dirty").hidden = !sniperDirty;
+  document.getElementById("sniper-dirty").innerHTML = icon("alert", "sm") + "Ændringerne er ikke gemt";
+}
+function renderSniper(data) {
+  const sn = data.sniper;
+  if (!sn) return;
+  document.getElementById("sniper-title").innerHTML = icon("target") + "Sniper";
+  const sw = document.getElementById("sniper-switch");
+  sw.setAttribute("aria-checked", sn.enabled ? "true" : "false");
+  document.getElementById("sniper-state").textContent = sn.enabled
+    ? `Leder efter nye tokens hvert ${sn.scan_seconds}. sekund`
+    : "Slået fra. Tænd for at købe nye tokens, der består alle tjek.";
+  const last = sn.last || {};
+  document.getElementById("sniper-when").textContent = last.at ? "seneste kig " + ago(last.at) : "";
+  const st = sn.stats;
+  put("sniper-stats", [
+    ["Snipes", fmtInt.format(st.trades)],
+    ["Ramte målet", fmtInt.format(st.targets)],
+    ["Gevinstprocent", st.win_rate == null ? "—" : pct(st.win_rate)],
+    ["Resultat", `<span class="${tone(st.pnl)}">${esc(signed(st.pnl))}</span>`],
+    ["Åbne", `${st.open} / ${sn.max_open}`],
+    ["I dag", `${st.today} / ${sn.max_per_day}`],
+  ].map(([l, v]) => `<div><span>${esc(l)}</span><b>${v}</b></div>`).join(""));
+  const steps = [["Tjekket", last.checked], ["Nye", last.new], ["Unge nok", last.young], ["Bestod alle tjek", last.passed], ["Købt", last.bought]];
+  put("sniper-scan", last.checked == null ? `<span class="chip">${esc(last.note || (sn.enabled ? "Venter på første kig…" : "Sniperen er slået fra"))}</span>` :
+    steps.map(([l, v], i) => `<span class="chip ${i === 4 && v ? "up" : ""}">${esc(l)} <b class="num">${esc(v ?? 0)}</b></span>${i < 4 ? '<span class="muted">→</span>' : ""}`).join("")
+    + (last.note ? `<span class="chip warn">${esc(last.note)}</span>` : "")
+    + (last.errors || []).slice(0, 3).map((t) => `<span class="chip warn" title="${esc(t)}">${icon("alert", "sm")}${esc(t.split(":")[0])}</span>`).join(""));
+  document.getElementById("sniper-goal-title").innerHTML = icon("target") + "Dit gevinstmål";
+  document.getElementById("sniper-filter-title").innerHTML = icon("shield") + "Filtre for nye tokens";
+  const key = JSON.stringify(sn.settings) + JSON.stringify(sn.fields.map((f) => f.bounds));
+  if (!sniperDirty && key !== sniperKey) {
+    sniperKey = key;
+    sniperDraft = { ...sn.settings };
+    renderSniperForm(data);
+  }
+  renderPreview();
+  document.getElementById("sniper-seen-title").innerHTML = icon("radar") + "Nye tokens botten har set";
+  const rows = (data.candidates || []).filter((c) => c.source === "Sniper: ny token");
+  put("sniper-seen", rows.length ? `<table><thead><tr><th>Tid</th><th>Token</th><th>Trin</th><th>Begrundelse</th><th></th></tr></thead><tbody>${rows.slice(0, 120).map((c) => `<tr>
+      <td class="muted" style="white-space:nowrap">${esc(ago(c.ts))}</td>
+      <td class="tok">${esc(c.symbol || short(c.mint))}</td>
+      <td><span class="stage-tag ${STAGE_CLASS[c.stage] || ""}">${esc(STAGES[c.stage] || c.stage)}</span></td>
+      <td style="min-width:260px">${esc(c.reason)}</td>
+      <td style="white-space:nowrap">${tokenLinks(c.mint, c.pair_url)}</td></tr>`).join("")}</tbody></table>` : empty(sn.enabled ? "Ingen nye tokens endnu. Botten kigger hvert 10. sekund og venter mindst et minut efter lancering." : "Tænd for sniperen for at se nye tokens her.", "target"));
+}
+function setDraft(name, value) {
+  if (!state || !sniperDraft) return;
+  const f = snFields(state)[name];
+  if (!f) return;
+  let v = Number(value);
+  if (Number.isNaN(v)) return;
+  v = fromUi(f, v);
+  sniperDraft[name] = v;
+  sniperDirty = true;
+  document.querySelectorAll(`[data-sf="${name}"]`).forEach((el) => { if (document.activeElement !== el) el.value = toUi(f, v); });
+  document.querySelectorAll(`[data-show="${name}"]`).forEach((el) => { el.textContent = (SHOW[name] || ((x) => fmtNum.format(x)))(v); });
+  if (name === "take_profit_pct") document.querySelectorAll("#tp-presets button").forEach((b) => b.setAttribute("aria-pressed", Math.abs(Number(b.dataset.tp) - v) < 1e-9 ? "true" : "false"));
+  renderPreview();
+}
+
 /* ---------- Nye handler: toasts og notifikationer ---------- */
 function notifyEnabled() { try { return localStorage.getItem("meme-notify") === "1" && "Notification" in window && Notification.permission === "granted"; } catch (e) { return false; } }
 function renderBell() {
@@ -1110,6 +1300,7 @@ function render(data) {
   renderActions(data);
   renderOverview(data);
   renderPositions(data);
+  renderSniper(data);
   renderRadar(data);
   renderJournal(data);
   renderLearning(data);
@@ -1164,7 +1355,35 @@ document.addEventListener("click", (ev) => {
   else if (t.dataset.unfollow) { if (confirm("Stop med at følge denne wallet?")) act(() => post("/api/meme/wallets", { wallet: t.dataset.unfollow, action: "remove" }), "Wallet fjernet"); }
   else if (t.dataset.copy) { ev.preventDefault(); navigator.clipboard && navigator.clipboard.writeText(t.dataset.copy).then(() => toast("", "Adressen er kopieret", short(t.dataset.copy))).catch(() => {}); }
 });
-document.addEventListener("input", (ev) => { if (ev.target.id === "radar-search") { radarQuery = ev.target.value; cache.radar = null; renderRadar(state); } });
+document.addEventListener("input", (ev) => {
+  if (ev.target.id === "radar-search") { radarQuery = ev.target.value; cache.radar = null; renderRadar(state); }
+  else if (ev.target.dataset && ev.target.dataset.sf) setDraft(ev.target.dataset.sf, ev.target.value);
+});
+document.getElementById("panel-sniper").addEventListener("click", (ev) => {
+  const preset = ev.target.closest("[data-tp]");
+  const toggle = ev.target.closest("[data-sb]");
+  if (preset) setDraft("take_profit_pct", Number(preset.dataset.tp) * 100);
+  else if (toggle && sniperDraft) {
+    const name = toggle.dataset.sb;
+    sniperDraft[name] = !sniperDraft[name];
+    sniperDirty = true;
+    toggle.setAttribute("aria-checked", sniperDraft[name] ? "true" : "false");
+    renderPreview();
+  }
+});
+document.getElementById("sniper-switch").addEventListener("click", () => {
+  const on = !(state && state.sniper && state.sniper.enabled);
+  act(() => post("/api/meme/sniper", { enabled: on }), on ? "Sniperen er tændt" : "Sniperen er slukket");
+});
+document.getElementById("sniper-save").addEventListener("click", () => {
+  if (!sniperDraft) return;
+  const { enabled, ...rest } = sniperDraft;
+  act(async () => { const b = await post("/api/meme/sniper", rest); sniperDirty = false; sniperKey = ""; return b; }, "Sniper-indstillingerne er gemt");
+});
+document.getElementById("sniper-reset").addEventListener("click", () => {
+  if (!confirm("Sæt alle sniper-indstillinger tilbage til standard?")) return;
+  act(async () => { const b = await post("/api/meme/sniper", { reset: true }); sniperDirty = false; sniperKey = ""; return b; }, "Standardindstillingerne er tilbage");
+});
 document.getElementById("scan").addEventListener("click", async (ev) => {
   const b = ev.currentTarget; b.disabled = true;
   try { await post("/api/meme/scan"); toast("", "Scanning bestilt", "Resultatet dukker op om lidt."); setTimeout(refresh, 3500); }
@@ -1203,7 +1422,7 @@ document.addEventListener("keydown", (ev) => {
   if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
   const tag = (ev.target.tagName || "").toLowerCase();
   if (tag === "input" || tag === "textarea") { if (ev.key === "Escape") ev.target.blur(); return; }
-  if (/^[1-7]$/.test(ev.key)) { setTab(TABS[Number(ev.key) - 1][0], true); return; }
+  if (/^[1-8]$/.test(ev.key)) { setTab(TABS[Number(ev.key) - 1][0], true); return; }
   const k = ev.key.toLowerCase();
   if (k === "s") document.getElementById("scan").click();
   else if (k === "p") document.getElementById("pause").click();
@@ -1228,7 +1447,7 @@ try { storedTheme = localStorage.getItem("meme-theme"); } catch (e) {}
 const queryTheme = new URLSearchParams(location.search).get("theme");
 applyTheme(queryTheme === "dark" || queryTheme === "light" ? queryTheme : (storedTheme || "dark"));
 renderBell();
-renderTabs({ positions: [], kpis: { trades: 0 }, copy_wallets: [] });
+renderTabs({ positions: [], kpis: { trades: 0 }, copy_wallets: [], sniper: null });
 setTab(location.hash.slice(1) || "oversigt", false);
 bindEquityHover();
 bindDailyHover();

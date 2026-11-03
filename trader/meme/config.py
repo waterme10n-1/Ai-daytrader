@@ -78,6 +78,11 @@ class MemeSettings:
     anthropic_api_key: str
     goal_usd_per_month: float
     db_path: str
+    sniper_enabled: bool = True
+    sniper_position_usd: float = 1.5
+    sniper_max_open: int = 2
+    sniper_max_per_day: int = 10
+    sniper_scan_seconds: int = 10
 
     @property
     def wallet_configured(self) -> bool:
@@ -131,6 +136,11 @@ class MemeSettings:
             anthropic_api_key=os.getenv("ANTHROPIC_API_KEY", "").strip(),
             goal_usd_per_month=max(1.0, _float(os.getenv("MEME_GOAL_USD_PER_MONTH"), 100.0)),
             db_path=os.getenv("MEME_DB_PATH", "").strip() or default_db,
+            sniper_enabled=_flag(os.getenv("MEME_SNIPER_ENABLED"), True),
+            sniper_position_usd=max(0.5, _float(os.getenv("MEME_SNIPER_POSITION_USD"), 1.5)),
+            sniper_max_open=max(1, min(10, _int(os.getenv("MEME_SNIPER_MAX_OPEN"), 2))),
+            sniper_max_per_day=max(1, min(100, _int(os.getenv("MEME_SNIPER_MAX_PER_DAY"), 10))),
+            sniper_scan_seconds=max(5, _int(os.getenv("MEME_SNIPER_SCAN_SECONDS"), 10)),
         )
 
 
@@ -234,6 +244,86 @@ def clamp_param(name: str, value: float) -> float:
     return clamped
 
 
+@dataclass
+class SniperSettings:
+    """Sniper: køb helt nye tokens, der består rug-tjek, og sælg ved dit gevinstmål.
+
+    Kan ændres fra dashboardet. Beløb pr. snipe kan aldrig overstige MEME_POSITION_USD,
+    og bankroll-loftet og tabsgrænserne gælder som for alt andet.
+    """
+
+    enabled: bool = True
+    take_profit_pct: float = 1.0
+    sell_fraction: float = 1.0
+    stop_loss_pct: float = 0.35
+    max_hold_minutes: float = 60.0
+    position_usd: float = 1.5
+    min_age_seconds: float = 60.0
+    max_age_minutes: float = 30.0
+    min_liquidity_usd: float = 8_000.0
+    min_holders: int = 25
+    max_top10_pct: float = 30.0
+    require_socials: bool = True
+    use_claude: bool = False
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+
+SNIPER_BOUNDS: dict[str, tuple[float, float]] = {
+    "take_profit_pct": (0.1, 10.0),
+    "sell_fraction": (0.25, 1.0),
+    "stop_loss_pct": (0.1, 0.6),
+    "max_hold_minutes": (5.0, 720.0),
+    "position_usd": (1.0, 1_000.0),
+    "min_age_seconds": (0.0, 1_800.0),
+    "max_age_minutes": (2.0, 240.0),
+    "min_liquidity_usd": (2_000.0, 500_000.0),
+    "min_holders": (5, 5_000),
+    "max_top10_pct": (10.0, 60.0),
+}
+SNIPER_BOOLS = ("enabled", "require_socials", "use_claude")
+SNIPER_LEARNABLE = ("min_liquidity_usd", "min_holders", "max_top10_pct", "min_age_seconds")
+SNIPER_LABELS: dict[str, str] = {
+    "enabled": "Sniper slået til",
+    "take_profit_pct": "Sælg ved gevinst",
+    "sell_fraction": "Andel der sælges ved målet",
+    "stop_loss_pct": "Stop-loss",
+    "max_hold_minutes": "Maks. holdetid (min.)",
+    "position_usd": "Beløb pr. snipe (USD)",
+    "min_age_seconds": "Vent mindst (sek.) efter lancering",
+    "max_age_minutes": "Maks. alder (min.)",
+    "min_liquidity_usd": "Min. likviditet (USD)",
+    "min_holders": "Min. antal holdere",
+    "max_top10_pct": "Maks. top-10 ejerandel (%)",
+    "require_socials": "Kræv X, Telegram eller hjemmeside",
+    "use_claude": "Spørg Claude først (langsommere)",
+}
+
+
+def clamp_sniper(name: str, value: float, cap_usd: float | None = None) -> float:
+    low, high = SNIPER_BOUNDS[name]
+    if name == "position_usd" and cap_usd is not None:
+        high = min(high, cap_usd)
+        low = min(low, high)
+    clamped = min(high, max(low, value))
+    return int(round(clamped)) if name == "min_holders" else clamped
+
+
+def sniper_from(data: dict | None, settings: MemeSettings) -> SniperSettings:
+    cfg = SniperSettings(enabled=settings.sniper_enabled, position_usd=min(settings.sniper_position_usd, settings.position_usd))
+    for key, value in (data or {}).items():
+        if key in SNIPER_BOOLS:
+            setattr(cfg, key, bool(value))
+        elif key in SNIPER_BOUNDS:
+            try:
+                setattr(cfg, key, clamp_sniper(key, float(value), settings.position_usd))
+            except (TypeError, ValueError):
+                continue
+    cfg.position_usd = clamp_sniper("position_usd", cfg.position_usd, settings.position_usd)
+    return cfg
+
+
 def public_meme_settings(settings: MemeSettings) -> dict:
     """Til dashboardet. Ingen hemmeligheder."""
     return {
@@ -265,4 +355,7 @@ def public_meme_settings(settings: MemeSettings) -> dict:
         "unlock_min_trades": UNLOCK_MIN_TRADES,
         "unlock_min_days": UNLOCK_MIN_DAYS,
         "unlock_min_profit_factor": UNLOCK_MIN_PROFIT_FACTOR,
+        "sniper_max_open": settings.sniper_max_open,
+        "sniper_max_per_day": settings.sniper_max_per_day,
+        "sniper_scan_seconds": settings.sniper_scan_seconds,
     }

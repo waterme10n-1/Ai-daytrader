@@ -342,6 +342,24 @@ class TokenInfo:
     liquidity: float | None
     mcap: float | None
     stats_1h: dict
+    created_at_ms: int = 0
+    graduated: bool | None = None
+
+
+def _iso_ms(value: Any) -> int:
+    if not value:
+        return 0
+    if isinstance(value, (int, float)):
+        return int(value if value > 10**11 else value * 1000)
+    try:
+        from datetime import datetime, timezone
+
+        moment = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        if moment.tzinfo is None:
+            moment = moment.replace(tzinfo=timezone.utc)
+        return int(moment.timestamp() * 1000)
+    except ValueError:
+        return 0
 
 
 def parse_token_info(raw: dict) -> TokenInfo | None:
@@ -375,6 +393,8 @@ def parse_token_info(raw: dict) -> TokenInfo | None:
         liquidity=opt_num(raw.get("liquidity")),
         mcap=opt_num(raw.get("mcap")),
         stats_1h=dict(raw.get("stats1h") or {}),
+        created_at_ms=_iso_ms((raw.get("firstPool") or {}).get("createdAt") or raw.get("createdAt")),
+        graduated=bool(raw.get("graduatedPool")) if "graduatedPool" in raw else None,
     )
 
 
@@ -476,6 +496,10 @@ class Jupiter:
 
     def top_tokens(self, category: str, interval: str = "1h", limit: int = 50) -> list[TokenInfo]:
         return self._token_list(f"/tokens/v2/{category}/{interval}", {"limit": str(limit)})
+
+    def recent_tokens(self, limit: int = 60) -> list[TokenInfo]:
+        """Tokens hvis første pool lige er oprettet. Sniperens hovedkilde."""
+        return self._token_list("/tokens/v2/recent", {"limit": str(limit)})
 
     def token_infos(self, mints: list[str]) -> dict[str, TokenInfo]:
         result: dict[str, TokenInfo] = {}

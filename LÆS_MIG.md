@@ -124,6 +124,7 @@ Memebotten kører i samme proces som aktiemotoren, 24/7, og har sit eget dashboa
 Efter login lander du på `/meme`. Siden opdaterer sig selv hvert 8. sekund.
 
 - **Oversigt**: egenkapital med graf (24 t, 7 d eller alt), målet om Claude Max, seneste scanning som tragt (fundet → marked → rug-tjek → score → købt), aktivitet, dagligt resultat og hvorfor botten solgte.
+- **Sniper**: tænd og sluk, sæt dit gevinstmål og stop-loss, og se de nye tokens botten har set på.
 - **Positioner**: et kort pr. position med en skala, der viser kursen i forhold til stop-loss, købskurs, delsalg og trailing stop, samt links til DexScreener, RugCheck, Solscan og X. Knappen **Sælg nu** sælger med det samme.
 - **Radar**: hvert token botten har set på, hvilket trin det faldt ved og hvorfor. Filtrér og søg, og bloker tokens, botten aldrig må købe.
 - **Journal**: alle lukkede handler. Klik på en række for begrundelse og transaktioner.
@@ -131,7 +132,7 @@ Efter login lander du på `/meme`. Siden opdaterer sig selv hvert 8. sekund.
 - **Wallets**: tilføj eller fjern wallets, der skal følges, direkte fra siden. Du behøver ikke genstarte.
 - **Indstillinger**: kravene før rigtige penge og alle indstillinger.
 
-Knapper: **Scan nu**, **Pause køb** (åbne positioner passes stadig) og **Nødstop** (sælger alt). Klokken øverst slår browser-notifikationer til ved køb og salg. Genveje: `1`–`7` skifter fane, `S` scanner, `P` sætter køb på pause, `/` søger i radaren og `T` skifter tema.
+Knapper: **Scan nu**, **Pause køb** (åbne positioner passes stadig) og **Nødstop** (sælger alt). Klokken øverst slår browser-notifikationer til ved køb og salg. Genveje: `1`–`8` skifter fane, `S` scanner, `P` sætter køb på pause, `/` søger i radaren og `T` skifter tema.
 
 ## Ærlige forventninger
 
@@ -153,6 +154,27 @@ Hvert minut:
 7. **Risiko**: højst `MEME_POSITION_USD` pr. handel, aldrig mere end `MEME_BANKROLL_USD` i alt, højst `MEME_MAX_OPEN` åbne og `MEME_MAX_TRADES_PER_DAY` køb om dagen.
 
 Hvert 15. sekund overvåges åbne positioner: stop-loss (-25 %), halvdelen sælges ved +60 %, trailing stop 25 % fra toppen, salg hvis likviditeten trækkes (rug-alarm), hvis intet sker, eller hvis den fulgte trader sælger. Tomme token-konti lukkes, så rent-depositummet kommer tilbage.
+
+## Sniper: helt nye tokens
+
+Sniperen er en ekstra strategi ved siden af den almindelige. Hvert 10. sekund henter den tokens, hvis første pool lige er oprettet (Jupiter), og nye profiler fra DexScreener. Et token købes kun, hvis det består alt dette:
+
+1. Det er mellem `Vent mindst` (standard 60 sek.) og `Maks. alder` (standard 30 min.) gammelt. Botten venter med vilje lidt, fordi mange rugs sker i det første minut.
+2. Det er ikke på en bonding curve, har mindst 8.000 USD likviditet, ikke dumper lige nu og ikke har massivt salg.
+3. Mint- og freeze authority er slået fra, udvikleren ejer højst 5 %, top-10 ejer højst 30 %, og der er mindst 25 holdere.
+4. Det har X, Telegram eller en hjemmeside (kan slås fra).
+5. RugCheck har ingen alvorlige advarsler, og Jupiter kan både købe og sælge tokenet igen uden stort tab (honeypot-tjek).
+6. Risikogrænserne tillader det: standard 1,50 USD pr. snipe, højst 2 åbne snipes og 10 om dagen, og bankroll-loftet gælder.
+
+Salg sker ved **dit gevinstmål** (standard +100 %). Du kan vælge at sælge det hele ved målet eller kun en del og lade resten følge toppen. Der er også stop-loss (standard -35 %), rug-alarm hvis likviditeten trækkes, og en tidsgrænse (standard 60 min.).
+
+Alt kan ændres på fanen **Sniper** i dashboardet: tænd og sluk, gevinstmål (med knapper til +25 % op til +500 %), andel der sælges, stop-loss, beløb pr. snipe, holdetid og filtrene. Siden viser også, hvor mange af dine snipes der skal ramme målet, før du går i nul. Læringen må kun stramme filtrene (fx efter rugs), aldrig ændre dit mål, dit stop eller beløbet.
+
+Vær klar over:
+
+- Sniping er den mest risikable måde at handle memecoins på. De fleste nye tokens rammer aldrig +100 %.
+- Professionelle snipere køber i samme blok, som poolen oprettes, med private noder. Denne bot er bevidst langsommere, fordi den tjekker tokenet først. Den køber derfor sjældent i bunden.
+- Claude bruges ikke til snipes som standard, fordi research tager op til et par minutter. Du kan slå det til, men så kommer botten senere ind.
 
 ## Sådan lærer den
 

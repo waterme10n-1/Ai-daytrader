@@ -44,7 +44,8 @@ CREATE TABLE IF NOT EXISTS positions (
     pair_url TEXT,
     signatures TEXT,
     exit_failures INTEGER NOT NULL DEFAULT 0,
-    learned INTEGER NOT NULL DEFAULT 0
+    learned INTEGER NOT NULL DEFAULT 0,
+    strategy TEXT NOT NULL DEFAULT 'momentum'
 );
 
 CREATE TABLE IF NOT EXISTS candidates (
@@ -116,6 +117,7 @@ CREATE INDEX IF NOT EXISTS idx_equity_mode ON equity (mode, ts);
 """
 
 POSITION_FIELDS = (
+    "strategy",
     "mode",
     "mint",
     "symbol",
@@ -177,6 +179,9 @@ class MemeStore:
         self._conn.row_factory = sqlite3.Row
         with self._lock:
             self._conn.executescript(SCHEMA)
+            columns = {row[1] for row in self._conn.execute("PRAGMA table_info(positions)")}
+            if "strategy" not in columns:
+                self._conn.execute("ALTER TABLE positions ADD COLUMN strategy TEXT NOT NULL DEFAULT 'momentum'")
             self._conn.commit()
 
     def close(self) -> None:
@@ -267,6 +272,8 @@ class MemeStore:
         values = []
         for name in POSITION_FIELDS:
             value = row.get(name)
+            if name == "strategy":
+                value = value or "momentum"
             if name in {"features", "safety", "ai", "signatures"}:
                 value = _json(value)
             values.append(value)
@@ -309,11 +316,17 @@ class MemeStore:
     def unlearned_closed(self) -> list[dict[str, Any]]:
         return self._all("SELECT * FROM positions WHERE status = 'closed' AND learned = 0 ORDER BY id")
 
-    def trades_opened_on(self, mode: str, day: str) -> int:
-        row = self._one(
-            "SELECT COUNT(*) AS n FROM positions WHERE mode = ? AND substr(opened_at, 1, 10) = ?",
-            (mode, day),
-        )
+    def trades_opened_on(self, mode: str, day: str, strategy: str | None = None) -> int:
+        if strategy is None:
+            row = self._one(
+                "SELECT COUNT(*) AS n FROM positions WHERE mode = ? AND substr(opened_at, 1, 10) = ?",
+                (mode, day),
+            )
+        else:
+            row = self._one(
+                "SELECT COUNT(*) AS n FROM positions WHERE mode = ? AND substr(opened_at, 1, 10) = ? AND strategy = ?",
+                (mode, day, strategy),
+            )
         return int(row["n"]) if row else 0
 
     def recent_loss_on(self, mint: str, since_iso: str) -> bool:

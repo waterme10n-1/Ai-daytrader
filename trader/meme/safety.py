@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from trader.meme.clients import PairInfo, Quote, RugReport, TokenInfo
-from trader.meme.config import StrategyParams
+from trader.meme.config import SniperSettings, StrategyParams
 
 
 def _usd(value: float) -> str:
@@ -95,4 +95,39 @@ def roundtrip_rejections(buy: Quote | None, sell: Quote | None, params: Strategy
         reasons.append(f"Køb+salg koster {loss:.1f} % (maks. {params.max_roundtrip_loss_pct:.1f} %) — tynd pool eller skat")
     if buy.price_impact_pct > params.max_roundtrip_loss_pct / 2:
         reasons.append(f"Prisimpact ved køb {buy.price_impact_pct:.1f} %")
+    return reasons
+
+
+BONDING_CURVE_DEXES = {"pumpfun", "pump.fun", "moonshot", "launchlab", "bonk"}
+
+
+def sniper_rejections(pair: PairInfo, token: TokenInfo | None, cfg: SniperSettings, age_minutes: float) -> list[str]:
+    """Hurtige tjek for helt nye tokens. RugCheck og exit-rute tjekkes bagefter."""
+    reasons: list[str] = []
+    if age_minutes > cfg.max_age_minutes:
+        reasons.append(f"For gammel til sniping ({age_minutes:.0f} min.)")
+    if pair.dex_id.lower() in BONDING_CURVE_DEXES:
+        reasons.append("Stadig på bonding curve")
+    if pair.liquidity_usd < cfg.min_liquidity_usd:
+        reasons.append(f"Likviditet {_usd(pair.liquidity_usd)} under {_usd(cfg.min_liquidity_usd)}")
+    if pair.change.get("m5", 0.0) < -25.0:
+        reasons.append(f"Dumper allerede ({pair.change['m5']:.0f} % på 5 min.)")
+    buys, sells = pair.buys.get("m5", 0), pair.sells.get("m5", 0)
+    if sells > max(4, buys * 2):
+        reasons.append(f"Massivt salg lige nu ({sells} salg mod {buys} køb på 5 min.)")
+    if token is not None:
+        if token.mint_disabled is False:
+            reasons.append("Mint authority er ikke slået fra")
+        if token.freeze_disabled is False:
+            reasons.append("Freeze authority er ikke slået fra")
+        if token.dev_balance_pct is not None and token.dev_balance_pct > 5.0:
+            reasons.append(f"Udvikleren ejer {token.dev_balance_pct:.0f} %")
+        if token.top_holders_pct is not None and token.top_holders_pct > cfg.max_top10_pct:
+            reasons.append(f"Topholdere ejer {token.top_holders_pct:.0f} % (maks. {cfg.max_top10_pct:.0f} %)")
+        if token.holders is not None and token.holders < cfg.min_holders:
+            reasons.append(f"Kun {token.holders} holdere (min. {cfg.min_holders})")
+    if cfg.require_socials:
+        has_social = bool(pair.socials or pair.websites or (token and (token.twitter or token.telegram or token.website)))
+        if not has_social:
+            reasons.append("Ingen X, Telegram eller hjemmeside")
     return reasons

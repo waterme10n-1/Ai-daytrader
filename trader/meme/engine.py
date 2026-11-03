@@ -31,14 +31,21 @@ from trader.meme.config import (
     PARAM_BOUNDS,
     PARAM_LABELS,
     QUOTE_MINTS,
+    SNIPER_BOOLS,
+    SNIPER_BOUNDS,
+    SNIPER_LABELS,
+    SNIPER_LEARNABLE,
     SOL_MINT,
     UNLOCK_MIN_DAYS,
     UNLOCK_MIN_PROFIT_FACTOR,
     UNLOCK_MIN_TRADES,
     MemeSettings,
+    SniperSettings,
     StrategyParams,
     clamp_param,
+    clamp_sniper,
     public_meme_settings,
+    sniper_from,
 )
 from trader.meme.copytrade import CopyTracker
 from trader.meme.learning import (
@@ -47,13 +54,22 @@ from trader.meme.learning import (
     WIN_THRESHOLD_PCT,
     Model,
     adapt_params,
+    adapt_sniper,
     build_features,
     source_stats,
     trade_lesson,
 )
 from trader.meme.research import MemeResearcher, Verdict
-from trader.meme.risk import EntryContext, daily_loss_hit, drawdown_hit, evaluate_entry, exit_decision
-from trader.meme.safety import market_rejections, roundtrip_rejections, rug_rejections
+from trader.meme.risk import (
+    MOONBAG_TRAIL,
+    EntryContext,
+    daily_loss_hit,
+    drawdown_hit,
+    evaluate_entry,
+    exit_decision,
+    sniper_exit_decision,
+)
+from trader.meme.safety import market_rejections, roundtrip_rejections, rug_rejections, sniper_rejections
 from trader.meme.store import MemeStore, loads, now_iso, utc_day
 from trader.meme.wallet import PaperWallet, SolanaWallet, load_keypair
 
@@ -70,7 +86,12 @@ ADAPT_EVERY = 5
 NO_LEARN_EXITS = {"kill", "manual"}
 FEE_MARGIN_USD = 0.05
 
+SNIPER_LOOP_SECONDS = 5
+SNIPER_DEEP_CHECKS = 4
+SNIPER_SEEN_HOURS = 6
+
 SOURCE_LABELS = {
+    "sniper": "Sniper: ny token",
     "jup_trending": "Jupiter: trending",
     "jup_organic": "Jupiter: organisk score",
     "dex_boost": "DexScreener: boost",
@@ -181,6 +202,9 @@ class MemeEngine:
         self.model = Model.from_dict(self.store.get_json("model"))
         self.kill_switch = self.store.get_state("kill_switch", "0") == "1"
         self.paused = self.store.get_state("paused", "0") == "1"
+        self.sniper: SniperSettings = sniper_from(self.store.get_json("sniper"), self.settings)
+        self._last_snipe = 0.0
+        self.last_snipe: dict[str, Any] = {}
         self.copy = CopyTracker(self.clients.rpc, self.store, self._all_wallets())
         self._paper = PaperWallet(self.settings, self.store, self.clients.jup)
         self._live: SolanaWallet | None = None
@@ -226,8 +250,14 @@ class MemeEngine:
                 self.tick()
             except Exception:
                 logger.exception("Memebottens løkke fangede en fejl")
-            self._wake.wait(self.settings.monitor_seconds)
+            self._wake.wait(self._loop_seconds())
             self._wake.clear()
+
+    def _loop_seconds(self) -> float:
+        """Sniperen kræver hurtigere runder, så stop og gevinstmål rammes i tide."""
+        if self.sniper.enabled:
+            return float(min(self.settings.monitor_seconds, SNIPER_LOOP_SECONDS))
+        return float(self.settings.monitor_seconds)
 
     def _notify(self, text: str) -> None:
         if self._notifier is not None:
@@ -322,10 +352,15 @@ class MemeEngine:
                     self.store.add_event("info", f"Ny dag {day}. Egenkapital {totals['equity']:.2f} USD.")
                     self._daily_review()
                 halted_day, halted_dd = self._halts(totals, day, wallet, sol_usd)
-                if force_scan or self._scan_requested or now - self._last_scan >= self.settings.scan_seconds:
+                requested = force_scan or self._scan_requested
+                entries_allowed = not (self.kill_switch or self.paused or halted_day or halted_dd)
+                if requested or now - self._last_scan >= self.settings.scan_seconds:
                     self._scan_requested = False
                     self._last_scan = now
-                    self._scan(wallet, sol_usd, day, entries_allowed=not (self.kill_switch or self.paused or halted_day or halted_dd))
+                    self._scan(wallet, sol_usd, day, entries_allowed=entries_allowed)
+                if self.sniper.enabled and (requested or now - self._last_snipe >= self.settings.sniper_scan_seconds):
+                    self._last_snipe = now
+                    self._snipe(wallet, sol_usd, day, entries_allowed=entries_allowed)
                 if now - self._last_snapshot >= 300:
                     self._last_snapshot = now
                     self.store.add_equity(self.mode, self._totals()["equity"])
@@ -382,15 +417,18 @@ class MemeEngine:
             if source.startswith("copy:") and (source[5:], mint) in self._copy_sells:
                 self._sell(pos, 1.0, "copy_exit", "Den fulgte trader solgte. Botten sælger også.", wallet, sol_usd)
                 continue
-            decision = exit_decision(
+            common = dict(
                 ratio=ratio,
                 peak_ratio=peak,
                 minutes_held=_minutes_since(pos["opened_at"]),
                 partial_taken=bool(pos["partial_taken"]),
                 liquidity_entry=pos.get("liquidity_entry"),
                 liquidity_now=liquidity,
-                params=self.params,
             )
+            if pos.get("strategy") == "sniper":
+                decision = sniper_exit_decision(cfg=self.sniper, **common)
+            else:
+                decision = exit_decision(params=self.params, **common)
             if decision.sell:
                 self._sell(pos, decision.fraction, decision.kind, decision.reason, wallet, sol_usd)
         self._copy_sells.clear()
@@ -408,7 +446,7 @@ class MemeEngine:
             self.store.update_position(int(pos["id"]), exit_failures=failures)
             pos["exit_failures"] = failures
             self.store.add_event("warning", f"Salg af {pos['symbol']} fejlede ({failures}): {fill.error}")
-            if failures >= EXIT_FAILURE_LIMIT and kind != "take_profit":
+            if failures >= EXIT_FAILURE_LIMIT and kind not in {"take_profit", "target"}:
                 self._close(
                     pos,
                     float(pos["proceeds_usd"]),
@@ -501,9 +539,16 @@ class MemeEngine:
             changes = self.model.update(features, won)
             self.store.add_lesson("handel", trade_lesson(pos, features, before, changes), int(pos["id"]))
             changed = True
-            closed = self.store.closed_positions(pos["mode"])
-            if len(closed) % ADAPT_EVERY == 0:
-                for note in adapt_params(self.params, closed):
+            strategy = pos.get("strategy") or "momentum"
+            same = [row for row in self.store.closed_positions(pos["mode"]) if (row.get("strategy") or "momentum") == strategy]
+            if len(same) % ADAPT_EVERY == 0:
+                if strategy == "sniper":
+                    notes = adapt_sniper(self.sniper, same)
+                    if notes:
+                        self._save_sniper()
+                else:
+                    notes = adapt_params(self.params, same)
+                for note in notes:
                     self.store.add_lesson("parameter", note, int(pos["id"]))
         if changed:
             self._save_learning()
@@ -812,10 +857,191 @@ class MemeEngine:
             if self._try_buy(cand, wallet, sol_usd, day):
                 summary["bought"] += 1
 
-    def _try_buy(self, cand: dict, wallet, sol_usd: float, day: str) -> bool:
+    def _snipe(self, wallet, sol_usd: float, day: str, *, entries_allowed: bool) -> None:
+        """Find helt nye tokens, tjek dem hurtigt og køb dem, der består."""
+        cfg = self.sniper
+        summary: dict[str, Any] = {"checked": 0, "new": 0, "young": 0, "passed": 0, "bought": 0, "errors": [], "at": now_iso()}
+        self.last_snipe = summary
+        if not entries_allowed:
+            summary["note"] = "Ingen nye køb (pause, nødstop eller tabsgrænse)."
+            return
+        now = time.time()
+        seen = {mint: stamp for mint, stamp in (self.store.get_json("sniper_seen", {}) or {}).items() if now - float(stamp) < SNIPER_SEEN_HOURS * 3600}
+        found: dict[str, dict] = {}
+        try:
+            for token in self.clients.jup.recent_tokens(60):
+                found[token.mint] = {"mint": token.mint, "token": token}
+        except SourceError as exc:
+            summary["errors"].append(f"Jupiter nye tokens: {exc}")
+        try:
+            for row in self.clients.dex.latest_profiles():
+                mint = str(row.get("tokenAddress") or "")
+                if mint:
+                    found.setdefault(mint, {"mint": mint, "token": None})
+        except SourceError as exc:
+            summary["errors"].append(f"DexScreener profiler: {exc}")
+        summary["checked"] = len(found)
+        open_mints = {row["mint"] for row in self.store.open_positions(self.mode)}
+        blocked = {row["mint"] for row in self._blacklist()}
+        fresh = [
+            cand
+            for mint, cand in found.items()
+            if mint not in seen and mint not in open_mints and mint not in blocked and mint not in QUOTE_MINTS and not self.store.ever_rugged(mint)
+        ]
+        summary["new"] = len(fresh)
+        if not fresh:
+            self.store.set_json("sniper_seen", seen)
+            return
+        try:
+            pairs = self.clients.dex.pairs_for([cand["mint"] for cand in fresh][:60])
+        except SourceError as exc:
+            summary["errors"].append(f"DexScreener par: {exc}")
+            return
+        missing_info = [cand["mint"] for cand in fresh if cand["token"] is None and cand["mint"] in pairs]
+        if missing_info:
+            try:
+                infos = self.clients.jup.token_infos(missing_info)
+                for cand in fresh:
+                    if cand["token"] is None:
+                        cand["token"] = infos.get(cand["mint"])
+            except SourceError as exc:
+                summary["errors"].append(f"Jupiter token-info: {exc}")
+        now_ms = int(now * 1000)
+        passed: list[dict] = []
+        for cand in fresh:
+            mint = cand["mint"]
+            pair = pairs.get(mint)
+            token: TokenInfo | None = cand["token"]
+            created = (pair.created_at_ms if pair and pair.created_at_ms else 0) or (token.created_at_ms if token else 0)
+            age = (now_ms - created) / 60_000 if created else None
+            if pair is None or age is None:
+                # DexScreener har måske ikke set poolen endnu. Prøv igen næste runde, hvis tokenet er ungt.
+                if not (age is not None and age < cfg.max_age_minutes):
+                    seen[mint] = now
+                continue
+            if age * 60 < cfg.min_age_seconds:
+                continue
+            seen[mint] = now
+            if age > cfg.max_age_minutes:
+                continue
+            summary["young"] += 1
+            cand.update({"pair": pair, "source": "sniper", "copy": False, "boosted": False, "age_minutes": age})
+            reasons = sniper_rejections(pair, token, cfg, age)
+            if reasons:
+                self._record(cand, "sniper", False, "; ".join(reasons[:3]))
+                continue
+            passed.append(cand)
+        self.store.set_json("sniper_seen", seen)
+        passed.sort(key=lambda item: item["pair"].liquidity_usd, reverse=True)
+        rug_params = StrategyParams.from_dict({**self.params.to_dict(), "max_top10_pct": cfg.max_top10_pct})
+        for cand in passed[:SNIPER_DEEP_CHECKS]:
+            try:
+                report = self.clients.rug.report(cand["mint"], max_age=60.0)
+            except SourceError as exc:
+                summary["errors"].append(f"RugCheck: {exc}")
+                report = None
+            reasons = rug_rejections(report, cand["token"], rug_params)
+            if reasons:
+                self._record(cand, "rug", False, "; ".join(reasons[:3]))
+                continue
+            features = build_features(cand["pair"], report=report, token=cand["token"], now_ms=now_ms)
+            cand.update({"report": report, "buzz": None, "features": features, "score": self.model.score(features)})
+            summary["passed"] += 1
+            if self._try_buy(cand, wallet, sol_usd, day, strategy="sniper"):
+                summary["bought"] += 1
+                if summary["bought"] >= MAX_BUYS_PER_SCAN:
+                    break
+
+    def _save_sniper(self) -> None:
+        self.store.set_json("sniper", self.sniper.to_dict())
+
+    def update_sniper(self, changes: dict) -> None:
+        if not isinstance(changes, dict):
+            raise ValueError("Ugyldige indstillinger.")
+        with self._lock:
+            notes = []
+            for key, value in changes.items():
+                if key in SNIPER_BOOLS:
+                    new = bool(value)
+                elif key in SNIPER_BOUNDS:
+                    try:
+                        new = clamp_sniper(key, float(value), self.settings.position_usd)
+                    except (TypeError, ValueError) as exc:
+                        raise ValueError(f"{SNIPER_LABELS.get(key, key)} skal være et tal.") from exc
+                else:
+                    continue
+                old = getattr(self.sniper, key)
+                if old != new:
+                    setattr(self.sniper, key, new)
+                    notes.append(SNIPER_LABELS.get(key, key))
+            if not notes:
+                return
+            self._save_sniper()
+            self.store.add_event(
+                "info",
+                f"Sniper-indstillinger ændret: {', '.join(notes)}. Gælder også åbne snipes.",
+                f"Mål +{self.sniper.take_profit_pct * 100:.0f} %, stop -{self.sniper.stop_loss_pct * 100:.0f} %, "
+                f"{self.sniper.position_usd:.2f} USD pr. snipe.",
+            )
+
+    def reset_sniper(self) -> None:
+        with self._lock:
+            enabled = self.sniper.enabled
+            self.sniper = sniper_from({"enabled": enabled}, self.settings)
+            self._save_sniper()
+            self.store.add_event("info", "Sniper-indstillingerne er sat tilbage til standard.")
+
+    def _sniper_status(self, closed: list[dict], open_rows: list[dict], day: str) -> dict:
+        defaults = sniper_from({}, self.settings)
+        snipes = [row for row in closed if row.get("strategy") == "sniper"]
+        pnl = [float(row["pnl_usd"]) for row in snipes]
+        wins = [value for value in pnl if value > 0]
+        kinds = {
+            "take_profit_pct": "pct", "sell_fraction": "pct", "stop_loss_pct": "pct", "max_hold_minutes": "min",
+            "position_usd": "usd", "min_age_seconds": "sec", "max_age_minutes": "min", "min_liquidity_usd": "usd",
+            "min_holders": "int", "max_top10_pct": "int",
+        }
+        fields = []
+        for name, (low, high) in SNIPER_BOUNDS.items():
+            if name == "position_usd":
+                high = min(high, self.settings.position_usd)
+            fields.append({
+                "name": name,
+                "label": SNIPER_LABELS[name],
+                "value": getattr(self.sniper, name),
+                "default": getattr(defaults, name),
+                "bounds": [low, high],
+                "kind": kinds[name],
+                "learnable": name in SNIPER_LEARNABLE,
+            })
+        for name in SNIPER_BOOLS:
+            fields.append({"name": name, "label": SNIPER_LABELS[name], "value": getattr(self.sniper, name), "default": getattr(defaults, name), "kind": "bool"})
+        return {
+            "enabled": self.sniper.enabled,
+            "settings": self.sniper.to_dict(),
+            "fields": fields,
+            "stats": {
+                "trades": len(snipes),
+                "wins": len(wins),
+                "win_rate": len(wins) / len(snipes) if snipes else None,
+                "pnl": sum(pnl),
+                "targets": sum(1 for row in snipes if row.get("exit_reason") == "target"),
+                "open": sum(1 for row in open_rows if row.get("strategy") == "sniper"),
+                "today": self.store.trades_opened_on(self.mode, day, "sniper"),
+            },
+            "last": self.last_snipe,
+            "scan_seconds": self.settings.sniper_scan_seconds,
+            "max_open": self.settings.sniper_max_open,
+            "max_per_day": self.settings.sniper_max_per_day,
+            "position_cap": self.settings.position_usd,
+        }
+
+    def _try_buy(self, cand: dict, wallet, sol_usd: float, day: str, strategy: str = "momentum") -> bool:
         pair: PairInfo = cand["pair"]
         totals = self._totals()
         open_rows = self.store.open_positions(self.mode)
+        sniping = strategy == "sniper"
+        same_strategy = [row for row in open_rows if (row.get("strategy") or "momentum") == strategy]
         try:
             cash = wallet.cash_usd(sol_usd)
         except SourceError as exc:
@@ -827,14 +1053,18 @@ class MemeEngine:
                 equity=totals["equity"],
                 cash=max(0.0, cash - FEE_MARGIN_USD),
                 deployed=totals["deployed"],
-                open_count=len(open_rows),
+                open_count=len(same_strategy),
                 open_mints={row["mint"] for row in open_rows},
-                trades_today=self.store.trades_opened_on(self.mode, day),
+                trades_today=self.store.trades_opened_on(self.mode, day, strategy),
                 kill_switch=self.kill_switch,
                 halted_day=False,
                 halted_drawdown=False,
             ),
             self.settings,
+            position_usd=self.sniper.position_usd if sniping else None,
+            max_open=self.settings.sniper_max_open if sniping else None,
+            max_trades=self.settings.sniper_max_per_day if sniping else None,
+            label="sniper-" if sniping else "",
         )
         if not decision.allowed:
             self._record(cand, "risiko", False, decision.reason, cand["score"], cand["features"])
@@ -852,7 +1082,7 @@ class MemeEngine:
             return False
 
         verdict: Verdict | None = None
-        if self.researcher.available():
+        if (not sniping or self.sniper.use_claude) and self.researcher.available():
             verdict = self.researcher.research(self._ai_payload(cand, buy_quote, sell_quote), self._lessons_text())
             if verdict is not None:
                 cand["features"]["ai_view"] = verdict.view
@@ -868,12 +1098,22 @@ class MemeEngine:
             self.store.add_event("warning", f"Køb af {pair.symbol} fejlede: {fill.error}")
             return False
         drivers = [FEATURES[name][0].lower() for name, value in self.model.contributions(cand["features"]) if value > 0.05][:3]
-        reasoning = f"Score {cand['score']:.2f}. Kilde: {source_label(cand['source'])}. Stærkeste signaler: {', '.join(drivers) or 'ingen enkeltstående'}."
+        if sniping:
+            token = cand.get("token")
+            holders = f", {token.holders} holdere" if token is not None and token.holders else ""
+            exit_plan = f"Sælger {'alt' if self.sniper.sell_fraction >= 0.999 else f'{self.sniper.sell_fraction * 100:.0f} %'} ved +{self.sniper.take_profit_pct * 100:.0f} %, stop ved -{self.sniper.stop_loss_pct * 100:.0f} %."
+            reasoning = (
+                f"Sniper: ny token, {cand.get('age_minutes', 0):.0f} min. gammel, likviditet ${pair.liquidity_usd:,.0f}{holders}. "
+                f"Bestod rug-tjek og exit-rute. {exit_plan}"
+            )
+        else:
+            reasoning = f"Score {cand['score']:.2f}. Kilde: {source_label(cand['source'])}. Stærkeste signaler: {', '.join(drivers) or 'ingen enkeltstående'}."
         if verdict is not None:
             reasoning += f" Claude ({verdict.confidence}): {verdict.summary}"
         report = cand.get("report")
         position_id = self.store.open_position(
             {
+                "strategy": strategy,
                 "mode": self.mode,
                 "mint": cand["mint"],
                 "symbol": pair.symbol,
@@ -908,7 +1148,7 @@ class MemeEngine:
         self._record(cand, "købt", True, reasoning, cand["score"], cand["features"])
         self.store.add_event(
             "trade",
-            f"Købt {pair.symbol} for {fill.usd:.2f} USD ({'papir' if self.mode == 'paper' else 'LIVE'}).",
+            f"Købt {pair.symbol} for {fill.usd:.2f} USD ({'sniper, ' if sniping else ''}{'papir' if self.mode == 'paper' else 'LIVE'}).",
             reasoning,
         )
         self._notify(f"Købt {pair.symbol} for {fill.usd:.2f} USD. {reasoning[:300]} {pair.url}")
@@ -1264,6 +1504,7 @@ class MemeEngine:
                 for wallet in self._all_wallets()
             ],
             "blacklist": list(reversed(self._blacklist())),
+            "sniper": self._sniper_status(closed, self.store.open_positions(mode), today),
             "unlock": unlock,
             "events": self.store.recent_events(150),
             "settings": public_meme_settings(self.settings),
@@ -1318,9 +1559,18 @@ class MemeEngine:
         unrealized = float(row["proceeds_usd"]) + mark - float(row["cost_usd"]) - float(row["fees_usd"])
         ai = loads(row["ai"], None)
         peak = float(row["peak_ratio"] or 1.0)
+        sniping = row.get("strategy") == "sniper"
         trail = None
-        if peak >= 1.0 + self.params.trail_activation_pct:
-            trail = peak * (1.0 - self.params.trailing_stop_pct) - 1.0
+        if sniping:
+            if row["partial_taken"]:
+                trail = max(0.0, peak * (1.0 - MOONBAG_TRAIL) - 1.0)
+            stop_pct, tp_pct = -self.sniper.stop_loss_pct, None if row["partial_taken"] else self.sniper.take_profit_pct
+            max_hold = self.sniper.max_hold_minutes
+        else:
+            if peak >= 1.0 + self.params.trail_activation_pct:
+                trail = peak * (1.0 - self.params.trailing_stop_pct) - 1.0
+            stop_pct, tp_pct = -self.params.stop_loss_pct, None if row["partial_taken"] else self.params.take_profit_pct
+            max_hold = self.params.max_hold_minutes
         return {
             "id": row["id"],
             "symbol": row["symbol"],
@@ -1337,10 +1587,11 @@ class MemeEngine:
             "change_pct": (float(row["last_ratio"] or 1.0) - 1.0),
             "peak_pct": (float(row["peak_ratio"] or 1.0) - 1.0),
             "partial": bool(row["partial_taken"]),
-            "stop_pct": -self.params.stop_loss_pct,
-            "tp_pct": None if row["partial_taken"] else self.params.take_profit_pct,
+            "strategy": row.get("strategy") or "momentum",
+            "stop_pct": stop_pct,
+            "tp_pct": tp_pct,
             "trail_pct": trail,
-            "max_hold_minutes": self.params.max_hold_minutes,
+            "max_hold_minutes": max_hold,
             "hold_minutes": _hold_minutes(row) if row["status"] == "closed" else None,
             "mark_usd": mark,
             "unrealized_usd": unrealized if row["status"] == "open" else None,

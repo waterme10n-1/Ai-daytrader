@@ -272,6 +272,21 @@ def create_app(
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         return meme().status()
 
+    @app.post("/api/meme/sniper")
+    async def meme_sniper(request: Request) -> dict:
+        try:
+            body = await request.json()
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Ugyldig JSON.") from exc
+        try:
+            if isinstance(body, dict) and body.get("reset"):
+                meme().reset_sniper()
+            else:
+                meme().update_sniper(body if isinstance(body, dict) else {})
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return meme().status()
+
     @app.post("/api/meme/live/unlock")
     def meme_unlock(body: PhraseBody) -> dict:
         ok, message = meme().request_live(body.phrase)
