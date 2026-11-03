@@ -231,6 +231,8 @@ class RugReport:
     insiders: int
     decimals: int | None
     raw_score: float | None
+    creator: str = ""
+    top_owners: list = field(default_factory=list)
 
 
 def parse_rug_report(mint: str, data: dict) -> RugReport:
@@ -274,6 +276,16 @@ def parse_rug_report(mint: str, data: dict) -> RugReport:
     risk = min(1.0, base + 0.25 * len(dangers) + 0.06 * len(warnings))
     total_holders = data.get("totalHolders")
     decimals = token.get("decimals")
+    owners: list[tuple[str, float]] = []
+    if isinstance(holders, list):
+        for row in holders:
+            if not isinstance(row, dict) or row.get("address") in excluded or row.get("owner") in excluded:
+                continue
+            owner = str(row.get("owner") or "")
+            if owner and owner not in [item[0] for item in owners]:
+                owners.append((owner, _num(row.get("pct"))))
+            if len(owners) >= 3:
+                break
     return RugReport(
         mint=mint,
         risk=risk,
@@ -289,6 +301,8 @@ def parse_rug_report(mint: str, data: dict) -> RugReport:
         insiders=_int(data.get("graphInsidersDetected")),
         decimals=_int(decimals) if decimals is not None else None,
         raw_score=_num(raw_score) if raw_score is not None else None,
+        creator=str(data.get("creator") or ""),
+        top_owners=owners,
     )
 
 
@@ -443,18 +457,22 @@ class Jupiter:
             raw=data,
         )
 
-    def swap_transaction(self, quote: Quote, user_public_key: str) -> str:
+    def swap_transaction(self, quote: Quote, user_public_key: str, *, urgent: bool = False, jito_tip: int | None = None) -> str:
+        if jito_tip:
+            fee: dict = {"jitoTipLamports": int(jito_tip * (2 if urgent else 1))}
+        else:
+            fee = {
+                "priorityLevelWithMaxLamports": {
+                    "maxLamports": max(10_000, self.priority_fee_lamports * (3 if urgent else 1)),
+                    "priorityLevel": "veryHigh" if urgent else "high",
+                }
+            }
         payload = {
             "quoteResponse": quote.raw,
             "userPublicKey": user_public_key,
             "wrapAndUnwrapSol": True,
             "dynamicComputeUnitLimit": True,
-            "prioritizationFeeLamports": {
-                "priorityLevelWithMaxLamports": {
-                    "maxLamports": max(10_000, self.priority_fee_lamports),
-                    "priorityLevel": "high",
-                }
-            },
+            "prioritizationFeeLamports": fee,
         }
         data = self.http.post("/swap/v1/swap", payload)
         tx = (data or {}).get("swapTransaction") if isinstance(data, dict) else None
@@ -509,6 +527,28 @@ class Jupiter:
             for token in self._token_list("/tokens/v2/search", {"query": ",".join(chunk)}):
                 result[token.mint] = token
         return result
+
+
+class JitoSender:
+    """Sender signerede transaktioner direkte til Jitos block engine. Lander oftere og ses ikke i den offentlige strøm."""
+
+    def __init__(self, url: str) -> None:
+        self.url = url
+        self._client = httpx.Client(timeout=10.0, headers={"User-Agent": USER_AGENT})
+
+    def close(self) -> None:
+        self._client.close()
+
+    def send(self, b64_tx: str) -> str:
+        payload = {"jsonrpc": "2.0", "id": 1, "method": "sendTransaction", "params": [b64_tx, {"encoding": "base64"}]}
+        try:
+            response = self._client.post(self.url, json=payload)
+        except httpx.HTTPError as exc:
+            raise SourceError(f"Jito: {exc.__class__.__name__}") from exc
+        data = response.json() if response.content else {}
+        if response.status_code >= 400 or data.get("error"):
+            raise SourceError(f"Jito: {data.get('error') or response.status_code}")
+        return str(data.get("result"))
 
 
 # --------------------------------------------------------------------------- X (valgfri)

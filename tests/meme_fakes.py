@@ -179,6 +179,12 @@ def settings(**overrides) -> MemeSettings:
         daily_loss_pct=0.25,
         max_drawdown_pct=0.5,
         db_path=":memory:",
+        paper_fail_rate=0.0,
+        paper_slippage_pct=0.0,
+        paper_sniper_extra_pct=0.0,
+        report_hour_utc=-1,
+        dev_watch=False,
+        shadows=False,
     )
     values.update(overrides)
     return dataclasses.replace(base, **values)

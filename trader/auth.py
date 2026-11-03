@@ -42,8 +42,53 @@ def auth_is_active(settings: Settings) -> bool:
     )
 
 
+def new_totp_secret() -> str:
+    """Ny hemmelighed til en godkendelses-app (Google Authenticator, 1Password, Authy …)."""
+    return base64.b32encode(secrets.token_bytes(20)).decode().rstrip("=")
+
+
+def _totp_key(secret: str) -> bytes:
+    clean = secret.strip().replace(" ", "").upper()
+    return base64.b32decode(clean + "=" * (-len(clean) % 8))
+
+
+def totp_code(secret: str, at: float | None = None, step: int = 30, digits: int = 6) -> str:
+    counter = int((time.time() if at is None else at) // step)
+    digest = hmac.new(_totp_key(secret), counter.to_bytes(8, "big"), hashlib.sha1).digest()
+    offset = digest[-1] & 0x0F
+    value = int.from_bytes(digest[offset : offset + 4], "big") & 0x7FFFFFFF
+    return str(value % 10**digits).zfill(digits)
+
+
+def totp_ok(secret: str, code: str, at: float | None = None, window: int = 1) -> bool:
+    """Godkender koden for nu og ét 30-sekunders vindue før og efter (uret kan gå lidt skævt)."""
+    code = "".join(ch for ch in str(code or "") if ch.isdigit())
+    if not secret or len(code) != 6:
+        return False
+    moment = time.time() if at is None else at
+    try:
+        return any(hmac.compare_digest(totp_code(secret, moment + shift * 30), code) for shift in range(-window, window + 1))
+    except (ValueError, TypeError):
+        return False
+
+
+def totp_uri(secret: str, account: str = "memebot", issuer: str = "AI Daytrader") -> str:
+    from urllib.parse import quote
+
+    return f"otpauth://totp/{quote(issuer)}:{quote(account)}?secret={secret}&issuer={quote(issuer)}&digits=6&period=30"
+
+
+def totp_enabled(settings: Settings) -> bool:
+    return bool(getattr(settings, "app_totp_secret", ""))
+
+
 def enforce_startup(settings: Settings) -> None:
     """Offentligt bind og halve login-opsætninger stopper processen."""
+    if totp_enabled(settings):
+        try:
+            _totp_key(settings.app_totp_secret)
+        except (ValueError, TypeError) as exc:
+            raise SystemExit("APP_TOTP_SECRET er ikke en gyldig base32-hemmelighed. Lav en ny med new_totp_secret().") from exc
     has_user = bool(settings.app_username)
     has_password = bool(settings.app_password or settings.app_password_hash)
     has_secret = len(settings.session_secret) >= MIN_SECRET_LENGTH
@@ -229,7 +274,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
 
-def render_login(csrf: str, error: str = "", username: str = "") -> str:
+def render_login(csrf: str, error: str = "", username: str = "", totp: bool = False) -> str:
     page = _LOGIN_HTML
     hidden = "" if error else "hidden"
     return (
@@ -237,7 +282,13 @@ def render_login(csrf: str, error: str = "", username: str = "") -> str:
         .replace("__ERROR__", escape(error))
         .replace("__USERNAME__", escape(username, quote=True))
         .replace("__ERROR_HIDDEN__", hidden)
+        .replace("__TOTP__", _TOTP_FIELD if totp else "")
     )
+
+
+_TOTP_FIELD = """<label>Kode fra din godkendelses-app
+      <input name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9 ]{6,7}" maxlength="7" required placeholder="123 456">
+    </label>"""
 
 
 _LOGIN_HTML = """<!DOCTYPE html>
@@ -322,6 +373,7 @@ _LOGIN_HTML = """<!DOCTYPE html>
     <label>Adgangskode
       <input name="password" type="password" autocomplete="current-password" required>
     </label>
+    __TOTP__
     <button type="submit">Log ind</button>
   </form>
   <button class="theme" id="theme" type="button">Lyst tema</button>
@@ -343,3 +395,17 @@ document.getElementById("theme").addEventListener("click", function () {
 </body>
 </html>
 """
+
+
+if __name__ == "__main__":  # python -m trader.auth totp
+    import sys
+
+    if len(sys.argv) > 1 and sys.argv[1] == "totp":
+        new_secret = new_totp_secret()
+        print("Sæt denne hemmelige variabel i Railway:")
+        print(f"APP_TOTP_SECRET={new_secret}")
+        print()
+        print("Tilføj den i din godkendelses-app (manuel nøgle eller link):")
+        print(totp_uri(new_secret))
+    else:
+        print("Brug: python -m trader.auth totp")

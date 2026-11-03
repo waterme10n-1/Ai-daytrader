@@ -9,10 +9,11 @@ from __future__ import annotations
 import base64
 import json
 import logging
+import random
 import time
 from dataclasses import dataclass
 
-from trader.meme.clients import Jupiter, SolanaRPC, SourceError
+from trader.meme.clients import JitoSender, Jupiter, SolanaRPC, SourceError
 from trader.meme.config import BASE_FEE_LAMPORTS, LAMPORTS_PER_SOL, SOL_MINT, MemeSettings
 from trader.meme.store import MemeStore
 
@@ -61,8 +62,13 @@ class Fill:
     error: str = ""
 
 
-def fee_sol(settings: MemeSettings) -> float:
-    return (BASE_FEE_LAMPORTS + settings.priority_fee_lamports) / LAMPORTS_PER_SOL
+def fee_sol(settings: MemeSettings, urgent: bool = False) -> float:
+    """Netværksgebyr, prioritetsgebyr og evt. Jito-tip for én handel."""
+    if settings.execution == "jito":
+        extra = settings.jito_tip_lamports * (2 if urgent else 1)
+    else:
+        extra = settings.priority_fee_lamports * (3 if urgent else 1)
+    return (BASE_FEE_LAMPORTS + extra) / LAMPORTS_PER_SOL
 
 
 class PaperWallet:
@@ -71,10 +77,11 @@ class PaperWallet:
     mode = "paper"
     public_key = ""
 
-    def __init__(self, settings: MemeSettings, store: MemeStore, jupiter: Jupiter) -> None:
+    def __init__(self, settings: MemeSettings, store: MemeStore, jupiter: Jupiter, rng: random.Random | None = None) -> None:
         self.settings = settings
         self.store = store
         self.jupiter = jupiter
+        self.rng = rng or random.Random()
         if self.store.get_state("paper_cash") is None:
             self.store.set_state("paper_cash", repr(settings.bankroll_usd))
 
@@ -90,7 +97,19 @@ class PaperWallet:
     def sol_balance(self) -> float | None:
         return None
 
-    def buy(self, mint: str, usd: float, sol_usd: float) -> Fill:
+    def _penalty(self, strategy: str) -> float:
+        """Ekstra slippage i papir: kursen når at flytte sig, før en rigtig handel lander."""
+        pct = self.settings.paper_slippage_pct + (self.settings.paper_sniper_extra_pct if strategy == "sniper" else 0.0)
+        return max(0.0, min(0.5, pct / 100.0))
+
+    def _failed(self, fee: float, what: str) -> Fill | None:
+        """Nogle rigtige transaktioner fejler. Gebyret betales alligevel."""
+        if self.settings.paper_fail_rate > 0 and self.rng.random() < self.settings.paper_fail_rate:
+            self._set_cash(self.cash_usd(0.0) - fee)
+            return Fill(False, fee_usd=fee, error=f"Simuleret fejlet {what} (papir): transaktionen landede ikke. Gebyret er betalt.")
+        return None
+
+    def buy(self, mint: str, usd: float, sol_usd: float, *, strategy: str = "momentum") -> Fill:
         if sol_usd <= 0:
             return Fill(False, error="Ingen SOL-kurs.")
         fee = fee_sol(self.settings) * sol_usd
@@ -104,19 +123,26 @@ class PaperWallet:
             return Fill(False, error=str(exc))
         if quote.out_amount <= 0:
             return Fill(False, error="Quoten gav 0 tokens.")
+        failed = self._failed(fee, "køb")
+        if failed is not None:
+            return failed
+        tokens = int(quote.out_amount * (1.0 - self._penalty(strategy)))
         self._set_cash(cash - usd - fee)
-        return Fill(True, usd=usd, fee_usd=fee, token_raw=quote.out_amount, sol=lamports / LAMPORTS_PER_SOL, signature="papir")
+        return Fill(True, usd=usd, fee_usd=fee, token_raw=tokens, sol=lamports / LAMPORTS_PER_SOL, signature="papir")
 
-    def sell(self, mint: str, raw_amount: int, sol_usd: float) -> Fill:
+    def sell(self, mint: str, raw_amount: int, sol_usd: float, *, strategy: str = "momentum", urgent: bool = False) -> Fill:
         if raw_amount <= 0:
             return Fill(False, error="Intet at sælge.")
         try:
             quote = self.jupiter.quote(mint, SOL_MINT, raw_amount)
         except SourceError as exc:
             return Fill(False, error=str(exc))
-        sol = quote.out_amount / LAMPORTS_PER_SOL
+        fee = fee_sol(self.settings, urgent) * sol_usd
+        failed = self._failed(fee, "salg")
+        if failed is not None:
+            return failed
+        sol = quote.out_amount / LAMPORTS_PER_SOL * (1.0 - self._penalty(strategy))
         usd = sol * sol_usd
-        fee = fee_sol(self.settings) * sol_usd
         self._set_cash(self.cash_usd(sol_usd) + usd - fee)
         return Fill(True, usd=usd, fee_usd=fee, token_raw=raw_amount, sol=sol, signature="papir")
 
@@ -152,6 +178,7 @@ class SolanaWallet:
         self.jupiter = jupiter
         self._keypair = load_keypair(settings.private_key)
         self.public_key = str(self._keypair.pubkey())
+        self.jito = JitoSender(settings.jito_url) if settings.execution == "jito" else None
 
     def sol_balance(self) -> float:
         return self.rpc.balance_lamports(self.public_key) / LAMPORTS_PER_SOL
@@ -166,8 +193,24 @@ class SolanaWallet:
         from solders.transaction import VersionedTransaction
 
         unsigned = VersionedTransaction.from_bytes(base64.b64decode(b64_tx))
-        signed = VersionedTransaction(unsigned.message, [self._keypair])
-        return self.rpc.send_transaction(base64.b64encode(bytes(signed)).decode())
+        signed = base64.b64encode(bytes(VersionedTransaction(unsigned.message, [self._keypair]))).decode()
+        if self.jito is not None:
+            # Send til Jito og til RPC. Samme signatur, så den lander kun én gang.
+            try:
+                signature = self.jito.send(signed)
+            except SourceError as exc:
+                logger.info("Jito afviste, sender via RPC: %s", exc)
+                return self.rpc.send_transaction(signed)
+            try:
+                self.rpc.send_transaction(signed)
+            except SourceError:
+                pass
+            return signature
+        return self.rpc.send_transaction(signed)
+
+    def _swap(self, quote, urgent: bool = False) -> str:
+        tip = self.settings.jito_tip_lamports if self.jito is not None else None
+        return self._sign_and_send(self.jupiter.swap_transaction(quote, self.public_key, urgent=urgent, jito_tip=tip))
 
     def _confirm(self, signature: str, timeout: float = 75.0) -> tuple[bool, str]:
         deadline = time.monotonic() + timeout
@@ -185,7 +228,7 @@ class SolanaWallet:
             time.sleep(2.0)
         return False, "Transaktionen blev ikke bekræftet i tide."
 
-    def buy(self, mint: str, usd: float, sol_usd: float) -> Fill:
+    def buy(self, mint: str, usd: float, sol_usd: float, *, strategy: str = "momentum") -> Fill:
         if sol_usd <= 0:
             return Fill(False, error="Ingen SOL-kurs.")
         lamports = int(usd / sol_usd * LAMPORTS_PER_SOL)
@@ -195,7 +238,7 @@ class SolanaWallet:
         before = self.token_raw(mint)
         try:
             quote = self.jupiter.quote(SOL_MINT, mint, lamports)
-            signature = self._sign_and_send(self.jupiter.swap_transaction(quote, self.public_key))
+            signature = self._swap(quote)
         except (SourceError, ValueError) as exc:
             return Fill(False, error=str(exc))
         ok, error = self._confirm(signature)
@@ -209,24 +252,30 @@ class SolanaWallet:
         sol_in = lamports / LAMPORTS_PER_SOL
         return Fill(True, usd=sol_in * sol_usd, fee_usd=fee, token_raw=received, sol=sol_in, signature=signature)
 
-    def sell(self, mint: str, raw_amount: int, sol_usd: float) -> Fill:
+    def sell(self, mint: str, raw_amount: int, sol_usd: float, *, strategy: str = "momentum", urgent: bool = False) -> Fill:
         held = self.token_raw(mint)
         amount = min(raw_amount, held)
         if amount <= 0:
             return Fill(False, error="Wallet'en har ingen tokens at sælge.")
         before = self.sol_balance()
-        try:
-            quote = self.jupiter.quote(mint, SOL_MINT, amount)
-            signature = self._sign_and_send(self.jupiter.swap_transaction(quote, self.public_key))
-        except (SourceError, ValueError) as exc:
-            return Fill(False, error=str(exc))
-        ok, error = self._confirm(signature)
-        left = self.token_raw(mint)
-        sold = max(0, held - left)
-        if not ok and sold <= 0:
-            return Fill(False, error=error, signature=signature)
+        # Et hastesalg (stop-loss, rug) prøves igen med dobbelt slippage, hvis første forsøg fejler.
+        attempts = [self.settings.slippage_bps] + ([min(1500, self.settings.slippage_bps * 2)] if urgent else [])
+        error, signature, sold = "", "", 0
+        for slippage in attempts:
+            try:
+                quote = self.jupiter.quote(mint, SOL_MINT, amount, slippage_bps=slippage)
+                signature = self._swap(quote, urgent=urgent)
+            except (SourceError, ValueError) as exc:
+                error = str(exc)
+                continue
+            ok, error = self._confirm(signature)
+            sold = max(0, held - self.token_raw(mint))
+            if ok or sold > 0:
+                break
+        if sold <= 0:
+            return Fill(False, error=error or "Salget fejlede.", signature=signature)
         net_sol = max(0.0, self.sol_balance() - before)
-        fee = fee_sol(self.settings) * sol_usd
+        fee = fee_sol(self.settings, urgent) * sol_usd
         return Fill(True, usd=net_sol * sol_usd + fee, fee_usd=fee, token_raw=sold, sol=net_sol, signature=signature)
 
     def transfer_sol(self, to_address: str, lamports: int) -> tuple[bool, str, str]:

@@ -111,6 +111,33 @@ CREATE TABLE IF NOT EXISTS days (
     PRIMARY KEY (day, mode)
 );
 
+CREATE TABLE IF NOT EXISTS shadows (
+    id INTEGER PRIMARY KEY,
+    ts TEXT NOT NULL,
+    mode TEXT NOT NULL,
+    mint TEXT NOT NULL,
+    symbol TEXT,
+    strategy TEXT NOT NULL,
+    stage TEXT NOT NULL,
+    reason TEXT,
+    entry_price REAL NOT NULL,
+    liquidity_entry REAL,
+    features TEXT,
+    path TEXT,
+    peak_ratio REAL NOT NULL DEFAULT 1,
+    low_ratio REAL NOT NULL DEFAULT 1,
+    last_ratio REAL NOT NULL DEFAULT 1,
+    rugged INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'tracking',
+    sim_pnl_pct REAL,
+    sim_exit TEXT,
+    verdict TEXT,
+    learned INTEGER NOT NULL DEFAULT 0,
+    done_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_shadows_status ON shadows (status, id);
+CREATE INDEX IF NOT EXISTS idx_shadows_mint ON shadows (mint, ts);
 CREATE INDEX IF NOT EXISTS idx_positions_mode_status ON positions (mode, status);
 CREATE INDEX IF NOT EXISTS idx_candidates_mint ON candidates (mint, ts);
 CREATE INDEX IF NOT EXISTS idx_equity_mode ON equity (mode, ts);
@@ -346,6 +373,72 @@ class MemeStore:
             (mint,),
         )
         return row is not None
+
+    # Skyggehandler ----------------------------------------------------------
+    def add_shadow(self, row: dict[str, Any]) -> int:
+        return self._write(
+            """
+            INSERT INTO shadows (ts, mode, mint, symbol, strategy, stage, reason, entry_price, liquidity_entry, features, path)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                now_iso(),
+                row["mode"],
+                row["mint"],
+                row.get("symbol") or "?",
+                row["strategy"],
+                row["stage"],
+                row.get("reason") or "",
+                float(row["entry_price"]),
+                row.get("liquidity_entry"),
+                _json(row.get("features")),
+                _json([[0.0, 1.0]]),
+            ),
+        )
+
+    def shadow_recent(self, mint: str, since_iso: str) -> bool:
+        return self._one("SELECT 1 AS hit FROM shadows WHERE mint = ? AND ts >= ? LIMIT 1", (mint, since_iso)) is not None
+
+    def active_shadows(self, limit: int = 500) -> list[dict[str, Any]]:
+        return self._all("SELECT * FROM shadows WHERE status = 'tracking' ORDER BY id LIMIT ?", (limit,))
+
+    def count_active_shadows(self) -> int:
+        row = self._one("SELECT COUNT(*) AS n FROM shadows WHERE status = 'tracking'")
+        return int(row["n"]) if row else 0
+
+    def update_shadow(self, shadow_id: int, **changes: Any) -> None:
+        if not changes:
+            return
+        parts, values = [], []
+        for key, value in changes.items():
+            if key in {"features", "path"}:
+                value = _json(value)
+            if isinstance(value, bool):
+                value = int(value)
+            parts.append(f"{key} = ?")
+            values.append(value)
+        values.append(shadow_id)
+        self._write(f"UPDATE shadows SET {', '.join(parts)} WHERE id = ?", tuple(values))
+
+    def done_shadows(self, mode: str, strategy: str | None = None, limit: int = 2000) -> list[dict[str, Any]]:
+        if strategy:
+            return self._all(
+                "SELECT * FROM shadows WHERE mode = ? AND status = 'done' AND strategy = ? ORDER BY id DESC LIMIT ?",
+                (mode, strategy, limit),
+            )
+        return self._all("SELECT * FROM shadows WHERE mode = ? AND status = 'done' ORDER BY id DESC LIMIT ?", (mode, limit))
+
+    def unlearned_shadows(self) -> list[dict[str, Any]]:
+        return self._all("SELECT * FROM shadows WHERE status = 'done' AND learned = 0 ORDER BY id")
+
+    def recent_shadows(self, mode: str, limit: int = 80) -> list[dict[str, Any]]:
+        return self._all("SELECT * FROM shadows WHERE mode = ? ORDER BY id DESC LIMIT ?", (mode, limit))
+
+    def prune_shadows(self, keep: int = 5000) -> None:
+        self._write(
+            "DELETE FROM shadows WHERE status = 'done' AND id <= (SELECT COALESCE(MAX(id), 0) - ? FROM shadows)",
+            (keep,),
+        )
 
     # Læring -----------------------------------------------------------------
     def add_lesson(self, kind: str, text: str, position_id: int | None = None) -> None:

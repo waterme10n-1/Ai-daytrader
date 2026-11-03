@@ -56,6 +56,10 @@ from trader.meme.learning import (
     adapt_params,
     adapt_sniper,
     build_features,
+    optimize_targets,
+    shadow_summary,
+    simulate_path,
+    verdict_for,
     source_stats,
     trade_lesson,
 )
@@ -71,7 +75,7 @@ from trader.meme.risk import (
 )
 from trader.meme.safety import market_rejections, roundtrip_rejections, rug_rejections, sniper_rejections
 from trader.meme.store import MemeStore, loads, now_iso, utc_day
-from trader.meme.wallet import MAX_DEPOSIT_SOL, PaperWallet, SolanaWallet, b58encode, build_transfer_message, load_keypair
+from trader.meme.wallet import MAX_DEPOSIT_SOL, PaperWallet, SolanaWallet, b58encode, build_transfer_message, fee_sol, load_keypair
 
 logger = logging.getLogger("trader.meme.engine")
 
@@ -81,6 +85,15 @@ MAX_DEEP_CHECKS = 6
 MAX_BUYS_PER_SCAN = 2
 MAX_COPY_WALLETS = 25
 SWEEP_INTERVAL_SECONDS = 30 * 60
+URGENT_EXITS = {"stop_loss", "rug_liquidity", "rug_no_route", "rug_dev", "kill", "no_price"}
+SHADOW_STAGES = {"rug", "score", "rute", "claude", "risiko", "sniper", "købt"}
+SHADOW_HORIZON_MINUTES = 360
+SHADOW_TRACK_SECONDS = 60
+SHADOW_MAX_ACTIVE = 150
+SHADOW_MARKED_PER_SCAN = 2
+SHADOW_LEARN_RATE = 0.3
+SHADOW_OPTIMIZER_STAGES = {"købt", "risiko", "claude"}
+INSIDER_CHECK_SECONDS = 60
 WALLET_CACHE_SECONDS = 20
 EXIT_FAILURE_LIMIT = 6
 MISSING_PRICE_LIMIT = 20
@@ -221,6 +234,11 @@ class MemeEngine:
         self._sol_usd = (0.0, 0.0)
         self._wallet_sol: float | None = None
         self._wallet_sol_at = 0.0
+        self._marked_shadow_budget = SHADOW_MARKED_PER_SCAN
+        self._last_shadow_track = 0.0
+        self._last_insider_check = 0.0
+        self._shadow_misses: dict[int, int] = {}
+        self._optimizer_cache: tuple[tuple, float, dict] | None = None
         self._missing_price: dict[int, int] = {}
         self._copy_sells: set[tuple[str, str]] = set()
         self.last_tick: str | None = None
@@ -239,6 +257,25 @@ class MemeEngine:
         self._thread = threading.Thread(target=self._loop, name="memebot", daemon=True)
         self._thread.start()
         self.store.add_event("info", f"Memebotten er startet i {'papir' if self.mode == 'paper' else 'LIVE'}-tilstand.")
+        threading.Thread(target=self._startup_checks, name="memebot-checks", daemon=True).start()
+
+    def _startup_checks(self) -> None:
+        try:
+            self.run_diagnostics()
+        except Exception:
+            logger.exception("Forbindelsestesten fejlede")
+
+    def run_diagnostics(self) -> dict:
+        from trader.meme.diagnostics import run_checks
+
+        result = run_checks(self)
+        failed = [item["label"] for item in result["checks"] if not item["ok"]]
+        self.store.add_event(
+            "info" if result["required_ok"] else "warning",
+            f"Forbindelsestest: {result['ok']} af {result['total']} virker.",
+            ("Fejler: " + ", ".join(failed)) if failed else "Alle datakilder svarer.",
+        )
+        return result
 
     def stop(self) -> None:
         self._stop.set()
@@ -493,6 +530,10 @@ class MemeEngine:
                     self._maybe_sweep(wallet, sol_usd)
                 self._monitor(wallet, sol_usd)
                 self._learn()
+                self._watch_insiders(wallet, sol_usd)
+                self._track_shadows()
+                self._learn_shadows()
+                self._maybe_daily_report()
                 day = utc_day()
                 totals = self._totals()
                 if self.store.ensure_day(day, self.mode, totals["equity"]):
@@ -587,10 +628,12 @@ class MemeEngine:
             return True
         full = fraction >= 0.999
         amount = remaining if full else max(1, int(remaining * fraction))
-        fill = wallet.sell(pos["mint"], amount, sol_usd)
+        fill = wallet.sell(pos["mint"], amount, sol_usd, strategy=pos.get("strategy") or "momentum", urgent=kind in URGENT_EXITS)
         if not fill.ok:
             failures = int(pos.get("exit_failures") or 0) + 1
-            self.store.update_position(int(pos["id"]), exit_failures=failures)
+            fees_now = float(pos["fees_usd"]) + float(fill.fee_usd or 0.0)
+            self.store.update_position(int(pos["id"]), exit_failures=failures, fees_usd=fees_now)
+            pos["fees_usd"] = fees_now
             pos["exit_failures"] = failures
             self.store.add_event("warning", f"Salg af {pos['symbol']} fejlede ({failures}): {fill.error}")
             if failures >= EXIT_FAILURE_LIMIT and kind not in {"take_profit", "target"}:
@@ -759,7 +802,7 @@ class MemeEngine:
             deployed += float(pos["cost_usd"]) * fraction
             unrealized += float(pos["proceeds_usd"]) + mark - float(pos["cost_usd"]) - float(pos["fees_usd"])
         closed = self.store.closed_positions(mode)
-        realized = sum(float(row["pnl_usd"]) for row in closed)
+        realized = sum(float(row["pnl_usd"]) for row in closed) - float(self.store.get_state(f"failed_fees:{mode}", "0") or 0)
         today = utc_day()
         realized_today = sum(float(row["pnl_usd"]) for row in closed if str(row["closed_at"] or "")[:10] == today)
         bankroll = self.settings.bankroll_usd
@@ -817,6 +860,302 @@ class MemeEngine:
             features=features,
             pair_url=pair.url if pair else "",
         )
+        self._maybe_shadow(cand, stage, reason, features)
+
+    # ------------------------------------------------------------------ skyggehandler
+    def _maybe_shadow(self, cand: dict, stage: str, reason: str, features=None) -> None:
+        if not self.settings.shadows:
+            return
+        pair: PairInfo | None = cand.get("pair")
+        if pair is None or pair.price_usd <= 0:
+            return
+        if stage == "marked":
+            if self._marked_shadow_budget <= 0:
+                return
+            self._marked_shadow_budget -= 1
+        elif stage not in SHADOW_STAGES:
+            return
+        if stage != "købt" and self.store.count_active_shadows() >= SHADOW_MAX_ACTIVE:
+            return
+        since = (datetime.now(timezone.utc) - timedelta(hours=6)).isoformat(timespec="seconds")
+        if self.store.shadow_recent(cand["mint"], since):
+            return
+        self.store.add_shadow(
+            {
+                "mode": self.mode,
+                "mint": cand["mint"],
+                "symbol": pair.symbol,
+                "strategy": "sniper" if cand.get("source") == "sniper" else "momentum",
+                "stage": stage,
+                "reason": reason[:300],
+                "entry_price": pair.price_usd,
+                "liquidity_entry": pair.liquidity_usd,
+                "features": features,
+            }
+        )
+
+    def _cost_pct(self, strategy: str) -> float:
+        slip = self.settings.paper_slippage_pct + (self.settings.paper_sniper_extra_pct if strategy == "sniper" else 0.0)
+        size = self.sniper.position_usd if strategy == "sniper" else self.settings.position_usd
+        sol_usd = self._sol_usd[0] or 150.0
+        fee_usd = fee_sol(self.settings) * sol_usd
+        return 2 * slip / 100.0 + (2 * fee_usd / size if size > 0 else 0.0)
+
+    def _rules_for(self, strategy: str) -> dict:
+        if strategy == "sniper":
+            return {
+                "tp": self.sniper.take_profit_pct,
+                "frac": self.sniper.sell_fraction,
+                "sl": self.sniper.stop_loss_pct,
+                "max_hold": self.sniper.max_hold_minutes,
+                "trailing": MOONBAG_TRAIL,
+                "breakeven_after_partial": True,
+                "cost_pct": self._cost_pct("sniper"),
+            }
+        return {
+            "tp": self.params.take_profit_pct,
+            "frac": self.params.partial_fraction,
+            "sl": self.params.stop_loss_pct,
+            "max_hold": self.params.max_hold_minutes,
+            "trail_activation": self.params.trail_activation_pct,
+            "trailing": self.params.trailing_stop_pct,
+            "stale": self.params.stale_minutes,
+            "cost_pct": self._cost_pct("momentum"),
+        }
+
+    def _track_shadows(self, force: bool = False) -> None:
+        if not self.settings.shadows:
+            return
+        now = time.time()
+        if not force and now - self._last_shadow_track < SHADOW_TRACK_SECONDS:
+            return
+        self._last_shadow_track = now
+        active = self.store.active_shadows(SHADOW_MAX_ACTIVE + 30)
+        if not active:
+            return
+        try:
+            pairs = self.clients.dex.pairs_for([row["mint"] for row in active])
+        except SourceError as exc:
+            logger.info("Skyggehandler kunne ikke opdateres: %s", exc)
+            return
+        for row in active:
+            shadow_id = int(row["id"])
+            age = _minutes_since(row["ts"])
+            path = loads(row["path"], []) or [[0.0, 1.0]]
+            pair = pairs.get(row["mint"])
+            rugged = bool(row["rugged"])
+            if pair is None or pair.price_usd <= 0:
+                misses = self._shadow_misses.get(shadow_id, 0) + 1
+                self._shadow_misses[shadow_id] = misses
+                if misses >= 30 or age >= SHADOW_HORIZON_MINUTES:
+                    self._finish_shadow(row, path, rugged=misses >= 30)
+                continue
+            self._shadow_misses.pop(shadow_id, None)
+            ratio = pair.price_usd / float(row["entry_price"])
+            if (row["liquidity_entry"] and pair.liquidity_usd < float(row["liquidity_entry"]) * 0.4) or ratio < 0.2:
+                rugged = True
+            if age - float(path[-1][0]) >= 0.9 or len(path) == 1:
+                path.append([round(age, 2), round(ratio, 5)])
+            changes = {
+                "path": path[-420:],
+                "peak_ratio": max(float(row["peak_ratio"]), ratio),
+                "low_ratio": min(float(row["low_ratio"]), ratio),
+                "last_ratio": ratio,
+                "rugged": rugged,
+            }
+            if rugged or age >= SHADOW_HORIZON_MINUTES:
+                row.update(changes)
+                self._finish_shadow(row, path, rugged=rugged)
+            else:
+                self.store.update_shadow(shadow_id, **changes)
+        self.store.prune_shadows()
+
+    def _finish_shadow(self, row: dict, path: list, *, rugged: bool) -> None:
+        pnl, kind = simulate_path(path, rugged=rugged, **self._rules_for(str(row["strategy"])))
+        self._shadow_misses.pop(int(row["id"]), None)
+        self.store.update_shadow(
+            int(row["id"]),
+            status="done",
+            path=path[-420:],
+            rugged=rugged,
+            sim_pnl_pct=pnl,
+            sim_exit=kind,
+            verdict=verdict_for(str(row["stage"]), pnl, rugged),
+            done_at=now_iso(),
+        )
+
+    def _learn_shadows(self) -> None:
+        rows = self.store.unlearned_shadows()
+        if not rows:
+            return
+        changed = False
+        for row in rows:
+            self.store.update_shadow(int(row["id"]), learned=True)
+            features = loads(row["features"], {}) or {}
+            if features and row["stage"] in {"score", "claude", "risiko", "rute"} and row["strategy"] == "momentum":
+                self.model.update(features, float(row["sim_pnl_pct"] or 0.0) > WIN_THRESHOLD_PCT, rate=SHADOW_LEARN_RATE)
+                changed = True
+        learned = int(self.store.get_state("shadows_learned", "0") or 0) + len(rows)
+        self.store.set_state("shadows_learned", str(learned))
+        if learned // 30 > (learned - len(rows)) // 30:
+            done = [row for row in self.store.done_shadows(self.mode, limit=30) if row["stage"] != "købt"]
+            if done:
+                dodged = sum(1 for row in done if row["verdict"] == "dodged")
+                missed = sum(1 for row in done if row["verdict"] == "missed")
+                self.store.add_lesson(
+                    "skygge",
+                    f"Skyggehandler: af de seneste {len(done)} afviste tokens faldt {dodged} bagefter (godt valgt), "
+                    f"og {missed} steg over 10 % (missede chancer).",
+                )
+                score_rows = [row for row in done if row["stage"] == "score"]
+                if len(score_rows) >= 10:
+                    missed_share = sum(1 for row in score_rows if row["verdict"] == "missed") / len(score_rows)
+                    average = sum(float(row["sim_pnl_pct"] or 0) for row in score_rows) / len(score_rows)
+                    if missed_share >= 0.5 and average >= 0.1:
+                        old = self.params.min_score
+                        self.params.min_score = clamp_param("min_score", old - 0.01)
+                        if self.params.min_score != old:
+                            self.store.add_lesson(
+                                "parameter",
+                                f"Min. score for køb: {old:.2f} → {self.params.min_score:.2f} "
+                                f"(halvdelen af de afviste tokens steg bagefter, i snit {average * 100:+.0f} %).",
+                            )
+                            changed = True
+        if changed:
+            self._save_learning()
+
+    def _optimizer(self) -> dict:
+        done = [row for row in self.store.done_shadows(self.mode, "sniper", 600) if row["stage"] in SHADOW_OPTIMIZER_STAGES][:300]
+        key = (len(done), int(done[0]["id"]) if done else 0, self.sniper.sell_fraction, self.sniper.max_hold_minutes, self.sniper.take_profit_pct, self.sniper.stop_loss_pct)
+        cached = self._optimizer_cache
+        if cached and cached[0] == key and time.time() - cached[1] < 300:
+            return cached[2]
+        paths = [(loads(row["path"], []) or [[0.0, 1.0]], bool(row["rugged"])) for row in done]
+        cost = self._cost_pct("sniper")
+        result = optimize_targets(paths, frac=self.sniper.sell_fraction, max_hold=self.sniper.max_hold_minutes, cost_pct=cost)
+        current = [
+            simulate_path(path, tp=self.sniper.take_profit_pct, frac=self.sniper.sell_fraction, sl=self.sniper.stop_loss_pct,
+                          max_hold=self.sniper.max_hold_minutes, rugged=rugged, cost_pct=cost, breakeven_after_partial=True)[0]
+            for path, rugged in paths
+        ]
+        result["current"] = {
+            "tp": self.sniper.take_profit_pct,
+            "sl": self.sniper.stop_loss_pct,
+            "n": len(current),
+            "avg": sum(current) / len(current) if current else None,
+            "win_rate": sum(1 for value in current if value > 0) / len(current) if current else None,
+        }
+        self._optimizer_cache = (key, time.time(), result)
+        return result
+
+    def _shadow_view(self, row: dict) -> dict:
+        return {
+            "id": row["id"],
+            "ts": row["ts"],
+            "symbol": row["symbol"],
+            "mint": row["mint"],
+            "strategy": row["strategy"],
+            "stage": row["stage"],
+            "reason": row["reason"],
+            "status": row["status"],
+            "peak_pct": float(row["peak_ratio"] or 1) - 1,
+            "low_pct": float(row["low_ratio"] or 1) - 1,
+            "last_pct": float(row["last_ratio"] or 1) - 1,
+            "sim_pnl_pct": row["sim_pnl_pct"],
+            "sim_exit": EXIT_LABELS.get(str(row["sim_exit"] or ""), row["sim_exit"]),
+            "verdict": row["verdict"],
+            "rugged": bool(row["rugged"]),
+            "minutes": round(_minutes_since(row["ts"])),
+        }
+
+    # ------------------------------------------------------------------ udvikler og topholdere
+    def _watch_insiders(self, wallet, sol_usd: float) -> None:
+        if not self.settings.dev_watch:
+            return
+        now = time.time()
+        if now - self._last_insider_check < INSIDER_CHECK_SECONDS:
+            return
+        self._last_insider_check = now
+        positions = self.store.open_positions(self.mode)
+        if not positions:
+            return
+        rpc = self.clients.rpc
+        if rpc is None:
+            rpc = self.clients.rpc = SolanaRPC(self.settings.rpc_url)
+            self.copy.rpc = rpc
+        for pos in positions:
+            safety = loads(pos["safety"], {}) or {}
+            watch = safety.get("watch") or {}
+            dev = str(watch.get("dev") or "")
+            holders = [str(item) for item in watch.get("holders") or [] if item]
+            owners = [owner for owner in [dev, *holders] if owner]
+            if not owners:
+                continue
+            current: dict[str, int] = {}
+            for owner in owners:
+                try:
+                    current[owner] = sum(row["amount"] for row in rpc.token_accounts(owner, pos["mint"]))
+                except SourceError as exc:
+                    logger.info("Kunne ikke læse %s: %s", owner, exc)
+            base = safety.get("watch_base")
+            if not isinstance(base, dict):
+                safety["watch_base"] = current
+                self.store.update_position(int(pos["id"]), safety=safety)
+                continue
+            dev_drop = 0.0
+            if dev and float(base.get(dev, 0) or 0) > 0 and dev in current:
+                dev_drop = 1.0 - current[dev] / float(base[dev])
+            tracked = [owner for owner in holders if float(base.get(owner, 0) or 0) > 0 and owner in current]
+            base_sum = sum(float(base[owner]) for owner in tracked)
+            hold_drop = 1.0 - sum(current[owner] for owner in tracked) / base_sum if base_sum > 0 else 0.0
+            if dev_drop >= 0.5 or hold_drop >= 0.4:
+                who = f"udvikleren har solgt {dev_drop * 100:.0f} %" if dev_drop >= 0.5 else f"topholderne har solgt {hold_drop * 100:.0f} %"
+                self._sell(pos, 1.0, "rug_dev", f"Insider-alarm: {who} af deres beholdning. Sælger alt.", wallet, sol_usd)
+
+    # ------------------------------------------------------------------ dagsrapport
+    def daily_report_text(self) -> str:
+        status = self.status()
+        k, g = status["kpis"], status["goal"]
+        today = utc_day()
+        closed_today = [row for row in self.store.closed_positions(self.mode) if str(row["closed_at"] or "")[:10] == today]
+        wins = [row for row in closed_today if float(row["pnl_usd"]) > 0]
+        lines = [
+            f"Dagsrapport {today} ({'papir' if self.mode == 'paper' else 'RIGTIGE PENGE'})",
+            f"Egenkapital {k['equity']:.2f} USD · i dag {k['today_pnl']:+.2f} · i alt {k['total_pnl']:+.2f}",
+            f"Lukkede handler i dag: {len(closed_today)} ({len(wins)} vindere, {len(closed_today) - len(wins)} tabere)",
+        ]
+        if closed_today:
+            best = max(closed_today, key=lambda row: float(row["pnl_usd"]))
+            worst = min(closed_today, key=lambda row: float(row["pnl_usd"]))
+            lines.append(f"Bedste {best['symbol']} {float(best['pnl_usd']):+.2f} · værste {worst['symbol']} {float(worst['pnl_usd']):+.2f}")
+        snipes = [row for row in closed_today if row.get("strategy") == "sniper"]
+        if snipes:
+            lines.append(f"Sniper: {len(snipes)} snipes, {sum(1 for row in snipes if row['exit_reason'] == 'target')} ramte målet")
+        lines.append(f"Åbne positioner: {k['open']} · AI i dag {k['ai_today']:.2f} USD")
+        lines.append(f"Måned: netto {g['month_net']:+.2f} USD efter udgifter på {g['month_costs']:.2f} · mål {g['target']:.0f} USD")
+        done_today = [row for row in self.store.done_shadows(self.mode, limit=400) if str(row["done_at"] or "")[:10] == today and row["stage"] != "købt"]
+        if done_today:
+            dodged = sum(1 for row in done_today if row["verdict"] == "dodged")
+            missed = sum(1 for row in done_today if row["verdict"] == "missed")
+            lines.append(f"Skyggehandler: {len(done_today)} afviste fulgt; {dodged} faldt, {missed} steg over 10 %")
+        lessons = [row["text"] for row in self.store.recent_lessons(10) if str(row["ts"])[:10] == today][:3]
+        if lessons:
+            lines.append("Lært i dag:")
+            lines.extend(f"• {text}" for text in lessons)
+        return "\n".join(lines)
+
+    def _maybe_daily_report(self) -> None:
+        hour = self.settings.report_hour_utc
+        if hour < 0:
+            return
+        now = datetime.now(timezone.utc)
+        today = utc_day(now)
+        if now.hour != hour or self.store.get_state("report_sent") == today:
+            return
+        self.store.set_state("report_sent", today)
+        text = self.daily_report_text()
+        self.store.set_json("last_report", {"ts": now_iso(), "text": text})
+        self._notify(text)
 
     def _discover(self, copy_buys: list) -> tuple[dict[str, dict], list[str]]:
         found: dict[str, dict] = {}
@@ -877,6 +1216,7 @@ class MemeEngine:
     def _scan(self, wallet, sol_usd: float, day: str, *, entries_allowed: bool) -> None:
         self.last_scan_at = now_iso()
         summary: dict[str, Any] = {"discovered": 0, "fresh": 0, "market_ok": 0, "rug_ok": 0, "scored": 0, "bought": 0, "errors": []}
+        self._marked_shadow_budget = SHADOW_MARKED_PER_SCAN
         self.last_scan = summary
         self.copy.wallets = self._all_wallets()
         self.copy.rpc = self.clients.rpc
@@ -1239,8 +1579,11 @@ class MemeEngine:
                     self._record(cand, "claude", False, f"Claude: skip ({verdict.confidence}). {flags or verdict.summary}", cand["score"], cand["features"])
                     return False
 
-        fill = wallet.buy(cand["mint"], decision.size_usd, sol_usd)
+        fill = wallet.buy(cand["mint"], decision.size_usd, sol_usd, strategy=strategy)
         if not fill.ok:
+            if fill.fee_usd:
+                key = f"failed_fees:{self.mode}"
+                self.store.set_state(key, repr(float(self.store.get_state(key, "0") or 0) + fill.fee_usd))
             self._record(cand, "køb", False, f"Købet fejlede: {fill.error}", cand["score"], cand["features"])
             self.store.add_event("warning", f"Køb af {pair.symbol} fejlede: {fill.error}")
             return False
@@ -1285,6 +1628,10 @@ class MemeEngine:
                     "lp_locked_pct": report.lp_locked_pct if report else None,
                     "warnings": report.warnings[:5] if report else [],
                     "roundtrip_loss_pct": round((1 - sell_quote.out_amount / buy_quote.in_amount) * 100, 2) if buy_quote and sell_quote and buy_quote.in_amount else None,
+                    "watch": {
+                        "dev": report.creator if report else "",
+                        "holders": [owner for owner, _pct in (report.top_owners if report else []) if owner and owner != (report.creator if report else "")][:3],
+                    },
                 },
                 "ai": verdict.to_dict() if verdict else None,
                 "reasoning": reasoning,
@@ -1535,8 +1882,10 @@ class MemeEngine:
         now = datetime.now(timezone.utc)
         days_in_month = calendar.monthrange(now.year, now.month)[1]
         elapsed = max(1.0, now.day - 1 + now.hour / 24)
-        month_net = month_realized - ai_month
-        projection = month_net / elapsed * days_in_month
+        fixed_monthly = self.settings.hosting_usd_per_month + self.settings.other_costs_usd_per_month
+        fixed_so_far = fixed_monthly * elapsed / days_in_month
+        month_net = month_realized - ai_month - fixed_so_far
+        projection = (month_realized - ai_month) / elapsed * days_in_month - fixed_monthly
         goal = self.settings.goal_usd_per_month
         fees_total = sum(float(row["fees_usd"] or 0) for row in self.store.list_positions(mode, 5000))
         stats = source_stats(closed)
@@ -1607,6 +1956,20 @@ class MemeEngine:
                 "projection": projection,
                 "progress": max(0.0, month_net) / goal if goal else 0.0,
                 "days_in_month": days_in_month,
+                "month_fixed": fixed_so_far,
+                "fixed_monthly": fixed_monthly,
+                "hosting_monthly": self.settings.hosting_usd_per_month,
+                "other_monthly": self.settings.other_costs_usd_per_month,
+                "month_costs": ai_month + fixed_so_far,
+                "need_per_month": goal + fixed_monthly,
+            },
+            "diagnostics": self.store.get_json("diagnostics", None),
+            "last_report": self.store.get_json("last_report", None),
+            "shadows": {
+                "active": self.store.count_active_shadows(),
+                "summary": shadow_summary([row for row in self.store.done_shadows(mode, limit=500)]),
+                "recent": [self._shadow_view(row) for row in self.store.recent_shadows(mode, 60)],
+                "optimizer": self._optimizer() if self.settings.shadows else None,
             },
             "equity": {
                 "24h": _downsample([row for row in series if row["ts"] >= cut_day], 300),
@@ -1709,6 +2072,10 @@ class MemeEngine:
             alerts.append({"level": "info", "text": "Ingen X_BEARER_TOKEN: X-omtale tjekkes kun gennem Claudes websøgning."})
         if self.settings.rpc_url.startswith("https://api.mainnet-beta.solana.com") and (self._all_wallets() or self.mode == "live"):
             alerts.append({"level": "warning", "text": "Offentlig Solana RPC er langsom og rate-limited. Brug en gratis Helius-nøgle i SOLANA_RPC_URL."})
+        diagnostics = self.store.get_json("diagnostics", None)
+        if diagnostics and not diagnostics.get("required_ok"):
+            failed = [item["label"] for item in diagnostics.get("checks", []) if not item["ok"] and not item.get("optional")]
+            alerts.append({"level": "warning", "text": f"Forbindelsestest: {', '.join(failed)} svarer ikke. Se Indstillinger → Forbindelser."})
         if self.last_error:
             alerts.append({"level": "error", "text": f"Seneste fejl: {self.last_error}"})
         return alerts
@@ -1719,6 +2086,8 @@ class MemeEngine:
         mark = float(row["cost_usd"]) * fraction * float(row["last_ratio"] or 1.0)
         unrealized = float(row["proceeds_usd"]) + mark - float(row["cost_usd"]) - float(row["fees_usd"])
         ai = loads(row["ai"], None)
+        safety = loads(row["safety"], {}) or {}
+        watch = safety.get("watch") or {}
         peak = float(row["peak_ratio"] or 1.0)
         sniping = row.get("strategy") == "sniper"
         trail = None
@@ -1749,6 +2118,7 @@ class MemeEngine:
             "peak_pct": (float(row["peak_ratio"] or 1.0) - 1.0),
             "partial": bool(row["partial_taken"]),
             "strategy": row.get("strategy") or "momentum",
+            "watching": bool(self.settings.dev_watch and (watch.get("dev") or watch.get("holders"))),
             "stop_pct": stop_pct,
             "tp_pct": tp_pct,
             "trail_pct": trail,

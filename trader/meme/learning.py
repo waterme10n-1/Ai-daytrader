@@ -125,10 +125,10 @@ class Model:
         items = [(name, self.weights.get(name, 0.0) * value) for name, value in features.items()]
         return sorted(items, key=lambda item: item[1], reverse=True)
 
-    def update(self, features: dict[str, float], won: bool) -> dict[str, float]:
-        """Ét SGD-skridt. Returnerer ændringen pr. vægt."""
+    def update(self, features: dict[str, float], won: bool, rate: float = 1.0) -> dict[str, float]:
+        """Ét SGD-skridt. rate < 1 for skyggehandler, der tæller mindre end rigtige handler."""
         target = 1.0 if won else 0.0
-        error = target - self.score(features)
+        error = (target - self.score(features)) * max(0.0, min(1.0, rate))
         changes: dict[str, float] = {}
         for name, value in features.items():
             if name not in FEATURES:
@@ -169,6 +169,9 @@ class Model:
 EXIT_LABELS = {
     "rug_liquidity": "likviditeten blev trukket",
     "rug_no_route": "ingen exit-rute (sandsynligvis rug)",
+    "rug_dev": "udvikleren eller topholdere solgte ud",
+    "horisont": "fulgt i 6 timer",
+    "rug": "rug",
     "stop_loss": "stop-loss",
     "take_profit": "delvis gevinst",
     "target": "gevinstmålet nået",
@@ -295,3 +298,103 @@ def adapt_sniper(cfg: SniperSettings, recent: list[dict]) -> list[str]:
         move("min_holders", cfg.min_holders + 5, why)
         move("min_liquidity_usd", cfg.min_liquidity_usd * 1.1, why)
     return notes
+
+
+# --------------------------------------------------------------------------- skyggehandler
+
+TARGET_GRID = (0.25, 0.5, 1.0, 2.0, 3.0, 5.0)
+STOP_GRID = (0.2, 0.3, 0.35, 0.5)
+MIN_PATHS = 20
+
+
+def simulate_path(
+    path: list,
+    *,
+    tp: float,
+    frac: float,
+    sl: float,
+    max_hold: float,
+    trail_activation: float | None = None,
+    trailing: float = 0.3,
+    stale: float | None = None,
+    rugged: bool = False,
+    cost_pct: float = 0.0,
+    breakeven_after_partial: bool = False,
+) -> tuple[float, str]:
+    """Kør bottens salgsregler på en kurs-sti [[minutter, kurs/købskurs], ...].
+
+    Returnerer (resultat i %, årsag). Mellem målingerne kendes kursen ikke, så et stop
+    sælger til den målte kurs (et hul ned rammer fuldt), mens et mål sælger til målet.
+    """
+    remaining, realized, peak, partial = 1.0, 0.0, 1.0, False
+    for minutes, ratio in path or []:
+        minutes, ratio = float(minutes), float(ratio)
+        peak = max(peak, ratio)
+        if ratio <= 1.0 - sl:
+            return realized + remaining * (ratio - 1.0) - cost_pct, "stop_loss"
+        if not partial and ratio >= 1.0 + tp:
+            sold = 1.0 if frac >= 0.999 else frac
+            realized += sold * tp
+            remaining -= sold
+            if remaining <= 1e-9:
+                return realized - cost_pct, "target"
+            partial = True
+            continue
+        if partial and (ratio <= peak * (1.0 - trailing) or (breakeven_after_partial and ratio <= 1.0)):
+            return realized + remaining * (ratio - 1.0) - cost_pct, "trailing"
+        if not partial and trail_activation is not None and peak >= 1.0 + trail_activation and ratio <= peak * (1.0 - trailing):
+            return realized + remaining * (ratio - 1.0) - cost_pct, "trailing"
+        if minutes >= max_hold:
+            return realized + remaining * (ratio - 1.0) - cost_pct, "time"
+        if stale is not None and not partial and minutes >= stale and ratio < 1.05:
+            return realized + remaining * (ratio - 1.0) - cost_pct, "stale"
+    last = float(path[-1][1]) if path else 1.0
+    return realized + remaining * (last - 1.0) - cost_pct, "rug" if rugged else "horisont"
+
+
+def verdict_for(stage: str, pnl: float, rugged: bool) -> str:
+    if stage == "købt":
+        return "taken"
+    if rugged or pnl <= -0.1:
+        return "dodged"
+    if pnl >= 0.1:
+        return "missed"
+    return "neutral"
+
+
+def optimize_targets(paths: list[tuple[list, bool]], *, frac: float, max_hold: float, cost_pct: float) -> dict:
+    """Hvilket gevinstmål og stop ville have givet det bedste gennemsnit på de observerede kurs-stier?"""
+    cells = []
+    for tp in TARGET_GRID:
+        for sl in STOP_GRID:
+            results = [
+                simulate_path(path, tp=tp, frac=frac, sl=sl, max_hold=max_hold, rugged=rugged, cost_pct=cost_pct, breakeven_after_partial=True)[0]
+                for path, rugged in paths
+            ]
+            n = len(results)
+            cells.append(
+                {
+                    "tp": tp,
+                    "sl": sl,
+                    "n": n,
+                    "avg": sum(results) / n if n else None,
+                    "win_rate": sum(1 for value in results if value > 0) / n if n else None,
+                }
+            )
+    ranked = [cell for cell in cells if cell["avg"] is not None]
+    best = max(ranked, key=lambda cell: cell["avg"]) if ranked else None
+    return {"n": len(paths), "enough": len(paths) >= MIN_PATHS, "cells": cells, "best": best, "targets": list(TARGET_GRID), "stops": list(STOP_GRID)}
+
+
+def shadow_summary(done: list[dict]) -> list[dict]:
+    """Pr. trin: hvor mange afviste tokens faldt, steg eller stod stille bagefter."""
+    stages: dict[str, dict] = {}
+    for row in done:
+        stage = str(row.get("stage") or "?")
+        entry = stages.setdefault(stage, {"stage": stage, "n": 0, "missed": 0, "dodged": 0, "neutral": 0, "taken": 0, "sum": 0.0})
+        entry["n"] += 1
+        entry[str(row.get("verdict") or "neutral")] = entry.get(str(row.get("verdict") or "neutral"), 0) + 1
+        entry["sum"] += float(row.get("sim_pnl_pct") or 0.0)
+    for entry in stages.values():
+        entry["avg"] = entry["sum"] / entry["n"] if entry["n"] else None
+    return sorted(stages.values(), key=lambda item: item["n"], reverse=True)

@@ -134,6 +134,26 @@ Efter login lander du på `/meme`. Siden opdaterer sig selv hvert 8. sekund.
 
 Knapper: **Scan nu**, **Pause køb** (åbne positioner passes stadig) og **Nødstop** (sælger alt). Klokken øverst slår browser-notifikationer til ved køb og salg. Genveje: `1`–`8` skifter fane, `S` scanner, `P` sætter køb på pause, `/` søger i radaren og `T` skifter tema.
 
+## Forbindelser, sikkerhed og opfølgning
+
+**Test forbindelser.** Ved opstart, og når du trykker på knappen under Indstillinger, kalder botten Jupiter, DexScreener, RugCheck, Solana RPC (og din wallet, X, Claude, Telegram og Jito, hvis de er sat op) og viser, hvad der virker. Ved hver fejl står der, hvad du skal rette. Gør det som det første efter udgivelsen.
+
+**Realistisk papirhandel.** Papirhandler fejler engang imellem (standard 5 %), og så betales gebyret alligevel. Der lægges 1 % ekstra slippage på hver handel og 2 % mere på snipes, fordi kursen når at flytte sig, før en rigtig handel lander. Så bliver papirresultatet ikke for flot, før du slår rigtige penge til.
+
+**Skyggehandler.** Botten følger kursen på de tokens, den afviste, og dem den købte, i 6 timer og regner ud, hvad der ville være sket med dens egne salgsregler. Under Læring kan du se, om afviste tokens faldt bagefter (godt valgt) eller steg (misset chance). Modellen lærer også lidt af de missede chancer. Hvis halvdelen af de tokens, scoren afviste, steg bagefter, sænker botten selv kravet en smule. Sikkerhedsfiltrene løsnes aldrig automatisk.
+
+**Hvilket mål ville have virket?** På Sniper-fanen bruger botten kursforløbene fra de tokens, den købte eller næsten købte, til at regne gevinstmål fra +25 % til +500 % mod stop fra -20 % til -50 % igennem. Fra 20 forløb og op viser den gennemsnittet efter gebyrer, og med én knap kan du bruge det bedste. Fortiden er ingen garanti, og kurserne måles kun én gang i minuttet.
+
+**Udvikler-alarm.** Ved hvert køb noterer botten udvikleren og de tre største holdere (fra RugCheck) og tjekker deres beholdning hvert minut. Sælger udvikleren mindst halvdelen eller topholderne tilsammen 40 %, sælger botten alt, og tokenet blokeres.
+
+**To-trins-login.** Kør `python -m trader.auth totp`, tilføj nøglen i en godkendelses-app (Google Authenticator, 1Password, Authy) og sæt `APP_TOTP_SECRET` i Railway. Så kræver login en kode, og siden spørger om en ny kode, før der hæves, og før rigtige penge slås til.
+
+**Telegram.** Med `TELEGRAM_BOT_TOKEN` og `TELEGRAM_CHAT_ID` kan du skrive til botten: `/status`, `/positioner`, `/pause`, `/fortsaet`, `/saelg BONK`, `/nodstop ja`, `/genoptag`, `/sniper til|fra`, `/maal 150`, `/rapport` og `/hjaelp`. Kun beskeder fra din egen chat besvares, og der kan ikke hæves penge eller slås rigtige penge til via Telegram. Hver dag kl. 19 UTC (`MEME_REPORT_HOUR_UTC`) kommer en dagsrapport med resultat, udgifter, skyggehandler og dagens lektioner.
+
+**Ærligt regnestykke.** Hosting (`MEME_HOSTING_USD_PER_MONTH`, standard 5 USD for Railway) og andre abonnementer (`MEME_OTHER_COSTS_USD_PER_MONTH`, fx X API eller en betalt RPC) trækkes fra sammen med Claude-forbruget. Målet viser, hvad botten reelt skal tjene for at betale Claude Max.
+
+**Hurtigere handler.** Stop-loss og rug-salg sendes med højere prioritetsgebyr, og fejler de, prøves de igen med dobbelt slippage. Med `MEME_EXECUTION=jito` sendes handler med et tip til Jitos block engine, så de lander oftere og ikke ses i den offentlige strøm.
+
 ## Ærlige forventninger
 
 - Claude Max koster 100 eller 200 USD om måneden. Fra 15 USD kræver det over 650 % afkast hver måned. Det sker næsten aldrig. Regn med, at indsatsen kan gå tabt.

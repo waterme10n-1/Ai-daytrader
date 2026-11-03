@@ -324,6 +324,19 @@
   .savebar { display: flex; gap: 8px; align-items: center; justify-content: flex-end; flex-wrap: wrap; }
   .dirty { color: var(--warn); font-size: 0.86rem; margin-right: auto; display: inline-flex; gap: 6px; align-items: center; }
 
+  .grid-table td.cell { text-align: center; font-variant-numeric: tabular-nums; border-radius: 8px; }
+  .grid-table td.cell b { display: block; }
+  .grid-table td.cell small { color: var(--muted); }
+  .grid-table td.best { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .grid-table td.current { box-shadow: inset 0 0 0 2px var(--border-strong); }
+  pre.report { white-space: pre-wrap; font-family: inherit; font-size: 0.88rem; background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px; padding: 12px; margin: 10px 0 0; }
+  .check-row { display: grid; grid-template-columns: 26px 1fr auto; gap: 10px; align-items: start; padding: 9px 0; border-bottom: 1px solid var(--border); font-size: 0.88rem; }
+  .check-row:last-child { border-bottom: 0; }
+  .check-row .ck { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--down-soft); color: var(--down); }
+  .check-row.ok .ck { background: var(--up-soft); color: var(--up); }
+  .check-row.optional:not(.ok) .ck { background: var(--warn-soft); color: var(--warn); }
+  .check-row .hint { color: var(--warn); font-size: 0.82rem; margin-top: 2px; }
+
   /* Toasts */
   .toasts { position: fixed; right: 16px; bottom: 16px; display: grid; gap: 8px; z-index: 50; width: min(360px, calc(100% - 32px)); }
   .toast { display: grid; grid-template-columns: 34px 1fr; gap: 10px; align-items: center; padding: 12px 14px; border-radius: 14px; background: var(--surface); border: 1px solid var(--border-strong); box-shadow: 0 14px 40px rgba(0, 0, 0, 0.3); animation: slidein 0.25s ease; font-size: 0.88rem; }
@@ -473,6 +486,10 @@
       <button class="btn primary" type="button" id="sniper-save">Gem indstillinger</button>
     </div>
     <div class="card">
+      <div class="card-head"><h2 id="opt-title"></h2><span class="muted" id="opt-note" style="font-size:0.86rem"></span></div>
+      <div id="opt"></div>
+    </div>
+    <div class="card">
       <div class="card-head"><h2 id="sniper-seen-title"></h2><span class="muted" style="font-size:0.86rem">Helt nye tokens, og hvorfor de blev købt eller sprunget over</span></div>
       <div class="table-wrap" id="sniper-seen"></div>
     </div>
@@ -505,6 +522,12 @@
         <div class="card-head"><h2 id="sources-title"></h2></div>
         <div class="table-wrap" id="sources"></div>
       </div>
+    </div>
+    <div class="card" style="grid-column:1/-1">
+      <div class="card-head"><h2 id="shadow-title"></h2><span class="muted" id="shadow-note" style="font-size:0.86rem"></span></div>
+      <p class="muted" style="margin:0 0 12px;font-size:0.88rem">Botten følger kursen på tokens, den afviste, i 6 timer og regner ud, hvad der ville være sket med dens egne salgsregler. Så lærer den også af de chancer, den gik glip af, og ser, om filtrene rammer rigtigt.</p>
+      <div class="table-wrap" id="shadow-summary"></div>
+      <details style="margin-top:12px"><summary>Seneste skyggehandler</summary><div class="table-wrap" id="shadow-recent" style="margin-top:10px"></div></details>
     </div>
     <div class="card" style="grid-column:1/-1">
       <div class="card-head"><h2 id="params-title"></h2><span class="muted">Læringen må kun flytte dem inden for grænserne</span></div>
@@ -568,6 +591,21 @@
       <div class="card-head"><h2 id="settings-title"></h2><span class="muted">Ændres i miljøvariablerne. Nøgler vises aldrig.</span></div>
       <div class="kv" id="settings"></div>
     </div>
+    <div class="grid sn-grid">
+      <div class="card">
+        <div class="card-head"><h2 id="diag-title"></h2><button class="btn small primary" type="button" id="diag-run"></button></div>
+        <div id="diag"></div>
+      </div>
+      <div class="grid" style="align-content:start">
+        <div class="card"><div class="card-head"><h2 id="sec-title"></h2><span class="chip" id="sec-chip"></span></div><div id="sec"></div></div>
+        <div class="card"><div class="card-head"><h2 id="exec-title"></h2></div><div class="kv" id="exec"></div></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h2 id="tg-title"></h2><button class="btn small" type="button" id="report-now">Vis dagsrapport nu</button></div>
+      <div id="tg"></div>
+      <pre class="report" id="report-text" hidden></pre>
+    </div>
     <div class="card">
       <div class="card-head"><h2 id="keys-title"></h2></div>
       <div class="kv">
@@ -624,6 +662,10 @@ const ICONS = {
   sliders: '<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M2 14h4M10 8h4M18 16h4"/>',
   search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
   target: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+  plug: '<path d="M12 22v-5"/><path d="M9 8V2"/><path d="M15 8V2"/><path d="M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8Z"/>',
+  lock: '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+  zap: '<path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/>',
+  chat: '<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>',
   ghost: '<path d="M9 10h.01M15 10h.01"/><path d="M12 2a8 8 0 0 0-8 8v12l3-3 2.5 2.5L12 19l2.5 2.5L17 19l3 3V10a8 8 0 0 0-8-8z"/>',
   send: '<path d="M14.5 21.7a.5.5 0 0 0 .9-.1l6.5-19a.5.5 0 0 0-.6-.6l-19 6.5a.5.5 0 0 0-.1.9l7.9 3.2a2 2 0 0 1 1.1 1.1Z"/><path d="m21.9 2.1-10.9 10.9"/>',
   down: '<path d="M12 5v14"/><path d="m19 12-7 7-7-7"/>',
@@ -644,7 +686,8 @@ const TABS = [
 ];
 const STAGES = { "købt": "Købt", sniper: "Sniper-filter", marked: "Markedsfilter", rug: "Rug-tjek", score: "Score", rute: "Exit-rute", claude: "Claude", risiko: "Risiko", "køb": "Køb fejlede" };
 const STAGE_CLASS = { "købt": "ok", rug: "rug", claude: "claude", risiko: "risiko", rute: "rute", sniper: "risiko" };
-const KIND = { handel: "Handel", parameter: "Parameter", claude: "Claude" };
+const KIND = { handel: "Handel", parameter: "Parameter", claude: "Claude", skygge: "Skyggehandel" };
+const VERDICT = { missed: ["Misset chance", "up"], dodged: ["Godt valgt", "info"], neutral: ["Neutral", ""], taken: ["Købt", "accent"] };
 
 const fmtMoney = new Intl.NumberFormat("da-DK", { style: "currency", currency: "USD", currencyDisplay: "narrowSymbol", minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmtMoney4 = new Intl.NumberFormat("da-DK", { style: "currency", currency: "USD", currencyDisplay: "narrowSymbol", minimumFractionDigits: 2, maximumFractionDigits: 4 });
@@ -919,7 +962,7 @@ function renderHero(data) {
   const g = data.goal;
   const p = Math.max(0, Math.min(1, g.progress || 0));
   const r = 50, c = 2 * Math.PI * r;
-  const need = k.bankroll ? (g.target / k.bankroll) * 100 : 0;
+  const need = k.bankroll ? ((g.need_per_month || g.target) / k.bankroll) * 100 : 0;
   put("goal", `
     <div class="card-head" style="margin:0"><h2>${icon("spark")}Mål: betal Claude Max</h2><span class="chip accent">${esc(money(g.target))}/md</span></div>
     <div class="goal-top">
@@ -933,6 +976,7 @@ function renderHero(data) {
         <div><span>Netto denne måned</span><b class="${tone(g.month_net)}">${esc(signed(g.month_net))}</b></div>
         <div><span>Handler</span><span class="${tone(g.month_realized)}">${esc(signed(g.month_realized))}</span></div>
         <div><span>AI-udgifter</span><span>${esc(money4(g.month_ai))}</span></div>
+        <div><span>Hosting og abonnementer</span><span title="${esc(money(g.fixed_monthly))} pr. måned, regnet med for de dage der er gået">${esc(money(g.month_fixed))}</span></div>
         <div><span>Fremskrevet måned</span><span class="${tone(g.projection)}">${esc(signed(g.projection))}</span></div>
       </div>
     </div>
@@ -945,7 +989,7 @@ function renderHero(data) {
         <div><span>AI-udgifter i alt</span><span>${esc(money4(k.ai_total))}</span></div>
       </div>
     </div>
-    <p class="note">Kræver over ${esc(fmtInt.format(need))} % afkast om måneden på ${esc(money(k.bankroll))}. Regn ikke med det.${data.mode === "paper" ? " Tæller først rigtigt, når botten handler live." : ""}</p>`);
+    <p class="note">${g.fixed_monthly ? `For at betale Claude Max skal botten tjene ${esc(money(g.need_per_month))} om måneden, fordi hosting og abonnementer koster ${esc(money(g.fixed_monthly))}. ` : ""}Kræver over ${esc(fmtInt.format(need))} % afkast om måneden på ${esc(money(k.bankroll))}. Regn ikke med det.${data.mode === "paper" ? " Tæller først rigtigt, når botten handler live." : ""}</p>`);
 }
 function renderKpis(data) {
   const k = data.kpis, s = data.settings;
@@ -1045,7 +1089,7 @@ function renderPositions(data) {
     const hold = p.max_hold_minutes ? Math.min(1, (p.minutes || 0) / p.max_hold_minutes) : 0;
     return `<article class="card">
       <div class="pos-head">
-        <div><div class="sym display">${esc(p.symbol)}${p.strategy === "sniper" ? ' <span class="chip accent" style="vertical-align:middle">' + icon("target", "sm") + "Sniper</span>" : ""}</div><div class="muted" style="font-size:0.82rem">${esc(p.name || "")} · ${esc(p.source)}${p.partial ? ' · <span class="up">delsalg taget</span>' : ""}</div>${tokenLinks(p.mint, p.pair_url)}</div>
+        <div><div class="sym display">${esc(p.symbol)}${p.strategy === "sniper" ? ' <span class="chip accent" style="vertical-align:middle">' + icon("target", "sm") + "Sniper</span>" : ""}</div><div class="muted" style="font-size:0.82rem">${esc(p.name || "")} · ${esc(p.source)}${p.partial ? ' · <span class="up">delsalg taget</span>' : ""}</div>${p.watching ? `<div class="chips" style="margin-top:6px"><span class="chip info" title="Botten sælger, hvis udvikleren eller topholderne sælger ud">${icon("shield", "sm")}Overvåger udvikleren</span></div>` : ""}${tokenLinks(p.mint, p.pair_url)}</div>
         <div><div class="pnl-big display num ${tone(p.change_pct)}">${esc(spct(p.change_pct))}</div><div class="num ${tone(p.unrealized_usd)}" style="text-align:right;font-size:0.86rem">${esc(signed(p.unrealized_usd))}</div></div>
       </div>
       ${rangeMeter(p)}
@@ -1104,7 +1148,7 @@ function renderJournal(data) {
 function renderLearning(data) {
   document.getElementById("lessons-title").innerHTML = icon("brain") + "Lektioner";
   const lessons = data.lessons || [];
-  put("lessons", lessons.length ? lessons.map((l) => `<li class="${esc(l.kind)}"><div class="meta"><span class="chip ${l.kind === "claude" ? "accent" : l.kind === "parameter" ? "warn" : ""}">${esc(KIND[l.kind] || l.kind)}</span>${esc(ago(l.ts))}</div><div>${esc(l.text)}</div></li>`).join("") : `<li style="list-style:none">${empty("Ingen lektioner endnu. Efter hver lukket handel skriver botten, hvad den lærte.", "brain")}</li>`);
+  put("lessons", lessons.length ? lessons.map((l) => `<li class="${esc(l.kind)}"><div class="meta"><span class="chip ${l.kind === "claude" ? "accent" : l.kind === "parameter" ? "warn" : l.kind === "skygge" ? "info" : ""}">${esc(KIND[l.kind] || l.kind)}</span>${esc(ago(l.ts))}</div><div>${esc(l.text)}</div></li>`).join("") : `<li style="list-style:none">${empty("Ingen lektioner endnu. Efter hver lukket handel skriver botten, hvad den lærte.", "brain")}</li>`);
 
   document.getElementById("weights-title").innerHTML = icon("sliders") + "Signalvægte";
   document.getElementById("weights-note").textContent = `${data.model.updates} opdateringer`;
@@ -1443,6 +1487,107 @@ function setDraft(name, value) {
   renderPreview();
 }
 
+/* ---------- Skyggehandler og målberegner ---------- */
+function renderShadows(data) {
+  const sh = data.shadows || {};
+  document.getElementById("shadow-title").innerHTML = icon("ghost") + "Skyggehandler";
+  document.getElementById("shadow-note").textContent = `${sh.active || 0} følges lige nu`;
+  const rows = (sh.summary || []).filter((r) => r.stage !== "købt");
+  put("shadow-summary", rows.length ? `<table><thead><tr><th>Afvist ved</th><th>Fulgt</th><th>Faldt bagefter</th><th>Steg over 10 %</th><th>Gns. hvis købt</th></tr></thead><tbody>${rows.map((r) => `<tr>
+      <td>${esc(STAGES[r.stage] || r.stage)}</td><td class="num">${esc(r.n)}</td>
+      <td class="num"><span class="chip info">${esc(r.dodged)} godt valgt</span></td>
+      <td class="num"><span class="chip ${r.missed ? "up" : ""}">${esc(r.missed)} misset</span></td>
+      <td class="num ${tone(r.avg)}">${esc(spct(r.avg))}</td></tr>`).join("")}</tbody></table>` : empty("Ingen færdige skyggehandler endnu. De første er klar 6 timer efter, at botten har afvist et token.", "ghost"));
+  const recent = sh.recent || [];
+  put("shadow-recent", recent.length ? `<table><thead><tr><th>Startet</th><th>Token</th><th>Afvist ved</th><th>Top</th><th>Nu</th><th>Hvis købt</th><th></th></tr></thead><tbody>${recent.map((r) => {
+    const v = VERDICT[r.verdict] || ["Følges", ""];
+    return `<tr><td class="muted" style="white-space:nowrap">${esc(ago(r.ts))}</td><td class="tok">${esc(r.symbol)}<small>${esc(r.strategy === "sniper" ? "sniper" : "momentum")}</small></td>
+      <td>${esc(STAGES[r.stage] || r.stage)}</td><td class="num">${esc(spct(r.peak_pct))}</td><td class="num ${tone(r.last_pct)}">${esc(spct(r.last_pct))}${r.rugged ? ' <span class="stage-tag rug">rug</span>' : ""}</td>
+      <td class="num ${tone(r.sim_pnl_pct)}">${r.status === "done" ? esc(spct(r.sim_pnl_pct)) + `<small class="muted" style="display:block">${esc(r.sim_exit || "")}</small>` : '<span class="muted">følges</span>'}</td>
+      <td><span class="chip ${v[1]}">${esc(r.status === "done" ? v[0] : "Følges")}</span></td></tr>`;
+  }).join("")}</tbody></table>` : empty("Ingen endnu.", "ghost"));
+}
+function renderOptimizer(data) {
+  const opt = data.shadows && data.shadows.optimizer;
+  document.getElementById("opt-title").innerHTML = icon("bars") + "Hvilket mål ville have virket?";
+  if (!opt) { put("opt", empty("Skyggehandler er slået fra (MEME_SHADOWS=false).", "bars")); document.getElementById("opt-note").textContent = ""; return; }
+  document.getElementById("opt-note").textContent = `bygget på ${opt.n} tokens, botten købte eller næsten købte`;
+  if (!opt.enough) {
+    const done = Math.min(100, Math.round(opt.n / 20 * 100));
+    put("opt", `<p class="muted" style="margin:0 0 8px;font-size:0.88rem">Botten samler selv kursforløb for de tokens, den køber eller næsten køber. Med mindst 20 forløb regner den ud, hvilket gevinstmål og stop der ville have tjent mest.</p><div class="meter"><i style="width:${done}%"></i></div><p class="muted" style="font-size:0.84rem">${esc(opt.n)} af 20 forløb indsamlet.</p>`);
+    return;
+  }
+  const cells = {};
+  for (const c of opt.cells) cells[c.tp + ":" + c.sl] = c;
+  const cur = opt.current || {};
+  const best = opt.best || {};
+  const ext = Math.max(0.05, ...opt.cells.map((c) => Math.abs(c.avg || 0)));
+  const bg = (v) => (v == null ? "" : `background:color-mix(in srgb, ${v >= 0 ? "var(--up)" : "var(--down)"} ${Math.round(Math.min(1, Math.abs(v) / ext) * 28)}%, transparent)`);
+  const same = (a, b) => Math.abs((a || 0) - (b || 0)) < 1e-9;
+  put("opt", `<div class="table-wrap"><table class="grid-table"><thead><tr><th>Mål / stop</th>${opt.stops.map((sl) => `<th>${esc(spct(-sl))}</th>`).join("")}</tr></thead><tbody>${opt.targets.map((tp) => `<tr><th>${esc(spct(tp))}</th>${opt.stops.map((sl) => {
+      const c = cells[tp + ":" + sl] || {};
+      const isBest = same(best.tp, tp) && same(best.sl, sl);
+      const isCur = same(cur.tp, tp) && same(cur.sl, sl);
+      return `<td class="cell ${isBest ? "best" : ""} ${isCur ? "current" : ""}" style="${bg(c.avg)}" title="${esc(c.n)} forløb${isCur ? " · dit nuværende mål" : ""}${isBest ? " · bedst" : ""}"><b class="${tone(c.avg)}">${esc(spct(c.avg))}</b><small>${esc(pct(c.win_rate))} vinder</small></td>`;
+    }).join("")}</tr>`).join("")}</tbody></table></div>
+    <div class="savebar" style="margin-top:12px;justify-content:space-between">
+      <span class="muted" style="font-size:0.84rem;flex:1 1 300px">Gennemsnit pr. snipe efter gebyrer og slippage. Dit nuværende mål (${esc(spct(cur.tp))} / ${esc(spct(-(cur.sl || 0)))}) gav <b class="${tone(cur.avg)}">${esc(spct(cur.avg))}</b>. Bedst: ${esc(spct(best.tp))} / ${esc(spct(-best.sl))} med <b class="${tone(best.avg)}">${esc(spct(best.avg))}</b>. Fortiden er ingen garanti, og kurserne måles hvert minut.</span>
+      ${best.tp != null && !(same(best.tp, cur.tp) && same(best.sl, cur.sl)) ? `<button class="btn small primary" type="button" id="opt-apply" data-tp="${best.tp}" data-sl="${best.sl}">Brug ${esc(spct(best.tp))} / ${esc(spct(-best.sl))}</button>` : ""}
+    </div>`);
+}
+
+/* ---------- Indstillinger: forbindelser, sikkerhed, udførelse, Telegram ---------- */
+function renderDiagnostics(data) {
+  document.getElementById("diag-title").innerHTML = icon("plug") + "Forbindelser";
+  const btn = document.getElementById("diag-run");
+  if (!btn.disabled) btn.innerHTML = icon("scan", "sm") + "Test forbindelser";
+  const d = data.diagnostics;
+  put("diag", !d ? empty("Ikke testet endnu. Botten tester selv ved opstart, eller tryk på knappen.", "plug")
+    : `<p class="muted" style="margin:0 0 6px;font-size:0.86rem">${esc(d.ok)} af ${esc(d.total)} virker · testet ${esc(ago(d.at))}</p>` +
+      d.checks.map((c) => `<div class="check-row ${c.ok ? "ok" : ""} ${c.optional ? "optional" : ""}"><span class="ck">${icon(c.ok ? "check" : c.optional ? "alert" : "x", "sm")}</span><div><b>${esc(c.label)}</b><div class="muted">${esc(c.detail)}</div>${!c.ok && c.hint ? `<div class="hint">${esc(c.hint)}</div>` : ""}</div><span class="muted num">${esc(c.ms)} ms</span></div>`).join(""));
+}
+function renderSecurity(data) {
+  document.getElementById("sec-title").innerHTML = icon("lock") + "Sikkerhed";
+  const on = data.security && data.security.totp;
+  const chip = document.getElementById("sec-chip");
+  chip.textContent = on ? "to-trins-login til" : "to-trins-login fra";
+  chip.className = "chip " + (on ? "up" : "warn");
+  put("sec", on
+    ? `<p class="muted" style="margin:0;font-size:0.88rem">Login kræver en kode fra din godkendelses-app. Før rigtige penge slås til, og før der hæves, spørger siden om en ny kode.</p>`
+    : `<p class="muted" style="margin:0 0 8px;font-size:0.88rem">Slå to-trins-login til, før botten handler med rigtige penge. Så kan ingen logge ind, hæve eller slå rigtige penge til med kun din adgangskode.</p>
+       <div class="steps"><div class="step"><span class="ck">1</span><span>Kør <code>python -m trader.auth totp</code> på din computer.</span><em></em></div>
+       <div class="step"><span class="ck">2</span><span>Tilføj nøglen i en godkendelses-app (Google Authenticator, 1Password, Authy).</span><em></em></div>
+       <div class="step"><span class="ck">3</span><span>Sæt <code>APP_TOTP_SECRET</code> i Railway og genstart.</span><em></em></div></div>`);
+}
+function renderExecution(data) {
+  document.getElementById("exec-title").innerHTML = icon("zap") + "Udførelse og papir";
+  const s = data.settings;
+  const rows = [
+    ["Sendes via", s.execution === "jito" ? `Jito (tip ${fmtInt.format(s.jito_tip_lamports)} lamports)` : "RPC med prioritetsgebyr"],
+    ["Hastesalg", "stop-loss og rug: højere gebyr, og et nyt forsøg med dobbelt slippage"],
+    ["Papir: fejlede handler", pct(s.paper_fail_rate)],
+    ["Papir: ekstra slippage", `${fmtNum.format(s.paper_slippage_pct)} % (+${fmtNum.format(s.paper_sniper_extra_pct)} % for snipes)`],
+    ["Udviklerovervågning", s.dev_watch ? "til" : "fra"],
+    ["Skyggehandler", s.shadows ? "til" : "fra"],
+  ];
+  put("exec", rows.map(([a, b]) => `<div><span>${esc(a)}</span><b>${esc(b)}</b></div>`).join(""));
+}
+function renderTelegram(data) {
+  document.getElementById("tg-title").innerHTML = icon("chat") + "Telegram";
+  const s = data.settings;
+  const hour = s.report_hour_utc;
+  const local = hour >= 0 ? new Date(Date.UTC(2026, 0, 1, hour)).toLocaleTimeString("da-DK", { hour: "2-digit", minute: "2-digit" }) : null;
+  const commands = [["/status", "egenkapital og tilstand"], ["/positioner", "åbne positioner"], ["/pause · /fortsaet", "stop eller fortsæt nye køb"], ["/saelg BONK", "sælg en position"], ["/nodstop ja", "sælg alt"], ["/sniper til · fra", "tænd og sluk sniperen"], ["/maal 150", "sniperens gevinstmål i %"], ["/rapport", "dagsrapporten nu"]];
+  put("tg", `<p class="muted" style="margin:0 0 10px;font-size:0.88rem">Med <code>TELEGRAM_BOT_TOKEN</code> og <code>TELEGRAM_CHAT_ID</code> får du besked ved køb og salg${hour >= 0 ? ` og en dagsrapport kl. ${esc(local)} (din tid)` : ""}. ${s.telegram_commands ? "Du kan også styre botten med kommandoer. Kun beskeder fra din egen chat besvares, og der kan ikke hæves penge herfra." : "Kommandoer er slået fra (MEME_TELEGRAM_COMMANDS=false)."}</p>
+    ${s.telegram_commands ? `<div class="kv">${commands.map(([c, d]) => `<div><span>${esc(d)}</span><b><code>${esc(c)}</code></b></div>`).join("")}</div>` : ""}`);
+}
+async function askCode() {
+  if (!(state && state.security && state.security.totp)) return "";
+  const code = prompt("Kode fra din godkendelses-app (6 cifre):");
+  if (code == null) throw new Error("Annulleret");
+  return code.trim();
+}
+
 /* ---------- Nye handler: toasts og notifikationer ---------- */
 function notifyEnabled() { try { return localStorage.getItem("meme-notify") === "1" && "Notification" in window && Notification.permission === "granted"; } catch (e) { return false; } }
 function renderBell() {
@@ -1488,6 +1633,12 @@ function render(data) {
   renderLearning(data);
   renderWallets(data);
   renderKrav(data);
+  renderShadows(data);
+  renderOptimizer(data);
+  renderDiagnostics(data);
+  renderSecurity(data);
+  renderExecution(data);
+  renderTelegram(data);
 }
 function csrfToken() { const m = document.cookie.match(/(?:^|; )dt_csrf=([^;]*)/); return m ? decodeURIComponent(m[1]) : ""; }
 async function refresh() {
@@ -1553,6 +1704,39 @@ document.getElementById("panel-sniper").addEventListener("click", (ev) => {
     renderPreview();
   }
 });
+document.getElementById("panel-sniper").addEventListener("click", (ev) => {
+  const apply = ev.target.closest("#opt-apply");
+  if (!apply) return;
+  const tp = Number(apply.dataset.tp), sl = Number(apply.dataset.sl);
+  if (!confirm(`Sæt sniperens mål til ${spct(tp)} og stop til ${spct(-sl)}?`)) return;
+  act(async () => { const b = await post("/api/meme/sniper", { take_profit_pct: tp, stop_loss_pct: sl }); sniperDirty = false; sniperKey = ""; return b; }, "Nyt mål og stop er gemt");
+});
+document.getElementById("diag-run").addEventListener("click", async (ev) => {
+  const b = ev.currentTarget;
+  b.disabled = true;
+  b.innerHTML = icon("scan", "sm") + "Tester…";
+  try {
+    const result = await post("/api/meme/diagnostics");
+    if (state) { state.diagnostics = result; delete cache.diag; }
+    toast(result.required_ok ? "up" : "down", `${result.ok} af ${result.total} forbindelser virker`, result.required_ok ? "" : "Se forklaringen ved det, der fejler.");
+  } catch (err) {
+    toast("down", "Testen fejlede", err.message);
+  } finally {
+    b.disabled = false;
+    if (state) renderDiagnostics(state);
+  }
+});
+document.getElementById("report-now").addEventListener("click", async () => {
+  try {
+    const r = await post("/api/meme/report");
+    const el = document.getElementById("report-text");
+    el.textContent = r.text;
+    el.hidden = false;
+  } catch (err) {
+    toast("down", "Rapporten kunne ikke laves", err.message);
+  }
+});
+
 document.getElementById("sniper-switch").addEventListener("click", () => {
   const on = !(state && state.sniper && state.sniper.enabled);
   act(() => post("/api/meme/sniper", { enabled: on }), on ? "Sniperen er tændt" : "Sniperen er slukket");
@@ -1592,7 +1776,7 @@ document.getElementById("panel-wallets").addEventListener("click", (ev) => {
     if (!(v > 0)) { toast("down", "Skriv et beløb i SOL", ""); return; }
     const to = walletInfo && walletInfo.withdraw_address;
     if (!confirm(`Send ${fmtNum.format(v)} SOL fra bot-wallet'en til ${short(to)}?`)) return;
-    act(async () => { const b = await post("/api/meme/wallet/withdraw", { sol: v }); walletInfo = { ...b.wallet, phantom: walletInfo && walletInfo.phantom }; if (state) renderWalletCards(state); setTimeout(() => refreshWallet(true), 4000); toast("up", `${fmtNum.format(b.sol)} SOL er sendt til din Phantom`, "tx " + short(b.signature)); return null; });
+    act(async () => { const code = await askCode(); const b = await post("/api/meme/wallet/withdraw", { sol: v, code }); walletInfo = { ...b.wallet, phantom: walletInfo && walletInfo.phantom }; if (state) renderWalletCards(state); setTimeout(() => refreshWallet(true), 4000); toast("up", `${fmtNum.format(b.sol)} SOL er sendt til din Phantom`, "tx " + short(b.signature)); return null; });
   }
 });
 document.getElementById("bulk-form").addEventListener("submit", (ev) => {
@@ -1617,7 +1801,7 @@ document.getElementById("wallet-form").addEventListener("submit", (ev) => {
 });
 document.getElementById("unlock-form").addEventListener("submit", async (ev) => {
   ev.preventDefault();
-  try { const b = await post("/api/meme/live/unlock", { phrase: document.getElementById("phrase").value }); render(b.status); document.getElementById("unlock-msg").textContent = b.message; }
+  try { const code = await askCode(); const b = await post("/api/meme/live/unlock", { phrase: document.getElementById("phrase").value, code }); render(b.status); document.getElementById("unlock-msg").textContent = b.message; }
   catch (err) { document.getElementById("unlock-msg").textContent = err.message; }
 });
 document.getElementById("notify").addEventListener("click", async () => {

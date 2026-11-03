@@ -43,6 +43,11 @@ def _https_template(value: str | None, default: str) -> str:
     return default
 
 
+def _https_url(value: str | None, default: str) -> str:
+    text = (value or "").strip()
+    return text if text.startswith("https://") else default
+
+
 def _list(value: str | None) -> tuple[str, ...]:
     if not value:
         return ()
@@ -93,6 +98,18 @@ class MemeSettings:
     withdraw_address: str = ""
     sweep_above_usd: float = 0.0
     axiom_link: str = "https://axiom.trade/meme/{pair}"
+    paper_fail_rate: float = 0.05
+    paper_slippage_pct: float = 1.0
+    paper_sniper_extra_pct: float = 2.0
+    execution: str = "rpc"
+    jito_tip_lamports: int = 100_000
+    jito_url: str = "https://mainnet.block-engine.jito.wtf/api/v1/transactions"
+    hosting_usd_per_month: float = 5.0
+    other_costs_usd_per_month: float = 0.0
+    report_hour_utc: int = 19
+    telegram_commands: bool = True
+    dev_watch: bool = True
+    shadows: bool = True
 
     @property
     def wallet_configured(self) -> bool:
@@ -154,6 +171,18 @@ class MemeSettings:
             withdraw_address=os.getenv("MEME_WITHDRAW_ADDRESS", "").strip(),
             sweep_above_usd=max(0.0, _float(os.getenv("MEME_SWEEP_ABOVE_USD"), 0.0)),
             axiom_link=_https_template(os.getenv("MEME_AXIOM_LINK"), "https://axiom.trade/meme/{pair}"),
+            paper_fail_rate=min(0.5, max(0.0, _float(os.getenv("MEME_PAPER_FAIL_RATE"), 0.05))),
+            paper_slippage_pct=min(10.0, max(0.0, _float(os.getenv("MEME_PAPER_SLIPPAGE_PCT"), 1.0))),
+            paper_sniper_extra_pct=min(20.0, max(0.0, _float(os.getenv("MEME_PAPER_SNIPER_EXTRA_PCT"), 2.0))),
+            execution="jito" if (os.getenv("MEME_EXECUTION") or "").strip().lower() == "jito" else "rpc",
+            jito_tip_lamports=max(1_000, min(10_000_000, _int(os.getenv("MEME_JITO_TIP_LAMPORTS"), 100_000))),
+            jito_url=_https_url(os.getenv("MEME_JITO_URL"), "https://mainnet.block-engine.jito.wtf/api/v1/transactions"),
+            hosting_usd_per_month=max(0.0, _float(os.getenv("MEME_HOSTING_USD_PER_MONTH"), 5.0)),
+            other_costs_usd_per_month=max(0.0, _float(os.getenv("MEME_OTHER_COSTS_USD_PER_MONTH"), 0.0)),
+            report_hour_utc=max(-1, min(23, _int(os.getenv("MEME_REPORT_HOUR_UTC"), 19))),
+            telegram_commands=_flag(os.getenv("MEME_TELEGRAM_COMMANDS"), True),
+            dev_watch=_flag(os.getenv("MEME_DEV_WATCH"), True),
+            shadows=_flag(os.getenv("MEME_SHADOWS"), True),
         )
 
 
@@ -374,4 +403,15 @@ def public_meme_settings(settings: MemeSettings) -> dict:
         "withdraw_address": settings.withdraw_address,
         "sweep_above_usd": settings.sweep_above_usd,
         "axiom_link": settings.axiom_link,
+        "paper_fail_rate": settings.paper_fail_rate,
+        "paper_slippage_pct": settings.paper_slippage_pct,
+        "paper_sniper_extra_pct": settings.paper_sniper_extra_pct,
+        "execution": settings.execution,
+        "jito_tip_lamports": settings.jito_tip_lamports,
+        "hosting_usd_per_month": settings.hosting_usd_per_month,
+        "other_costs_usd_per_month": settings.other_costs_usd_per_month,
+        "report_hour_utc": settings.report_hour_utc,
+        "telegram_commands": settings.telegram_commands,
+        "dev_watch": settings.dev_watch,
+        "shadows": settings.shadows,
     }

@@ -28,6 +28,8 @@ from trader.auth import (
     read_session,
     render_login,
     sign_payload,
+    totp_enabled,
+    totp_ok,
     unsign_payload,
     _delete_cookie,
     _set_cookie,
@@ -44,6 +46,7 @@ MEME_STATIC = Path(__file__).resolve().parent / "static" / "meme.html"
 
 class PhraseBody(BaseModel):
     phrase: str = ""
+    code: str = ""
 
 
 class IdBody(BaseModel):
@@ -67,6 +70,7 @@ class DepositBody(BaseModel):
 
 class WithdrawBody(BaseModel):
     sol: float
+    code: str = ""
 
 
 class TokenBody(BaseModel):
@@ -104,12 +108,21 @@ def create_app(
         holder["meme"] = meme
         app.state.meme = meme
         eng.start()
+        bot = None
         if meme is not None:
             meme.start()
+            cfg = holder["settings"]
+            if auto_meme and meme.settings.telegram_commands and cfg.telegram_bot_token and cfg.telegram_chat_id:
+                from trader.meme.telegram import TelegramBot
+
+                bot = TelegramBot(meme, cfg.telegram_bot_token, cfg.telegram_chat_id)
+                bot.start()
         try:
             yield
         finally:
             eng.stop()
+            if bot is not None:
+                bot.stop()
             if meme is not None:
                 meme.stop()
 
@@ -120,6 +133,20 @@ def create_app(
 
     def current() -> TradingEngine:
         return app.state.engine
+
+    def require_code(request: Request, code: str) -> None:
+        """Ekstra kode fra godkendelses-appen før rigtige penge og udbetalinger, når to-trins-login er slået til."""
+        settings = active_settings()
+        if not totp_enabled(settings):
+            return
+        guard: LoginGuard = request.app.state.login_guard
+        key = "totp:" + client_key(request)
+        if guard.locked(key):
+            raise HTTPException(status_code=429, detail="For mange forkerte koder. Prøv igen om et kvarter.")
+        if not totp_ok(settings.app_totp_secret, code):
+            guard.fail(key)
+            raise HTTPException(status_code=401, detail="Koden fra din godkendelses-app mangler eller er forkert.")
+        guard.succeed(key)
 
     def active_settings() -> Settings:
         return app.state.settings
@@ -154,6 +181,7 @@ def create_app(
         form = parse_qs((await request.body()).decode("utf-8", errors="replace"))
         username = form.get("username", [""])[0]
         password = form.get("password", [""])[0]
+        code = form.get("code", [""])[0]
         csrf = form.get("csrf", [""])[0]
         ticket = unsign_payload(settings.session_secret, request.cookies.get(LOGIN_COOKIE, ""))
         expected = str(ticket.get("csrf")) if ticket and ticket.get("purpose") == "login" else ""
@@ -165,7 +193,9 @@ def create_app(
                 username=username,
                 status_code=403,
             )
-        if not credentials_match(settings, username, password):
+        if not credentials_match(settings, username, password) or (
+            totp_enabled(settings) and not totp_ok(settings.app_totp_secret, code)
+        ):
             locked = guard.fail(key)
             message = (
                 "For mange forsøg. Prøv igen om et kvarter."
@@ -231,7 +261,9 @@ def create_app(
 
     @app.get("/api/meme/status")
     def meme_status() -> dict:
-        return meme().status()
+        status = meme().status()
+        status["security"] = {"totp": totp_enabled(active_settings())}
+        return status
 
     @app.post("/api/meme/kill")
     def meme_kill() -> dict:
@@ -291,7 +323,8 @@ def create_app(
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     @app.post("/api/meme/wallet/withdraw")
-    def meme_withdraw(body: WithdrawBody) -> dict:
+    def meme_withdraw(body: WithdrawBody, request: Request) -> dict:
+        require_code(request, body.code)
         try:
             result = meme().withdraw(body.sol)
         except ValueError as exc:
@@ -324,8 +357,18 @@ def create_app(
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         return meme().status()
 
+    @app.post("/api/meme/diagnostics")
+    def meme_diagnostics() -> dict:
+        return meme().run_diagnostics()
+
+    @app.post("/api/meme/report")
+    def meme_report() -> dict:
+        text = meme().daily_report_text()
+        return {"text": text}
+
     @app.post("/api/meme/live/unlock")
-    def meme_unlock(body: PhraseBody) -> dict:
+    def meme_unlock(body: PhraseBody, request: Request) -> dict:
+        require_code(request, body.code)
         ok, message = meme().request_live(body.phrase)
         if not ok:
             raise HTTPException(status_code=400, detail=message)
@@ -355,7 +398,8 @@ def create_app(
         return {"ok": True, "result": result, "status": current().status()}
 
     @app.post("/api/live/unlock")
-    def unlock(body: PhraseBody) -> dict:
+    def unlock(body: PhraseBody, request: Request) -> dict:
+        require_code(request, body.code)
         ok, message = current().request_live(body.phrase)
         if not ok:
             raise HTTPException(status_code=400, detail=message)
@@ -393,7 +437,7 @@ def _login_response(
         settings.session_secret,
         {"purpose": "login", "csrf": csrf, "exp": int(time.time()) + LOGIN_CSRF_SECONDS},
     )
-    response = HTMLResponse(render_login(csrf, error=error, username=username), status_code=status_code)
+    response = HTMLResponse(render_login(csrf, error=error, username=username, totp=totp_enabled(settings)), status_code=status_code)
     response.headers["Cache-Control"] = "no-store"
     _set_cookie(
         response,

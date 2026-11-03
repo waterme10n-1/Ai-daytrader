@@ -89,6 +89,7 @@ class Settings:
     app_password: str = ""
     app_password_hash: str = ""
     session_secret: str = ""
+    app_totp_secret: str = ""
 
     @property
     def paper_keys_present(self) -> bool:
@@ -128,6 +129,7 @@ class Settings:
             app_password=os.getenv("APP_PASSWORD", ""),
             app_password_hash=os.getenv("APP_PASSWORD_HASH", "").strip(),
             session_secret=os.getenv("SESSION_SECRET", "").strip(),
+            app_totp_secret=os.getenv("APP_TOTP_SECRET", "").strip().replace(" ", "").upper(),
         )
 
 
