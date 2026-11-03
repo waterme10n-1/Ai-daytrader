@@ -513,6 +513,16 @@
   </section>
 
   <section class="panel grid" id="panel-wallets" role="tabpanel" hidden>
+    <div class="grid sn-grid">
+      <div class="card">
+        <div class="card-head"><h2 id="botw-title"></h2><span class="chip" id="botw-chip"></span></div>
+        <div id="botw"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2 id="ph-title"></h2><span class="chip" id="ph-chip"></span></div>
+        <div id="ph"></div>
+      </div>
+    </div>
     <div class="card">
       <div class="card-head"><h2 id="wallets-title"></h2></div>
       <p class="muted" style="margin:0 0 12px;font-size:0.88rem">Find dygtige traders på fx GMGN, Birdeye eller Kolscan og tjek selv deres historik. Botten kopierer kun nye køb, og kun hvis tokenet består alle tjek. Wallets, der giver tab over tid, bliver slået fra automatisk.</p>
@@ -520,11 +530,23 @@
         <input id="wallet-input" placeholder="Solana-adresse på en wallet, du vil følge" autocomplete="off" spellcheck="false" aria-label="Wallet-adresse">
         <button class="btn primary" type="submit" id="wallet-add"></button>
       </form>
+      <details style="margin:-4px 0 14px"><summary>Indsæt mange adresser på én gang (fx fra Axioms wallet tracker)</summary>
+        <form class="addform" id="bulk-form" style="margin-top:10px">
+          <textarea id="bulk-input" rows="4" placeholder="Én adresse pr. linje" spellcheck="false" aria-label="Flere wallet-adresser" style="flex:1 1 100%;border-radius:11px;border:1px solid var(--border-strong);background:var(--surface-2);padding:10px 12px;font:inherit;font-family:ui-monospace,Menlo,monospace;font-size:0.82rem"></textarea>
+          <button class="btn" type="submit">Importér</button>
+        </form>
+      </details>
       <div id="wallets"></div>
     </div>
-    <div class="card">
-      <div class="card-head"><h2 id="blocked-title"></h2></div>
-      <div id="blocked"></div>
+    <div class="grid sn-grid">
+      <div class="card">
+        <div class="card-head"><h2 id="axiom-title"></h2></div>
+        <div id="axiom"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2 id="blocked-title"></h2></div>
+        <div id="blocked"></div>
+      </div>
     </div>
   </section>
 
@@ -602,6 +624,10 @@ const ICONS = {
   sliders: '<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M2 14h4M10 8h4M18 16h4"/>',
   search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
   target: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+  ghost: '<path d="M9 10h.01M15 10h.01"/><path d="M12 2a8 8 0 0 0-8 8v12l3-3 2.5 2.5L12 19l2.5 2.5L17 19l3 3V10a8 8 0 0 0-8-8z"/>',
+  send: '<path d="M14.5 21.7a.5.5 0 0 0 .9-.1l6.5-19a.5.5 0 0 0-.6-.6l-19 6.5a.5.5 0 0 0-.1.9l7.9 3.2a2 2 0 0 1 1.1 1.1Z"/><path d="m21.9 2.1-10.9 10.9"/>',
+  down: '<path d="M12 5v14"/><path d="m19 12-7 7-7-7"/>',
+  link: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
   save: '<path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/><path d="M7 3v4a1 1 0 0 0 1 1h7"/>',
 };
 function icon(name, cls) { return `<svg class="i${cls ? " " + cls : ""}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ""}</svg>`; }
@@ -613,7 +639,7 @@ const TABS = [
   ["radar", "Radar", "radar"],
   ["journal", "Journal", "book"],
   ["laering", "Læring", "brain"],
-  ["wallets", "Wallets", "wallet"],
+  ["wallets", "Wallet", "wallet"],
   ["krav", "Indstillinger", "shield"],
 ];
 const STAGES = { "købt": "Købt", sniper: "Sniper-filter", marked: "Markedsfilter", rug: "Rug-tjek", score: "Score", rute: "Exit-rute", claude: "Claude", risiko: "Risiko", "køb": "Køb fejlede" };
@@ -686,7 +712,16 @@ function tokenLinks(mint, pairUrl) {
     <a href="https://rugcheck.xyz/tokens/${m}" target="_blank" rel="noopener noreferrer" title="Rapport på RugCheck">RC</a>
     <a href="https://solscan.io/token/${m}" target="_blank" rel="noopener noreferrer" title="Token på Solscan">SS</a>
     <a href="https://x.com/search?q=${m}&amp;f=live" target="_blank" rel="noopener noreferrer" title="Søg på X">X</a>
+    ${axiomLink(m, pairUrl)}
   </span>`;
+}
+function axiomLink(mint, pairUrl) {
+  const tpl = state && state.settings && state.settings.axiom_link;
+  if (!tpl || !/^https:\/\//.test(tpl)) return "";
+  const fromUrl = pairUrl && /^https:\/\/dexscreener\.com\/solana\//.test(pairUrl) ? pairUrl.split("/").pop().split("?")[0] : "";
+  const pair = safeMint(fromUrl) || mint;
+  const url = tpl.replace("{pair}", encodeURIComponent(pair)).replace("{mint}", encodeURIComponent(mint));
+  return `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer" title="Åbn i Axiom">AX</a>`;
 }
 
 /* ---------- Tema og faner ---------- */
@@ -700,6 +735,7 @@ function applyTheme(theme) {
 function setTab(name, push) {
   if (!TABS.some(([id]) => id === name)) name = "oversigt";
   active = name;
+  if (name === "wallets") refreshWallet(true);
   for (const [id] of TABS) {
     const panel = document.getElementById("panel-" + id);
     panel.hidden = id !== name;
@@ -1089,7 +1125,153 @@ function renderLearning(data) {
     return `<tr><td>${esc(p.label)}</td><td class="num ${moved ? "changed" : ""}">${esc(fmtNum.format(p.value))}</td><td class="num muted">${esc(fmtNum.format(p.default))}</td><td class="num muted">${esc(fmtNum.format(p.bounds[0]))} – ${esc(fmtNum.format(p.bounds[1]))}</td></tr>`;
   }).join("")}</tbody></table>`);
 }
+/* ---------- Phantom og bot-wallet ---------- */
+let phantomAddr = null;
+let walletInfo = null;
+let walletFetchedAt = 0;
+function phantomProvider() {
+  const p = (window.phantom && window.phantom.solana) || window.solana;
+  return p && p.isPhantom ? p : null;
+}
+function phantomBrowseLink() {
+  return `https://phantom.app/ul/browse/${encodeURIComponent(location.href)}?ref=${encodeURIComponent(location.origin)}`;
+}
+async function refreshWallet(force) {
+  if (!force && Date.now() - walletFetchedAt < 15000) return;
+  walletFetchedAt = Date.now();
+  try {
+    const q = phantomAddr ? `?phantom=${encodeURIComponent(phantomAddr)}` : "";
+    const r = await fetch("/api/meme/wallet" + q, { cache: "no-store", credentials: "same-origin" });
+    if (r.ok) { walletInfo = await r.json(); if (state) renderWalletCards(state); }
+  } catch (e) { /* næste runde prøver igen */ }
+}
+async function connectPhantom(silent) {
+  const p = phantomProvider();
+  if (!p) { if (!silent) toast("down", "Phantom blev ikke fundet", "Installér Phantom, eller åbn siden i Phantom-appen."); return; }
+  try {
+    const res = await p.connect(silent ? { onlyIfTrusted: true } : undefined);
+    phantomAddr = res.publicKey.toString();
+    try { localStorage.setItem("meme-phantom", "1"); } catch (e) {}
+    if (!silent) toast("", "Phantom er forbundet", short(phantomAddr));
+    refreshWallet(true);
+  } catch (err) {
+    if (!silent) toast("down", "Phantom blev ikke forbundet", err && err.message ? err.message : "Afvist");
+  }
+}
+async function disconnectPhantom() {
+  const p = phantomProvider();
+  try { if (p) await p.disconnect(); } catch (e) {}
+  phantomAddr = null;
+  try { localStorage.setItem("meme-phantom", "0"); } catch (e) {}
+  if (walletInfo) walletInfo.phantom = null;
+  if (state) renderWalletCards(state);
+}
+async function depositFromPhantom(sol) {
+  const p = phantomProvider();
+  if (!p || !phantomAddr) { toast("down", "Forbind Phantom først", ""); return; }
+  const usd = state && state.engine.sol_usd ? ` (ca. ${money(sol * state.engine.sol_usd)})` : "";
+  if (!confirm(`Send ${fmtNum.format(sol)} SOL${usd} fra din Phantom til bot-wallet'en?\n\nPhantom viser beløbet, før du godkender.`)) return;
+  try {
+    const tx = await post("/api/meme/wallet/deposit", { from_address: phantomAddr, sol });
+    const res = await p.request({ method: "signAndSendTransaction", params: { message: tx.message } });
+    const sig = res && (res.signature || res);
+    toast("up", `${fmtNum.format(tx.sol)} SOL er sendt til botten`, sig ? "tx " + short(String(sig)) : "");
+    setTimeout(() => refreshWallet(true), 4000);
+    setTimeout(() => refreshWallet(true), 15000);
+  } catch (err) {
+    toast("down", "Indbetalingen blev ikke sendt", err && err.message ? err.message : "Afvist i Phantom");
+  }
+}
+function copyBtn(text, label) {
+  return `<a href="#" data-copy="${esc(text)}">${icon("copy", "sm")}${esc(label || "Kopiér")}</a>`;
+}
+function renderWalletCards(data) {
+  const kept = {};
+  for (const id of ["dep-sol", "withdraw-sol"]) { const el = document.getElementById(id); if (el && el.value) kept[id] = [el.value, document.activeElement === el]; }
+  drawWalletCards(data);
+  for (const [id, [value, focused]] of Object.entries(kept)) { const el = document.getElementById(id); if (el && !el.value) { el.value = value; if (focused) el.focus(); } }
+}
+function drawWalletCards(data) {
+  const w = walletInfo || data.wallet || {};
+  const solUsd = data.engine.sol_usd || null;
+  document.getElementById("botw-title").innerHTML = icon("wallet") + "Bot-wallet";
+  const chip = document.getElementById("botw-chip");
+  chip.textContent = w.configured ? (data.mode === "live" ? "handler live" : "klar · papir") : "ikke sat op";
+  chip.className = "chip " + (w.configured ? (data.mode === "live" ? "down" : "info") : "warn");
+  if (!w.configured) {
+    put("botw", `<p class="muted" style="margin:0 0 10px;font-size:0.88rem">Botten handler fra sin egen konto i din Phantom. Så kan du følge hver handel direkte i Phantom-appen, og din hovedkonto er aldrig i spil.</p>
+      <div class="steps">
+        <div class="step"><span class="ck">1</span><span>Phantom → Konti → <b>Opret ny konto</b>. Kald den fx «Memebot».</span><em></em></div>
+        <div class="step"><span class="ck">2</span><span>Indstillinger → Administrer konti → Memebot → <b>Vis privat nøgle</b>.</span><em></em></div>
+        <div class="step"><span class="ck">3</span><span>Indsæt nøglen som hemmelig variabel <code>SOLANA_PRIVATE_KEY</code> i Railway, og genstart.</span><em></em></div>
+        <div class="step"><span class="ck">4</span><span>Kom tilbage hertil og indbetal fra din hovedkonto med «Forbind Phantom».</span><em></em></div>
+      </div>
+      <p class="note">Send aldrig nøglen i en chat, en mail eller til nogen. Del aldrig din recovery-sætning. ${w.error ? esc(w.error) : ""}</p>`);
+  } else {
+    const sol = w.sol, usd = w.usd ?? (sol != null && solUsd ? sol * solUsd : null);
+    const target = w.withdraw_address;
+    const freeSol = sol != null ? Math.max(0, sol - (w.reserve_sol || 0) - 0.00001) : 0;
+    const overBankroll = solUsd ? Math.max(0, freeSol - data.kpis.bankroll / solUsd) : 0;
+    const sweep = w.sweep_above_usd > 0
+      ? `Automatisk udbetaling er slået til: alt over ${money(data.kpis.bankroll)} + ${money(w.sweep_above_usd)} sendes til din Phantom højst hver halve time (kun live).`
+      : "Automatisk udbetaling er slået fra. Sæt MEME_SWEEP_ABOVE_USD for at få gevinster sendt til din Phantom af sig selv.";
+    put("botw", `
+      <div class="label">Saldo</div>
+      <div class="big display num" style="font-size:2.2rem">${sol == null ? "—" : esc(fmtNum.format(sol)) + " SOL"}</div>
+      <div class="chips" style="margin-bottom:12px"><span class="chip">${esc(usd == null ? "henter…" : "≈ " + money(usd))}</span><span class="chip">reserve ${esc(fmtNum.format(w.reserve_sol || 0))} SOL til gebyrer</span>${w.swept_total_usd ? `<span class="chip up">udbetalt i alt ${esc(money(w.swept_total_usd))}</span>` : ""}</div>
+      <div class="addr" style="overflow-wrap:anywhere">${esc(w.address)}</div>
+      <div class="links">${copyBtn(w.address, "Kopiér adresse")}<a href="https://solscan.io/account/${esc(safeMint(w.address))}" target="_blank" rel="noopener noreferrer">${icon("ext", "sm")}Solscan</a></div>
+      <div class="field" style="margin-top:12px">
+        <div class="field-top"><span>${icon("down", "sm")} Hæv til din Phantom</span><span class="muted addr">${target ? esc(short(target)) : ""}</span></div>
+        ${target ? `<div class="row"><input type="number" id="withdraw-sol" min="0.001" step="0.01" placeholder="SOL" aria-label="Beløb i SOL at hæve" style="width:130px;height:36px;border-radius:10px;border:1px solid var(--border-strong);background:var(--surface-2);padding:0 10px">
+          <button class="btn small" type="button" data-wfill="${freeSol.toFixed(4)}">Alt (${esc(fmtNum.format(freeSol))})</button>
+          ${overBankroll > 0.0005 ? `<button class="btn small" type="button" data-wfill="${overBankroll.toFixed(4)}">Over bankroll (${esc(fmtNum.format(overBankroll))})</button>` : ""}
+          <button class="btn small primary" type="button" id="withdraw-go">${icon("send", "sm")}Hæv</button></div>`
+        : `<p class="muted" style="margin:0;font-size:0.84rem">${esc(w.withdraw_error || "")} Botten sender kun penge til den adresse, du selv har sat i Railway, så ingen kan omdirigere dem fra dashboardet.${phantomAddr ? ` Din forbundne Phantom: <code>${esc(phantomAddr)}</code> ${copyBtn("MEME_WITHDRAW_ADDRESS=" + phantomAddr, "Kopiér linje")}` : " Forbind Phantom for at se din adresse."}</p>`}
+      </div>
+      <p class="note" style="margin-top:10px">${esc(sweep)}</p>`);
+  }
+
+  document.getElementById("ph-title").innerHTML = icon("ghost") + "Din Phantom";
+  const p = phantomProvider();
+  const phChip = document.getElementById("ph-chip");
+  phChip.textContent = phantomAddr ? "forbundet" : p ? "ikke forbundet" : "ikke fundet";
+  phChip.className = "chip " + (phantomAddr ? "up" : "");
+  if (!p) {
+    put("ph", `<p class="muted" style="margin:0 0 12px;font-size:0.88rem">Phantom blev ikke fundet i denne browser. På computeren skal Phantom-udvidelsen være installeret. På mobilen åbner du dashboardet inde i Phantom-appen.</p>
+      <div class="links"><a href="https://phantom.com/download" target="_blank" rel="noopener noreferrer">${icon("ext", "sm")}Hent Phantom</a><a href="${esc(phantomBrowseLink())}">${icon("ghost", "sm")}Åbn i Phantom-appen</a></div>`);
+  } else if (!phantomAddr) {
+    put("ph", `<p class="muted" style="margin:0 0 12px;font-size:0.88rem">Forbind din hovedkonto for at indbetale til botten med ét klik. Botten kan aldrig hæve fra din Phantom: hver indbetaling skal du selv godkende i Phantom.</p>
+      <button class="btn primary" type="button" id="ph-connect">${icon("link", "sm")}Forbind Phantom</button>`);
+  } else {
+    const same = w.address && phantomAddr === w.address;
+    const phSol = w.phantom && w.phantom.address === phantomAddr ? w.phantom.sol : null;
+    put("ph", `
+      <div class="label">Forbundet konto</div>
+      <div class="addr" style="overflow-wrap:anywhere;margin:4px 0">${esc(phantomAddr)}</div>
+      <div class="chips" style="margin-bottom:12px"><span class="chip">${esc(phSol == null ? "saldo henter…" : fmtNum.format(phSol) + " SOL")}</span>${phSol != null && solUsd ? `<span class="chip">≈ ${esc(money(phSol * solUsd))}</span>` : ""}</div>
+      ${same ? `<p class="note" style="color:var(--warn)">Du har valgt bot-kontoen i Phantom. Skift til din hovedkonto for at indbetale.</p>` : !w.configured ? `<p class="note">Sæt bot-wallet'en op først (se til venstre), så kan du indbetale herfra.</p>` : `
+      <div class="field">
+        <div class="field-top"><span>${icon("send", "sm")} Indbetal til botten</span><span class="muted" id="dep-usd"></span></div>
+        <div class="presets">${[0.05, 0.1, 0.25].map((v) => `<button type="button" data-dep="${v}">${esc(fmtNum.format(v))} SOL${solUsd ? ` · ${esc(money(v * solUsd))}` : ""}</button>`).join("")}</div>
+        <div class="row"><input type="number" id="dep-sol" min="0.001" max="${esc(w.max_deposit_sol || 20)}" step="0.01" placeholder="SOL" aria-label="Beløb i SOL at indbetale" style="width:130px;height:36px;border-radius:10px;border:1px solid var(--border-strong);background:var(--surface-2);padding:0 10px">
+          <button class="btn small primary" type="button" id="dep-go">${icon("ghost", "sm")}Godkend i Phantom</button></div>
+        <span class="muted" style="font-size:0.8rem">Botten bruger højst ${esc(money(data.kpis.bankroll))} i alt. Læg ca. 0,03 SOL ekstra oveni til gebyrer.</span>
+      </div>`}
+      <div class="links" style="margin-top:10px">${copyBtn(phantomAddr, "Kopiér adresse")}<a href="#" id="ph-disconnect">${icon("x", "sm")}Afbryd</a></div>`);
+  }
+
+  document.getElementById("axiom-title").innerHTML = icon("link") + "Axiom";
+  put("axiom", `<p class="muted" style="margin:0 0 10px;font-size:0.88rem">Axiom har ingen officiel API til bots, så botten handler ikke gennem Axiom. Men de spiller fint sammen:</p>
+    <div class="steps">
+      <div class="step"><span class="ck">AX</span><span>Tryk <b>AX</b> ved et token i positioner, radar og journal for at åbne det i Axiom.</span><em></em></div>
+      <div class="step"><span class="ck">${icon("wallet", "sm")}</span><span>Tilføj bot-wallet'en i Axioms <b>wallet tracker</b> for at følge dens handler dér.${w.address ? " " + copyBtn(w.address, "Kopiér adresse") : ""}</span><em></em></div>
+      <div class="step"><span class="ck">${icon("plus", "sm")}</span><span>Find dygtige traders i Axiom og indsæt deres adresser under <b>Fulgte wallets</b> herover.</span><em></em></div>
+    </div>`);
+}
+
 function renderWallets(data) {
+  renderWalletCards(data);
   document.getElementById("wallets-title").innerHTML = icon("wallet") + "Fulgte wallets";
   document.getElementById("wallet-add").innerHTML = icon("plus", "sm") + "Følg";
   const ws = data.copy_wallets || [];
@@ -1396,6 +1578,36 @@ document.getElementById("kill").addEventListener("click", (ev) => {
   if (confirm("Nødstop: sælg alle positioner nu og stop nye køb?")) act(() => post("/api/meme/kill"), "Nødstop er aktivt");
 });
 document.getElementById("to-paper").addEventListener("click", () => { if (confirm("Sælg alle live-positioner og gå tilbage til papirpenge?")) act(() => post("/api/meme/paper"), "Tilbage på papirpenge"); });
+document.getElementById("panel-wallets").addEventListener("click", (ev) => {
+  const t = ev.target.closest("#ph-connect,#ph-disconnect,[data-dep],#dep-go,[data-wfill],#withdraw-go");
+  if (!t) return;
+  ev.preventDefault();
+  if (t.id === "ph-connect") connectPhantom(false);
+  else if (t.id === "ph-disconnect") disconnectPhantom();
+  else if (t.dataset.dep) { const i = document.getElementById("dep-sol"); if (i) i.value = t.dataset.dep; }
+  else if (t.id === "dep-go") { const v = Number((document.getElementById("dep-sol") || {}).value); if (v > 0) depositFromPhantom(v); else toast("down", "Skriv et beløb i SOL", ""); }
+  else if (t.dataset.wfill) { const i = document.getElementById("withdraw-sol"); if (i) i.value = t.dataset.wfill; }
+  else if (t.id === "withdraw-go") {
+    const v = Number((document.getElementById("withdraw-sol") || {}).value);
+    if (!(v > 0)) { toast("down", "Skriv et beløb i SOL", ""); return; }
+    const to = walletInfo && walletInfo.withdraw_address;
+    if (!confirm(`Send ${fmtNum.format(v)} SOL fra bot-wallet'en til ${short(to)}?`)) return;
+    act(async () => { const b = await post("/api/meme/wallet/withdraw", { sol: v }); walletInfo = { ...b.wallet, phantom: walletInfo && walletInfo.phantom }; if (state) renderWalletCards(state); setTimeout(() => refreshWallet(true), 4000); toast("up", `${fmtNum.format(b.sol)} SOL er sendt til din Phantom`, "tx " + short(b.signature)); return null; });
+  }
+});
+document.getElementById("bulk-form").addEventListener("submit", (ev) => {
+  ev.preventDefault();
+  const input = document.getElementById("bulk-input");
+  const wallets = input.value.split(/[\s,;]+/).map((x) => x.trim()).filter(Boolean);
+  if (!wallets.length) return;
+  act(async () => {
+    const b = await post("/api/meme/wallets", { wallets, action: "add" });
+    input.value = "";
+    const r = b.import || { added: 0, errors: [] };
+    toast(r.added ? "up" : "down", `${r.added} wallets tilføjet`, r.errors.length ? `${r.errors.length} sprunget over: ${r.errors[0]}` : "");
+    return b;
+  });
+});
 document.getElementById("wallet-form").addEventListener("submit", (ev) => {
   ev.preventDefault();
   const input = document.getElementById("wallet-input");
@@ -1432,6 +1644,7 @@ document.addEventListener("keydown", (ev) => {
 window.addEventListener("hashchange", () => setTab(location.hash.slice(1), false));
 let resizeTimer = null;
 window.addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { delete cache["equity-svg"]; if (state) renderHero(state); }, 150); });
+setInterval(() => { if (active === "wallets") refreshWallet(false); }, 5000);
 setInterval(() => {
   if (!state) return;
   const left = Math.max(0, Math.round((state.engine.next_scan_in || 0) - (Date.now() - countdownBase) / 1000));
@@ -1451,6 +1664,14 @@ renderTabs({ positions: [], kpis: { trades: 0 }, copy_wallets: [], sniper: null 
 setTab(location.hash.slice(1) || "oversigt", false);
 bindEquityHover();
 bindDailyHover();
+(() => {
+  const p = phantomProvider();
+  if (!p) return;
+  let wanted = false;
+  try { wanted = localStorage.getItem("meme-phantom") === "1"; } catch (e) {}
+  if (wanted) connectPhantom(true);
+  if (p.on) p.on("accountChanged", (pk) => { phantomAddr = pk ? pk.toString() : null; refreshWallet(true); if (state) renderWalletCards(state); });
+})();
 refresh();
 setInterval(refresh, 8000);
 </script>

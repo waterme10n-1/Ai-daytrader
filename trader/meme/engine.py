@@ -71,7 +71,7 @@ from trader.meme.risk import (
 )
 from trader.meme.safety import market_rejections, roundtrip_rejections, rug_rejections, sniper_rejections
 from trader.meme.store import MemeStore, loads, now_iso, utc_day
-from trader.meme.wallet import PaperWallet, SolanaWallet, load_keypair
+from trader.meme.wallet import MAX_DEPOSIT_SOL, PaperWallet, SolanaWallet, b58encode, build_transfer_message, load_keypair
 
 logger = logging.getLogger("trader.meme.engine")
 
@@ -80,6 +80,8 @@ LOSS_COOLDOWN_HOURS = 12
 MAX_DEEP_CHECKS = 6
 MAX_BUYS_PER_SCAN = 2
 MAX_COPY_WALLETS = 25
+SWEEP_INTERVAL_SECONDS = 30 * 60
+WALLET_CACHE_SECONDS = 20
 EXIT_FAILURE_LIMIT = 6
 MISSING_PRICE_LIMIT = 20
 ADAPT_EVERY = 5
@@ -218,6 +220,7 @@ class MemeEngine:
         self._last_snapshot = 0.0
         self._sol_usd = (0.0, 0.0)
         self._wallet_sol: float | None = None
+        self._wallet_sol_at = 0.0
         self._missing_price: dict[int, int] = {}
         self._copy_sells: set[tuple[str, str]] = set()
         self.last_tick: str | None = None
@@ -285,11 +288,153 @@ class MemeEngine:
     def _wallet(self):
         if self.mode != "live":
             return self._paper
+        return self._signer()
+
+    def _signer(self) -> SolanaWallet:
+        """Bot-wallet'en (samme nøgle i papir og live). Kun til saldo, ind- og udbetaling i papir."""
         if self._live is None:
+            if not self.settings.private_key:
+                raise ValueError("SOLANA_PRIVATE_KEY er ikke sat. Se fanen Wallet for, hvordan du laver en bot-wallet i Phantom.")
             rpc = self.clients.rpc or SolanaRPC(self.settings.rpc_url)
             self.clients.rpc = rpc
+            self.copy.rpc = rpc
             self._live = SolanaWallet(self.settings, rpc, self.clients.jup)
         return self._live
+
+    def _withdraw_target(self) -> tuple[str, str]:
+        """(adresse, fejl). Udbetaling går kun til adressen i MEME_WITHDRAW_ADDRESS."""
+        target = self.settings.withdraw_address
+        if not target:
+            return "", "MEME_WITHDRAW_ADDRESS er ikke sat."
+        if not _valid_address(target):
+            return "", "MEME_WITHDRAW_ADDRESS er ikke en gyldig Solana-adresse."
+        pubkey, _error = self._wallet_pubkey()
+        if pubkey and target == pubkey:
+            return "", "MEME_WITHDRAW_ADDRESS må ikke være bot-wallet'en selv."
+        return target, ""
+
+    def wallet_info(self, *, refresh: bool = False, phantom: str = "") -> dict:
+        pubkey, key_error = self._wallet_pubkey()
+        target, target_error = self._withdraw_target()
+        if refresh and pubkey and time.time() - self._wallet_sol_at >= 3:
+            try:
+                self._wallet_sol = self._signer().sol_balance()
+                self._wallet_sol_at = time.time()
+            except (SourceError, ValueError) as exc:
+                key_error = key_error or f"Saldo kunne ikke hentes: {exc}"
+        sol_usd = self._sol_usd[0] or None
+        info: dict[str, Any] = {
+            "address": pubkey,
+            "configured": bool(pubkey),
+            "error": key_error,
+            "sol": self._wallet_sol,
+            "usd": (self._wallet_sol * sol_usd) if self._wallet_sol is not None and sol_usd else None,
+            "updated": datetime.fromtimestamp(self._wallet_sol_at, timezone.utc).isoformat(timespec="seconds") if self._wallet_sol_at else None,
+            "reserve_sol": self.settings.sol_reserve,
+            "withdraw_address": target,
+            "withdraw_error": target_error,
+            "sweep_above_usd": self.settings.sweep_above_usd,
+            "swept_total_usd": float(self.store.get_state("swept_total_usd", "0") or 0),
+            "last_sweep": self.store.get_json("last_sweep", None),
+            "max_deposit_sol": MAX_DEPOSIT_SOL,
+            "phantom": None,
+        }
+        phantom = phantom.strip()
+        if refresh and phantom and _valid_address(phantom):
+            try:
+                rpc = self.clients.rpc or SolanaRPC(self.settings.rpc_url)
+                self.clients.rpc = rpc
+                info["phantom"] = {"address": phantom, "sol": rpc.balance_lamports(phantom) / LAMPORTS_PER_SOL}
+            except SourceError as exc:
+                info["phantom"] = {"address": phantom, "sol": None, "error": str(exc)}
+        return info
+
+    def deposit_transaction(self, from_address: str, sol_amount: float) -> dict:
+        """Byg en usigneret overførsel fra din Phantom til bot-wallet'en. Phantom signerer den."""
+        from_address = (from_address or "").strip()
+        pubkey, key_error = self._wallet_pubkey()
+        if not pubkey:
+            raise ValueError(key_error or "Bot-wallet'en er ikke sat op.")
+        if not _valid_address(from_address):
+            raise ValueError("Forbind Phantom først.")
+        if from_address == pubkey:
+            raise ValueError("Din Phantom-konto er den samme som bot-wallet'en. Vælg din hovedkonto i Phantom.")
+        try:
+            sol = float(sol_amount)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("Beløbet skal være et tal.") from exc
+        if not 0.001 <= sol <= MAX_DEPOSIT_SOL:
+            raise ValueError(f"Indbetal mellem 0,001 og {MAX_DEPOSIT_SOL:g} SOL.")
+        rpc = self.clients.rpc or SolanaRPC(self.settings.rpc_url)
+        self.clients.rpc = rpc
+        blockhash, last_valid = rpc.latest_blockhash()
+        lamports = int(round(sol * LAMPORTS_PER_SOL))
+        message = build_transfer_message(from_address, pubkey, lamports, blockhash)
+        return {
+            "message": b58encode(message),
+            "to": pubkey,
+            "from": from_address,
+            "lamports": lamports,
+            "sol": lamports / LAMPORTS_PER_SOL,
+            "last_valid_block_height": last_valid,
+        }
+
+    def withdraw(self, sol_amount: float) -> dict:
+        target, target_error = self._withdraw_target()
+        if not target:
+            raise ValueError(target_error)
+        try:
+            sol = float(sol_amount)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("Beløbet skal være et tal.") from exc
+        with self._lock:
+            wallet = self._signer()
+            try:
+                balance = wallet.sol_balance()
+            except SourceError as exc:
+                raise ValueError(f"Saldo kunne ikke hentes: {exc}") from exc
+            available = balance - self.settings.sol_reserve - 0.00001
+            if sol <= 0:
+                raise ValueError("Beløbet skal være over 0.")
+            if sol > available + 1e-12:
+                raise ValueError(
+                    f"Du kan højst hæve {max(0.0, available):.4f} SOL. Reserven på {self.settings.sol_reserve} SOL til gebyrer bliver i wallet'en."
+                )
+            ok, signature, error = wallet.transfer_sol(target, int(sol * LAMPORTS_PER_SOL))
+            if not ok:
+                self.store.add_event("error", f"Udbetaling af {sol:.4f} SOL fejlede: {error}")
+                raise ValueError(f"Udbetalingen fejlede: {error}")
+            self._wallet_sol, self._wallet_sol_at = None, 0.0
+            self.store.add_event("info", f"{sol:.4f} SOL er sendt til din Phantom ({target[:4]}…{target[-4:]}).", signature)
+            self._notify(f"{sol:.4f} SOL er sendt til din Phantom.")
+            return {"signature": signature, "sol": sol, "to": target}
+
+    def _maybe_sweep(self, wallet, sol_usd: float) -> None:
+        """Send overskud over bankroll til din Phantom. Kun live, kun til MEME_WITHDRAW_ADDRESS."""
+        if self.mode != "live" or self.settings.sweep_above_usd <= 0 or sol_usd <= 0:
+            return
+        target, _error = self._withdraw_target()
+        if not target:
+            return
+        now = time.time()
+        if now - float(self.store.get_state("last_sweep_ts", "0") or 0) < SWEEP_INTERVAL_SECONDS:
+            return
+        self.store.set_state("last_sweep_ts", repr(now))
+        cash = wallet.cash_usd(sol_usd)
+        excess = cash - self.settings.bankroll_usd
+        if excess < self.settings.sweep_above_usd:
+            return
+        sol = excess / sol_usd
+        ok, signature, error = wallet.transfer_sol(target, int(sol * LAMPORTS_PER_SOL))
+        if not ok:
+            self.store.add_event("warning", f"Automatisk udbetaling fejlede: {error}")
+            return
+        total = float(self.store.get_state("swept_total_usd", "0") or 0) + excess
+        self.store.set_state("swept_total_usd", repr(total))
+        self.store.set_json("last_sweep", {"ts": now_iso(), "usd": excess, "sol": sol, "signature": signature})
+        self._wallet_sol, self._wallet_sol_at = None, 0.0
+        self.store.add_event("trade", f"Gevinst på {excess:.2f} USD ({sol:.4f} SOL) er sendt til din Phantom.", signature)
+        self._notify(f"Gevinst på {excess:.2f} USD er sendt til din Phantom.")
 
     def _wallet_pubkey(self) -> tuple[str, str]:
         """(pubkey, fejl). Aldrig selve nøglen."""
@@ -342,8 +487,10 @@ class MemeEngine:
                 if self.mode == "live":
                     try:
                         self._wallet_sol = wallet.sol_balance()
+                        self._wallet_sol_at = time.time()
                     except SourceError as exc:
                         logger.info("SOL-saldo kunne ikke hentes: %s", exc)
+                    self._maybe_sweep(wallet, sol_usd)
                 self._monitor(wallet, sol_usd)
                 self._learn()
                 day = utc_day()
@@ -1266,6 +1413,19 @@ class MemeEngine:
             self.copy.wallets = self._all_wallets()
             self.store.add_event("info", f"Følger nu {wallet[:4]}…{wallet[-4:]}. Kun nye handler fra nu af kopieres.")
 
+    def add_wallets(self, wallets: list[str]) -> dict:
+        added, errors = 0, []
+        for raw in wallets[:MAX_COPY_WALLETS]:
+            wallet = str(raw).strip()
+            if not wallet:
+                continue
+            try:
+                self.add_wallet(wallet)
+                added += 1
+            except ValueError as exc:
+                errors.append(f"{wallet[:6]}…: {exc}")
+        return {"added": added, "errors": errors}
+
     def remove_wallet(self, wallet: str) -> None:
         wallet = wallet.strip()
         if wallet in self.settings.copy_wallets:
@@ -1505,6 +1665,7 @@ class MemeEngine:
             ],
             "blacklist": list(reversed(self._blacklist())),
             "sniper": self._sniper_status(closed, self.store.open_positions(mode), today),
+            "wallet": self.wallet_info(),
             "unlock": unlock,
             "events": self.store.recent_events(150),
             "settings": public_meme_settings(self.settings),

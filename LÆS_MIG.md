@@ -129,7 +129,7 @@ Efter login lander du på `/meme`. Siden opdaterer sig selv hvert 8. sekund.
 - **Radar**: hvert token botten har set på, hvilket trin det faldt ved og hvorfor. Filtrér og søg, og bloker tokens, botten aldrig må købe.
 - **Journal**: alle lukkede handler. Klik på en række for begrundelse og transaktioner.
 - **Læring**: lektioner, signalvægte, kilder og strategiparametre.
-- **Wallets**: tilføj eller fjern wallets, der skal følges, direkte fra siden. Du behøver ikke genstarte.
+- **Wallet**: bot-wallet'ens saldo, forbind din Phantom, indbetal og hæv, Axiom-genveje, samt wallets botten følger (tilføj og fjern uden genstart).
 - **Indstillinger**: kravene før rigtige penge og alle indstillinger.
 
 Knapper: **Scan nu**, **Pause køb** (åbne positioner passes stadig) og **Nødstop** (sælger alt). Klokken øverst slår browser-notifikationer til ved køb og salg. Genveje: `1`–`8` skifter fane, `S` scanner, `P` sætter køb på pause, `/` søger i radaren og `T` skifter tema.
@@ -207,6 +207,23 @@ Alle punkter skal være opfyldt, og de tjekkes i koden:
 3. Vis den private nøgle for **kun den konto** (Indstillinger → Administrer konti → kontoen → Vis privat nøgle). Del aldrig din recovery-sætning (seed phrase). Den giver adgang til alle dine konti.
 4. Sæt nøglen som hemmelig variabel `SOLANA_PRIVATE_KEY` hos Railway. Indsæt den aldrig i en chat, en fil i repoet eller en besked. Nøglen bruges kun til at signere lokalt i botten og vises aldrig i dashboardet.
 5. Opret en gratis nøgle hos [helius.dev](https://www.helius.dev) og sæt `SOLANA_RPC_URL=https://mainnet.helius-rpc.com/?api-key=...`. Den offentlige RPC er for langsom til at handle sikkert.
+
+### Phantom i dashboardet
+
+Fanen **Wallet** på `/meme` kobler botten sammen med Phantom:
+
+- **Bot-wallet**: saldo, adresse og link til Solscan. Fordi bot-wallet'en er en konto i din Phantom, kan du også følge hver handel direkte i Phantom-appen.
+- **Forbind Phantom**: forbind din hovedkonto (Phantom-udvidelsen på computeren, eller åbn dashboardet inde i Phantom-appen på mobilen). Så kan du **indbetale** til botten med ét klik. Phantom viser beløbet, og du godkender selv. Botten kan aldrig hæve fra din hovedkonto.
+- **Hæv til din Phantom**: send SOL fra bot-wallet'en tilbage til din hovedkonto. Det virker kun til adressen i `MEME_WITHDRAW_ADDRESS`, som du selv sætter i Railway. Så kan ingen omdirigere pengene, heller ikke hvis nogen skulle komme ind i dashboardet. Reserven til gebyrer bliver altid stående.
+- **Automatisk udbetaling**: sæt `MEME_SWEEP_ABOVE_USD` (fx 5). Når botten handler live og har mere end bankroll + 5 USD i fri SOL, sendes overskuddet til din Phantom, højst hver halve time. Gevinsten havner altså hos dig og ikke i botten.
+
+### Axiom
+
+Axiom har ingen officiel API til bots. Der findes uofficielle biblioteker, men de kræver dit Axiom-login, og det giver adgang til din Axiom-konto. Derfor handler botten ikke gennem Axiom. Du kan bruge Axiom ved siden af:
+
+- Knappen **AX** ved hvert token åbner det i Axiom. Linkformatet kan ændres med `MEME_AXIOM_LINK`, hvis Axiom skifter det.
+- Tilføj bot-wallet'ens adresse i Axioms wallet tracker for at følge dens handler dér.
+- Find dygtige traders i Axiom og indsæt deres adresser under **Fulgte wallets** (der er også et felt til mange adresser på én gang).
 
 Botten bruger højst `MEME_BANKROLL_USD` i alt, også hvis du sender flere penge til kontoen. Knappen **Tilbage til papirpenge** sælger alle live-positioner.
 

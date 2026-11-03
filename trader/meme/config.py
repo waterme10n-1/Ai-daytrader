@@ -36,6 +36,13 @@ RUGCHECK_URL = "https://api.rugcheck.xyz"
 X_API_URL = "https://api.x.com"
 
 
+def _https_template(value: str | None, default: str) -> str:
+    text = (value or "").strip()
+    if text.startswith("https://") and ("{pair}" in text or "{mint}" in text):
+        return text
+    return default
+
+
 def _list(value: str | None) -> tuple[str, ...]:
     if not value:
         return ()
@@ -83,6 +90,9 @@ class MemeSettings:
     sniper_max_open: int = 2
     sniper_max_per_day: int = 10
     sniper_scan_seconds: int = 10
+    withdraw_address: str = ""
+    sweep_above_usd: float = 0.0
+    axiom_link: str = "https://axiom.trade/meme/{pair}"
 
     @property
     def wallet_configured(self) -> bool:
@@ -141,6 +151,9 @@ class MemeSettings:
             sniper_max_open=max(1, min(10, _int(os.getenv("MEME_SNIPER_MAX_OPEN"), 2))),
             sniper_max_per_day=max(1, min(100, _int(os.getenv("MEME_SNIPER_MAX_PER_DAY"), 10))),
             sniper_scan_seconds=max(5, _int(os.getenv("MEME_SNIPER_SCAN_SECONDS"), 10)),
+            withdraw_address=os.getenv("MEME_WITHDRAW_ADDRESS", "").strip(),
+            sweep_above_usd=max(0.0, _float(os.getenv("MEME_SWEEP_ABOVE_USD"), 0.0)),
+            axiom_link=_https_template(os.getenv("MEME_AXIOM_LINK"), "https://axiom.trade/meme/{pair}"),
         )
 
 
@@ -358,4 +371,7 @@ def public_meme_settings(settings: MemeSettings) -> dict:
         "sniper_max_open": settings.sniper_max_open,
         "sniper_max_per_day": settings.sniper_max_per_day,
         "sniper_scan_seconds": settings.sniper_scan_seconds,
+        "withdraw_address": settings.withdraw_address,
+        "sweep_above_usd": settings.sweep_above_usd,
+        "axiom_link": settings.axiom_link,
     }

@@ -35,6 +35,7 @@ from trader.auth import (
 from trader.broker import BrokerError
 from trader.config import Settings
 from trader.engine import TradingEngine
+from trader.meme.clients import SourceError
 from trader.meme.config import MemeSettings
 
 STATIC = Path(__file__).resolve().parent / "static" / "index.html"
@@ -54,8 +55,18 @@ class PauseBody(BaseModel):
 
 
 class WalletBody(BaseModel):
-    wallet: str
+    wallet: str = ""
+    wallets: list[str] = []
     action: str = "add"
+
+
+class DepositBody(BaseModel):
+    from_address: str
+    sol: float
+
+
+class WithdrawBody(BaseModel):
+    sol: float
 
 
 class TokenBody(BaseModel):
@@ -255,11 +266,37 @@ def create_app(
         try:
             if body.action == "remove":
                 meme().remove_wallet(body.wallet)
+            elif body.wallets:
+                result = meme().add_wallets(body.wallets)
+                if not result["added"] and result["errors"]:
+                    raise ValueError("; ".join(result["errors"][:3]))
+                status = meme().status()
+                status["import"] = result
+                return status
             else:
                 meme().add_wallet(body.wallet)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         return meme().status()
+
+    @app.get("/api/meme/wallet")
+    def meme_wallet(phantom: str = "") -> dict:
+        return meme().wallet_info(refresh=True, phantom=phantom)
+
+    @app.post("/api/meme/wallet/deposit")
+    def meme_deposit(body: DepositBody) -> dict:
+        try:
+            return meme().deposit_transaction(body.from_address, body.sol)
+        except (ValueError, SourceError) as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.post("/api/meme/wallet/withdraw")
+    def meme_withdraw(body: WithdrawBody) -> dict:
+        try:
+            result = meme().withdraw(body.sol)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return {**result, "wallet": meme().wallet_info(refresh=True)}
 
     @app.post("/api/meme/blacklist")
     def meme_blacklist(body: TokenBody) -> dict:

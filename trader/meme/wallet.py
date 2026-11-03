@@ -18,6 +18,32 @@ from trader.meme.store import MemeStore
 
 logger = logging.getLogger("trader.meme.wallet")
 
+MAX_DEPOSIT_SOL = 20.0
+_B58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+
+
+def b58encode(data: bytes) -> str:
+    number = int.from_bytes(data, "big")
+    out = ""
+    while number:
+        number, rest = divmod(number, 58)
+        out = _B58[rest] + out
+    pad = len(data) - len(data.lstrip(b"\0"))
+    return "1" * pad + out
+
+
+def build_transfer_message(from_address: str, to_address: str, lamports: int, blockhash: str) -> bytes:
+    """Usigneret SOL-overførsel. Din Phantom signerer den i browseren; serveren ser aldrig din nøgle."""
+    from solders.hash import Hash
+    from solders.message import Message
+    from solders.pubkey import Pubkey
+    from solders.system_program import TransferParams, transfer
+
+    sender = Pubkey.from_string(from_address)
+    ix = transfer(TransferParams(from_pubkey=sender, to_pubkey=Pubkey.from_string(to_address), lamports=int(lamports)))
+    return bytes(Message.new_with_blockhash([ix], sender, Hash.from_string(blockhash)))
+
+
 TOKEN_PROGRAMS = {
     "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
     "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
@@ -202,6 +228,26 @@ class SolanaWallet:
         net_sol = max(0.0, self.sol_balance() - before)
         fee = fee_sol(self.settings) * sol_usd
         return Fill(True, usd=net_sol * sol_usd + fee, fee_usd=fee, token_raw=sold, sol=net_sol, signature=signature)
+
+    def transfer_sol(self, to_address: str, lamports: int) -> tuple[bool, str, str]:
+        """Send SOL fra bot-wallet'en. Returnerer (ok, signatur, fejl)."""
+        from solders.hash import Hash
+        from solders.message import Message
+        from solders.pubkey import Pubkey
+        from solders.system_program import TransferParams, transfer
+        from solders.transaction import Transaction
+
+        try:
+            blockhash, _height = self.rpc.latest_blockhash()
+            owner = self._keypair.pubkey()
+            ix = transfer(TransferParams(from_pubkey=owner, to_pubkey=Pubkey.from_string(to_address), lamports=int(lamports)))
+            recent = Hash.from_string(blockhash)
+            tx = Transaction([self._keypair], Message.new_with_blockhash([ix], owner, recent), recent)
+            signature = self.rpc.send_transaction(base64.b64encode(bytes(tx)).decode())
+        except (SourceError, ValueError) as exc:
+            return False, "", str(exc)
+        ok, error = self._confirm(signature)
+        return ok, signature, error
 
     def after_close(self, mint: str) -> None:
         """Luk tomme token-konti, så rent-depositummet (~0,002 SOL) kommer tilbage."""
