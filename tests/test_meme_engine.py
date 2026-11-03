@@ -277,3 +277,65 @@ def test_daily_loss_halts_new_entries():
     _arm(dex, rug, mint="Third111111", symbol="THREE")
     engine.tick(force_scan=True)
     assert engine.store.open_positions("paper") == []
+
+
+def test_pause_blocks_new_buys_but_keeps_managing_positions():
+    engine, dex, rug, _jup, _notes = make_engine()
+    _arm(dex, rug)
+    engine.tick(force_scan=True)
+    assert len(engine.store.open_positions("paper")) == 1
+    engine.pause(True)
+    _arm(dex, rug, mint="Second11111", symbol="TWO")
+    engine.tick(force_scan=True)
+    assert len(engine.store.open_positions("paper")) == 1
+    dex.set_price(MINT, 0.0007)
+    engine.tick()
+    assert engine.store.open_positions("paper") == []  # stop-loss virker stadig under pause
+    assert engine.status()["paused"] is True
+    engine.pause(False)
+    engine.tick(force_scan=True)
+    assert [row["mint"] for row in engine.store.open_positions("paper")] == ["Second11111"]
+
+
+def test_wallets_and_blacklist_from_dashboard():
+    from solders.keypair import Keypair
+
+    engine, dex, rug, _jup, _notes = make_engine()
+    good = str(Keypair().pubkey())
+    with pytest.raises(ValueError):
+        engine.add_wallet("ikke-en-adresse")
+    engine.add_wallet(good)
+    with pytest.raises(ValueError):
+        engine.add_wallet(good)
+    wallets = engine.status()["copy_wallets"]
+    assert wallets[0]["wallet"] == good and wallets[0]["origin"] == "ui"
+    assert engine.copy.wallets == (good,) and engine.clients.rpc is not None
+    engine.remove_wallet(good)
+    assert engine.status()["copy_wallets"] == []
+
+    token = str(Keypair().pubkey())
+    _arm(dex, rug, mint=token, symbol="BAD")
+    engine.block_token(token, "BAD")
+    engine.tick(force_scan=True)
+    assert engine.store.open_positions("paper") == []
+    assert engine.status()["blacklist"][0]["mint"] == token
+    engine.unblock_token(token)
+    engine.tick(force_scan=True)
+    assert len(engine.store.open_positions("paper")) == 1
+
+
+def test_status_has_chart_data_and_levels():
+    engine, dex, rug, _jup, _notes = make_engine()
+    _arm(dex, rug)
+    engine.tick(force_scan=True)
+    dex.set_price(MINT, 0.0007)
+    engine.tick()
+    status = engine.status()
+    assert status["equity"]["24h"][-1]["equity"] == pytest.approx(status["kpis"]["equity"])
+    assert status["daily_pnl"][0]["trades"] == 1
+    assert status["exits"][0]["kind"] == "stop_loss" and status["exits"][0]["count"] == 1
+    assert status["kpis"]["streak"] == {"kind": "loss", "count": 1}
+    assert status["kpis"]["avg_hold_minutes"] is not None
+    assert status["levels"]["stop_loss_pct"] == pytest.approx(0.25)
+    funnel = status["engine"]["last_scan"]
+    assert funnel["rug_ok"] >= funnel["scored"]

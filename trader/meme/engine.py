@@ -63,6 +63,7 @@ CANDIDATE_COOLDOWN_MINUTES = 20
 LOSS_COOLDOWN_HOURS = 12
 MAX_DEEP_CHECKS = 6
 MAX_BUYS_PER_SCAN = 2
+MAX_COPY_WALLETS = 25
 EXIT_FAILURE_LIMIT = 6
 MISSING_PRICE_LIMIT = 20
 ADAPT_EVERY = 5
@@ -82,6 +83,37 @@ def source_label(source: str) -> str:
         wallet = source[5:]
         return f"Copy: {wallet[:4]}…{wallet[-4:]}"
     return SOURCE_LABELS.get(source, source)
+
+
+def _valid_address(text: str) -> bool:
+    if not 32 <= len(text) <= 44:
+        return False
+    try:
+        from solders.pubkey import Pubkey
+
+        Pubkey.from_string(text)
+    except Exception:
+        return False
+    return True
+
+
+def _downsample(rows: list[dict], limit: int) -> list[dict]:
+    if len(rows) <= limit:
+        return rows
+    step = len(rows) / limit
+    picked = [rows[int(index * step)] for index in range(limit)]
+    if picked[-1] is not rows[-1]:
+        picked.append(rows[-1])
+    return picked
+
+
+def _hold_minutes(row: dict) -> float | None:
+    try:
+        opened = datetime.fromisoformat(row["opened_at"])
+        closed = datetime.fromisoformat(row["closed_at"])
+    except (TypeError, ValueError, KeyError):
+        return None
+    return max(0.0, (closed - opened).total_seconds() / 60.0)
 
 
 def _minutes_since(iso: str | None) -> float:
@@ -148,7 +180,8 @@ class MemeEngine:
         self.params = StrategyParams.from_dict(self.store.get_json("params"))
         self.model = Model.from_dict(self.store.get_json("model"))
         self.kill_switch = self.store.get_state("kill_switch", "0") == "1"
-        self.copy = CopyTracker(self.clients.rpc, self.store, self.settings.copy_wallets)
+        self.paused = self.store.get_state("paused", "0") == "1"
+        self.copy = CopyTracker(self.clients.rpc, self.store, self._all_wallets())
         self._paper = PaperWallet(self.settings, self.store, self.clients.jup)
         self._live: SolanaWallet | None = None
         self._pubkey_cache: tuple[str, str] | None = None
@@ -292,7 +325,7 @@ class MemeEngine:
                 if force_scan or self._scan_requested or now - self._last_scan >= self.settings.scan_seconds:
                     self._scan_requested = False
                     self._last_scan = now
-                    self._scan(wallet, sol_usd, day, entries_allowed=not (self.kill_switch or halted_day or halted_dd))
+                    self._scan(wallet, sol_usd, day, entries_allowed=not (self.kill_switch or self.paused or halted_day or halted_dd))
                 if now - self._last_snapshot >= 300:
                     self._last_snapshot = now
                     self.store.add_equity(self.mode, self._totals()["equity"])
@@ -653,6 +686,8 @@ class MemeEngine:
         self.last_scan_at = now_iso()
         summary: dict[str, Any] = {"discovered": 0, "fresh": 0, "market_ok": 0, "rug_ok": 0, "scored": 0, "bought": 0, "errors": []}
         self.last_scan = summary
+        self.copy.wallets = self._all_wallets()
+        self.copy.rpc = self.clients.rpc
         closed_all = self.store.closed_positions(self.mode)
         stats = source_stats(closed_all)
         muted = {source for source, entry in stats.items() if entry["muted"]}
@@ -670,7 +705,7 @@ class MemeEngine:
             self.store.add_event("info", f"Fulgt wallet {signal.wallet[:4]}…{signal.wallet[-4:]} købte {signal.mint[:6]}… for {signal.sol:.2f} SOL.")
 
         if not entries_allowed:
-            summary["note"] = "Ingen nye køb (nødstop eller tabsgrænse)."
+            summary["note"] = "Ingen nye køb (pause, nødstop eller tabsgrænse)."
             return
 
         found, errors = self._discover(copy_buys)
@@ -679,10 +714,11 @@ class MemeEngine:
         open_mints = {row["mint"] for row in self.store.open_positions(self.mode)}
         cutoff_loss = (datetime.now(timezone.utc) - timedelta(hours=LOSS_COOLDOWN_HOURS)).isoformat(timespec="seconds")
         cutoff_seen = (datetime.now(timezone.utc) - timedelta(minutes=CANDIDATE_COOLDOWN_MINUTES)).isoformat(timespec="seconds")
+        blocked = {row["mint"] for row in self._blacklist()}
         fresh: list[dict] = []
         for cand in found.values():
             mint = cand["mint"]
-            if mint in open_mints:
+            if mint in open_mints or mint in blocked:
                 continue
             if cand["source"] in muted and not cand["copy"]:
                 continue
@@ -733,6 +769,7 @@ class MemeEngine:
                 summary["errors"].append(f"Jupiter token-info: {exc}")
 
         scored: list[dict] = []
+        rug_passed = 0
         for cand in deep:
             pair = cand["pair"]
             token: TokenInfo | None = cand.get("token")
@@ -746,6 +783,7 @@ class MemeEngine:
             if reasons:
                 self._record(cand, "rug", False, "; ".join(reasons[:3]), cand["prelim"])
                 continue
+            rug_passed += 1
             buzz = self._x_buzz(cand["mint"], pair.symbol)
             cand["buzz"] = buzz
             features = build_features(
@@ -765,7 +803,7 @@ class MemeEngine:
                 self._record(cand, "score", False, f"Score {score:.2f} under {self.params.min_score:.2f}. Trak ned: {top or 'intet særligt'}", score, features)
                 continue
             scored.append(cand)
-        summary["rug_ok"] = len(scored)
+        summary["rug_ok"] = rug_passed
         summary["scored"] = len(scored)
         scored.sort(key=lambda item: item["score"], reverse=True)
         for cand in scored[MAX_BUYS_PER_SCAN:]:
@@ -951,6 +989,73 @@ class MemeEngine:
             self.store.set_state(f"halt_dd:{self.mode}", "0")
             self.store.add_event("info", "Genoptaget. Drawdown måles fra nu. Dagens tabsgrænse gælder stadig.")
 
+    def pause(self, paused: bool) -> None:
+        with self._lock:
+            self.paused = bool(paused)
+            self.store.set_state("paused", "1" if self.paused else "0")
+            if self.paused:
+                self.store.add_event("info", "Nye køb er sat på pause. Åbne positioner passes stadig.")
+            else:
+                self.store.add_event("info", "Pausen er ophævet. Botten køber igen, når noget består alle tjek.")
+
+    def _extra_wallets(self) -> list[str]:
+        value = self.store.get_json("copy_wallets_extra", [])
+        return [str(item) for item in value] if isinstance(value, list) else []
+
+    def _all_wallets(self) -> tuple[str, ...]:
+        merged = list(self.settings.copy_wallets)
+        for wallet in self._extra_wallets():
+            if wallet not in merged:
+                merged.append(wallet)
+        return tuple(merged)
+
+    def add_wallet(self, wallet: str) -> None:
+        wallet = wallet.strip()
+        if not _valid_address(wallet):
+            raise ValueError("Det ligner ikke en Solana-adresse.")
+        if wallet in self._all_wallets():
+            raise ValueError("Den wallet følges allerede.")
+        if len(self._all_wallets()) >= MAX_COPY_WALLETS:
+            raise ValueError(f"Højst {MAX_COPY_WALLETS} wallets kan følges.")
+        with self._lock:
+            extra = self._extra_wallets() + [wallet]
+            self.store.set_json("copy_wallets_extra", extra)
+            if self.clients.rpc is None:
+                self.clients.rpc = SolanaRPC(self.settings.rpc_url)
+            self.copy.rpc = self.clients.rpc
+            self.copy.wallets = self._all_wallets()
+            self.store.add_event("info", f"Følger nu {wallet[:4]}…{wallet[-4:]}. Kun nye handler fra nu af kopieres.")
+
+    def remove_wallet(self, wallet: str) -> None:
+        wallet = wallet.strip()
+        if wallet in self.settings.copy_wallets:
+            raise ValueError("Den wallet står i MEME_COPY_WALLETS og fjernes dér.")
+        extra = self._extra_wallets()
+        if wallet not in extra:
+            raise ValueError("Den wallet følges ikke.")
+        with self._lock:
+            self.store.set_json("copy_wallets_extra", [item for item in extra if item != wallet])
+            self.copy.wallets = self._all_wallets()
+            self.store.add_event("info", f"Følger ikke længere {wallet[:4]}…{wallet[-4:]}.")
+
+    def _blacklist(self) -> list[dict]:
+        value = self.store.get_json("blacklist", [])
+        return [row for row in value if isinstance(row, dict) and row.get("mint")] if isinstance(value, list) else []
+
+    def block_token(self, mint: str, symbol: str = "") -> None:
+        mint = mint.strip()
+        if not _valid_address(mint):
+            raise ValueError("Det ligner ikke en token-adresse.")
+        rows = [row for row in self._blacklist() if row["mint"] != mint]
+        rows.append({"mint": mint, "symbol": symbol.strip()[:24] or "?", "ts": now_iso()})
+        self.store.set_json("blacklist", rows[-500:])
+        self.store.add_event("info", f"{symbol or mint[:6]} er blokeret. Botten køber det aldrig.")
+
+    def unblock_token(self, mint: str) -> None:
+        rows = [row for row in self._blacklist() if row["mint"] != mint.strip()]
+        self.store.set_json("blacklist", rows)
+        self.store.add_event("info", f"{mint[:6]}… er ikke længere blokeret.")
+
     def _unlock(self) -> dict:
         closed = self.store.closed_positions("paper")
         pnl = [float(row["pnl_usd"]) for row in closed]
@@ -964,12 +1069,12 @@ class MemeEngine:
         items = [
             {"id": "trades", "label": f"Mindst {UNLOCK_MIN_TRADES} lukkede papirhandler", "ok": len(closed) >= UNLOCK_MIN_TRADES, "detail": f"{len(closed)} / {UNLOCK_MIN_TRADES}"},
             {"id": "days", "label": f"Handler på mindst {UNLOCK_MIN_DAYS} forskellige dage", "ok": days >= UNLOCK_MIN_DAYS, "detail": f"{days} / {UNLOCK_MIN_DAYS}"},
-            {"id": "pnl", "label": "Papirresultat over 0", "ok": net > 0, "detail": f"{net:+.2f} USD"},
+            {"id": "pnl", "label": "Papirresultat over 0", "ok": net > 0, "detail": f"{net:+.2f} USD".replace(".", ",")},
             {
                 "id": "pf",
-                "label": f"Profitfaktor mindst {UNLOCK_MIN_PROFIT_FACTOR:g}",
+                "label": f"Profitfaktor mindst {UNLOCK_MIN_PROFIT_FACTOR:g}".replace(".", ","),
                 "ok": factor >= UNLOCK_MIN_PROFIT_FACTOR and len(closed) > 0,
-                "detail": "∞" if factor == float("inf") else f"{factor:.2f}",
+                "detail": "∞" if factor == float("inf") else f"{factor:.2f}".replace(".", ","),
             },
             {"id": "allow", "label": "MEME_ALLOW_LIVE=true", "ok": self.settings.allow_live, "detail": "ja" if self.settings.allow_live else "nej"},
             {
@@ -1039,9 +1144,35 @@ class MemeEngine:
         pubkey, _key_error = self._wallet_pubkey()
         defaults = StrategyParams()
         initial = Model()
+        holds = [value for value in (_hold_minutes(row) for row in closed) if value is not None]
+        streak_kind, streak = "", 0
+        for value in reversed(pnl):
+            kind = "win" if value > 0 else "loss"
+            if streak and kind != streak_kind:
+                break
+            streak_kind, streak = kind, streak + 1
+        daily: dict[str, dict[str, float]] = {}
+        for row in closed:
+            day = str(row["closed_at"] or "")[:10]
+            entry = daily.setdefault(day, {"pnl": 0.0, "trades": 0})
+            entry["pnl"] += float(row["pnl_usd"])
+            entry["trades"] += 1
+        exits: dict[str, dict[str, Any]] = {}
+        for row in closed:
+            kind = str(row["exit_reason"] or "ukendt")
+            entry = exits.setdefault(kind, {"kind": kind, "label": EXIT_LABELS.get(kind, kind), "count": 0, "pnl": 0.0})
+            entry["count"] += 1
+            entry["pnl"] += float(row["pnl_usd"])
+        series = sorted(self.store.equity_series(mode, 20000), key=lambda row: row["ts"])
+        series.append({"ts": now_iso(), "equity": totals["equity"]})
+        cut_day = (now - timedelta(days=1)).isoformat(timespec="seconds")
+        cut_week = (now - timedelta(days=7)).isoformat(timespec="seconds")
+        extra_wallets = set(self._extra_wallets())
+        next_scan = max(0.0, self.settings.scan_seconds - (time.time() - self._last_scan)) if self._last_scan else 0.0
         return {
             "mode": mode,
             "kill_switch": self.kill_switch,
+            "paused": self.paused,
             "halted_day": self.store.get_state(f"halt_day:{mode}:{today}", "0") == "1",
             "halted_drawdown": self.store.get_state(f"halt_dd:{mode}", "0") == "1",
             "alerts": self._alerts(),
@@ -1062,6 +1193,11 @@ class MemeEngine:
                 "ai_total": self.store.ai_spend_total(),
                 "ai_budget_left": self.researcher.budget_left() if self.settings.ai_configured else 0.0,
                 "net_after_ai": totals["realized"] - self.store.ai_spend_total(),
+                "wins": len(wins),
+                "losses": len(losses),
+                "avg_hold_minutes": sum(holds) / len(holds) if holds else None,
+                "streak": {"kind": streak_kind, "count": streak},
+                "return_pct": (totals["total_pnl"] / totals["bankroll"]) if totals["bankroll"] else 0.0,
             },
             "goal": {
                 "target": goal,
@@ -1072,10 +1208,24 @@ class MemeEngine:
                 "progress": max(0.0, month_net) / goal if goal else 0.0,
                 "days_in_month": days_in_month,
             },
-            "equity_curve": self.store.equity_series(mode),
+            "equity": {
+                "24h": _downsample([row for row in series if row["ts"] >= cut_day], 300),
+                "7d": _downsample([row for row in series if row["ts"] >= cut_week], 300),
+                "all": _downsample(series, 300),
+            },
+            "daily_pnl": [{"day": day, **values} for day, values in sorted(daily.items())[-30:]],
+            "exits": sorted(exits.values(), key=lambda item: item["count"], reverse=True),
+            "levels": {
+                "stop_loss_pct": self.params.stop_loss_pct,
+                "take_profit_pct": self.params.take_profit_pct,
+                "trail_activation_pct": self.params.trail_activation_pct,
+                "trailing_stop_pct": self.params.trailing_stop_pct,
+                "max_hold_minutes": self.params.max_hold_minutes,
+                "stale_minutes": self.params.stale_minutes,
+            },
             "positions": [self._position_view(row) for row in self.store.open_positions(mode)],
             "trades": [self._position_view(row) for row in self.store.list_positions(mode, 200) if row["status"] == "closed"],
-            "candidates": [self._candidate_view(row) for row in self.store.recent_candidates(mode, 150)],
+            "candidates": [self._candidate_view(row) for row in self.store.recent_candidates(mode, 300)],
             "lessons": self.store.recent_lessons(60),
             "model": {
                 "bias": self.model.bias,
@@ -1108,10 +1258,12 @@ class MemeEngine:
                 {
                     "wallet": wallet,
                     "label": source_label(f"copy:{wallet}"),
+                    "origin": "ui" if wallet in extra_wallets and wallet not in self.settings.copy_wallets else "env",
                     **stats.get(f"copy:{wallet}", {"trades": 0, "wins": 0, "pnl": 0.0, "win_rate": None, "muted": False}),
                 }
-                for wallet in self.settings.copy_wallets
+                for wallet in self._all_wallets()
             ],
+            "blacklist": list(reversed(self._blacklist())),
             "unlock": unlock,
             "events": self.store.recent_events(150),
             "settings": public_meme_settings(self.settings),
@@ -1125,6 +1277,10 @@ class MemeEngine:
                 "wallet": pubkey,
                 "wallet_sol": self._wallet_sol if mode == "live" else None,
                 "paper_cash": self._paper.cash_usd(0.0),
+                "running": bool(self._thread and self._thread.is_alive()),
+                "next_scan_in": round(next_scan),
+                "scan_seconds": self.settings.scan_seconds,
+                "monitor_seconds": self.settings.monitor_seconds,
             },
         }
 
@@ -1136,6 +1292,8 @@ class MemeEngine:
             alerts.append({"level": "info", "text": "Papirhandel: rigtige kurser og rigtige Jupiter-quotes, men ingen rigtige penge."})
         if self.kill_switch:
             alerts.append({"level": "warning", "text": "Nødstop er aktivt. Ingen nye køb."})
+        if self.paused:
+            alerts.append({"level": "warning", "text": "Nye køb er sat på pause. Åbne positioner passes stadig."})
         today = utc_day()
         if self.store.get_state(f"halt_day:{self.mode}:{today}", "0") == "1":
             alerts.append({"level": "warning", "text": "Dagens tabsgrænse er ramt. Ingen nye køb før i morgen (UTC)."})
@@ -1147,7 +1305,7 @@ class MemeEngine:
             alerts.append({"level": "info", "text": "Dagens AI-budget er brugt. Resten af dagen kører botten kun på regler."})
         if not self.settings.x_configured:
             alerts.append({"level": "info", "text": "Ingen X_BEARER_TOKEN: X-omtale tjekkes kun gennem Claudes websøgning."})
-        if self.settings.rpc_url.startswith("https://api.mainnet-beta.solana.com") and (self.settings.copy_wallets or self.mode == "live"):
+        if self.settings.rpc_url.startswith("https://api.mainnet-beta.solana.com") and (self._all_wallets() or self.mode == "live"):
             alerts.append({"level": "warning", "text": "Offentlig Solana RPC er langsom og rate-limited. Brug en gratis Helius-nøgle i SOLANA_RPC_URL."})
         if self.last_error:
             alerts.append({"level": "error", "text": f"Seneste fejl: {self.last_error}"})
@@ -1159,6 +1317,10 @@ class MemeEngine:
         mark = float(row["cost_usd"]) * fraction * float(row["last_ratio"] or 1.0)
         unrealized = float(row["proceeds_usd"]) + mark - float(row["cost_usd"]) - float(row["fees_usd"])
         ai = loads(row["ai"], None)
+        peak = float(row["peak_ratio"] or 1.0)
+        trail = None
+        if peak >= 1.0 + self.params.trail_activation_pct:
+            trail = peak * (1.0 - self.params.trailing_stop_pct) - 1.0
         return {
             "id": row["id"],
             "symbol": row["symbol"],
@@ -1175,6 +1337,11 @@ class MemeEngine:
             "change_pct": (float(row["last_ratio"] or 1.0) - 1.0),
             "peak_pct": (float(row["peak_ratio"] or 1.0) - 1.0),
             "partial": bool(row["partial_taken"]),
+            "stop_pct": -self.params.stop_loss_pct,
+            "tp_pct": None if row["partial_taken"] else self.params.take_profit_pct,
+            "trail_pct": trail,
+            "max_hold_minutes": self.params.max_hold_minutes,
+            "hold_minutes": _hold_minutes(row) if row["status"] == "closed" else None,
             "mark_usd": mark,
             "unrealized_usd": unrealized if row["status"] == "open" else None,
             "pnl_usd": row["pnl_usd"],

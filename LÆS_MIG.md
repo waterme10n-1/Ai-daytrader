@@ -119,6 +119,20 @@ pytest
 
 Memebotten kører i samme proces som aktiemotoren, 24/7, og har sit eget dashboard på `/meme` (link øverst på forsiden). Den starter **altid på papirpenge**: rigtige kurser fra DexScreener og rigtige quotes fra Jupiter, men ingen transaktioner.
 
+## Dashboardet
+
+Efter login lander du på `/meme`. Siden opdaterer sig selv hvert 8. sekund.
+
+- **Oversigt**: egenkapital med graf (24 t, 7 d eller alt), målet om Claude Max, seneste scanning som tragt (fundet → marked → rug-tjek → score → købt), aktivitet, dagligt resultat og hvorfor botten solgte.
+- **Positioner**: et kort pr. position med en skala, der viser kursen i forhold til stop-loss, købskurs, delsalg og trailing stop, samt links til DexScreener, RugCheck, Solscan og X. Knappen **Sælg nu** sælger med det samme.
+- **Radar**: hvert token botten har set på, hvilket trin det faldt ved og hvorfor. Filtrér og søg, og bloker tokens, botten aldrig må købe.
+- **Journal**: alle lukkede handler. Klik på en række for begrundelse og transaktioner.
+- **Læring**: lektioner, signalvægte, kilder og strategiparametre.
+- **Wallets**: tilføj eller fjern wallets, der skal følges, direkte fra siden. Du behøver ikke genstarte.
+- **Indstillinger**: kravene før rigtige penge og alle indstillinger.
+
+Knapper: **Scan nu**, **Pause køb** (åbne positioner passes stadig) og **Nødstop** (sælger alt). Klokken øverst slår browser-notifikationer til ved køb og salg. Genveje: `1`–`7` skifter fane, `S` scanner, `P` sætter køb på pause, `/` søger i radaren og `T` skifter tema.
+
 ## Ærlige forventninger
 
 - Claude Max koster 100 eller 200 USD om måneden. Fra 15 USD kræver det over 650 % afkast hver måned. Det sker næsten aldrig. Regn med, at indsatsen kan gå tabt.

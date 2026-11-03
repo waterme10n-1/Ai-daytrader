@@ -49,6 +49,21 @@ class IdBody(BaseModel):
     id: int
 
 
+class PauseBody(BaseModel):
+    paused: bool
+
+
+class WalletBody(BaseModel):
+    wallet: str
+    action: str = "add"
+
+
+class TokenBody(BaseModel):
+    mint: str
+    symbol: str = ""
+    action: str = "block"
+
+
 def create_app(
     engine: TradingEngine | None = None,
     settings: Settings | None = None,
@@ -160,7 +175,9 @@ def create_app(
             settings.session_secret,
             {"u": settings.app_username, "csrf": csrf_token, "exp": now + SESSION_SECONDS},
         )
-        response = RedirectResponse("/", status_code=303)
+        # Memebotten er forsiden efter login, når den kører. Aktierne ligger stadig på /.
+        landing = "/meme" if getattr(app.state, "meme", None) is not None else "/"
+        response = RedirectResponse(landing, status_code=303)
         secure = cookie_is_secure(request)
         _set_cookie(response, SESSION_COOKIE, token, secure=secure, httponly=True, max_age=SESSION_SECONDS, path="/")
         _set_cookie(response, CSRF_COOKIE, csrf_token, secure=secure, httponly=False, max_age=SESSION_SECONDS, path="/")
@@ -224,6 +241,33 @@ def create_app(
     def meme_sell(body: IdBody) -> dict:
         try:
             meme().sell_position(body.id)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return meme().status()
+
+    @app.post("/api/meme/pause")
+    def meme_pause(body: PauseBody) -> dict:
+        meme().pause(body.paused)
+        return meme().status()
+
+    @app.post("/api/meme/wallets")
+    def meme_wallets(body: WalletBody) -> dict:
+        try:
+            if body.action == "remove":
+                meme().remove_wallet(body.wallet)
+            else:
+                meme().add_wallet(body.wallet)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return meme().status()
+
+    @app.post("/api/meme/blacklist")
+    def meme_blacklist(body: TokenBody) -> dict:
+        try:
+            if body.action == "unblock":
+                meme().unblock_token(body.mint)
+            else:
+                meme().block_token(body.mint, body.symbol)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         return meme().status()
