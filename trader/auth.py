@@ -138,16 +138,44 @@ def tokens_match(left: str, right: str) -> bool:
     return hmac.compare_digest(left.encode(), right.encode())
 
 
+def _same_username(entered: str, expected: str) -> bool:
+    # Telefoner skriver ofte stort begyndelsesbogstav eller sætter et mellemrum efter ordet.
+    return tokens_match(entered.strip().casefold(), expected.strip().casefold())
+
+
+def _same_password(settings: Settings, entered: str) -> bool:
+    if not entered:
+        return False
+    trimmed = entered.strip()
+    if settings.app_password_hash:
+        if verify_password(entered, settings.app_password_hash):
+            return True
+        return trimmed != entered and verify_password(trimmed, settings.app_password_hash)
+    if not settings.app_password:
+        return False
+    return tokens_match(trimmed, settings.app_password)
+
+
 def credentials_match(settings: Settings, username: str, password: str) -> bool:
     if not username or not password or not settings.app_username:
         return False
-    if not tokens_match(username, settings.app_username):
+    if not _same_username(username, settings.app_username):
         return False
-    if settings.app_password_hash:
-        return verify_password(password, settings.app_password_hash)
-    if not settings.app_password:
-        return False
-    return tokens_match(password, settings.app_password)
+    return _same_password(settings, password)
+
+
+def login_failure_reason(settings: Settings, username: str, password: str, code_ok: bool = True) -> str:
+    """Kun til serverens log, så ejeren kan se i Railway hvad der gik galt. Vises aldrig i browseren."""
+    if not settings.app_username:
+        return "APP_USERNAME er tom"
+    if not _same_username(username, settings.app_username):
+        return "brugernavnet passer ikke til APP_USERNAME"
+    if not _same_password(settings, password):
+        source = "APP_PASSWORD_HASH" if settings.app_password_hash else "APP_PASSWORD"
+        return f"adgangskoden passer ikke til {source}"
+    if not code_ok:
+        return "koden fra godkendelses-appen er forkert eller for gammel"
+    return "ukendt"
 
 
 def _b64e(raw: bytes) -> str:
@@ -347,6 +375,7 @@ _LOGIN_HTML = """<!DOCTYPE html>
     font: inherit; font-weight: 600; cursor: pointer; border: 0; height: 44px; border-radius: 11px;
     color: #fff; background: linear-gradient(135deg, #8a3ffc, #12c98a); box-shadow: 0 8px 24px rgba(117, 55, 238, 0.3);
   }
+  .hint { margin: -4px 0 0; color: var(--muted); font-size: 0.8rem; line-height: 1.4; }
   .error { margin: 0; padding: 10px 12px; border-radius: 11px; background: var(--bad-soft); color: var(--bad); font-size: 0.9rem; }
   .theme {
     margin: 16px auto 0; display: block; background: transparent; color: var(--muted);
@@ -368,11 +397,12 @@ _LOGIN_HTML = """<!DOCTYPE html>
     <p class="error" __ERROR_HIDDEN__>__ERROR__</p>
     <input type="hidden" name="csrf" value="__CSRF__">
     <label>Brugernavn
-      <input name="username" autocomplete="username" required value="__USERNAME__">
+      <input name="username" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required value="__USERNAME__">
     </label>
     <label>Adgangskode
       <input name="password" type="password" autocomplete="current-password" required>
     </label>
+    <p class="hint">Det er APP_USERNAME og APP_PASSWORD fra Variables i Railway. Store og små bogstaver tæller i adgangskoden.</p>
     __TOTP__
     <button type="submit">Log ind</button>
   </form>
