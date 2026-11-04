@@ -1357,9 +1357,19 @@ function renderKrav(data) {
     ["MEME_ALLOW_LIVE", s.allow_live ? "ja" : "nej"],
     ["Solana RPC", s.rpc_is_public ? "offentlig (langsom)" : "egen"],
     ["Jupiter", s.jupiter_url],
+    ["Jupiter-kvote", jupiterQuota(data)],
   ];
   put("settings", rows.map(([a, b]) => `<div><span>${esc(a)}</span><b>${esc(b)}</b></div>`).join(""));
   document.getElementById("keys-title").innerHTML = icon("keyboard") + "Genveje";
+}
+
+function jupiterQuota(data) {
+  const j = (data.engine || {}).jupiter;
+  const s = data.settings;
+  const key = s.jupiter_keyed ? "med nøgle" : "uden nøgle (gratis nøgle på portal.jup.ag giver mere)";
+  if (!j) return `${s.jupiter_rpm} kald/min · ${key}`;
+  const pause = j.cooldown_seconds > 0 ? ` · pause ${j.cooldown_seconds} s` : "";
+  return `${j.used_last_minute}/${j.per_minute} kald seneste minut${pause} · ${key}`;
 }
 
 /* ---------- Sniper ---------- */

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -24,6 +25,7 @@ from trader.auth import (
     client_key,
     cookie_is_secure,
     credentials_match,
+    login_failure_reason,
     tokens_match,
     enforce_startup,
     read_session,
@@ -40,6 +42,8 @@ from trader.config import Settings
 from trader.engine import TradingEngine
 from trader.meme.clients import SourceError
 from trader.meme.config import MemeSettings
+
+logger = logging.getLogger("trader.app")
 
 STATIC = Path(__file__).resolve().parent / "static" / "index.html"
 MEME_STATIC = Path(__file__).resolve().parent / "static" / "meme.html"
@@ -196,9 +200,9 @@ def create_app(
                 username=username,
                 status_code=403,
             )
-        if not credentials_match(settings, username, password) or (
-            totp_enabled(settings) and not totp_ok(settings.app_totp_secret, code)
-        ):
+        code_ok = not totp_enabled(settings) or totp_ok(settings.app_totp_secret, code)
+        if not credentials_match(settings, username, password) or not code_ok:
+            logger.warning("Login afvist: %s.", login_failure_reason(settings, username, password, code_ok))
             locked = guard.fail(key)
             message = (
                 "For mange forsøg. Prøv igen om et kvarter."

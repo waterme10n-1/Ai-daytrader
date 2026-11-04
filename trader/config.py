@@ -57,6 +57,17 @@ def _float(value: str | None, default: float) -> float:
         return default
 
 
+def _login_text(value: str | None) -> str:
+    """Brugernavn og adgangskode fra miljøet uden mellemrum og anførselstegn omkring.
+
+    I Railway skriver man let `"min-kode"` eller får et mellemrum med, og så passer login aldrig.
+    """
+    text = (value or "").strip()
+    if len(text) >= 2 and text[0] == text[-1] and text[0] in "\"'":
+        text = text[1:-1].strip()
+    return text
+
+
 def _int(value: str | None, default: int) -> int:
     if value is None or value.strip() == "":
         return default
@@ -125,8 +136,8 @@ class Settings:
             db_path=os.getenv("DB_PATH", "trader.db").strip() or "trader.db",
             port=_int(os.getenv("PORT"), 8741),
             host=os.getenv("HOST", "127.0.0.1").strip() or "127.0.0.1",
-            app_username=os.getenv("APP_USERNAME", "").strip(),
-            app_password=os.getenv("APP_PASSWORD", ""),
+            app_username=_login_text(os.getenv("APP_USERNAME")),
+            app_password=_login_text(os.getenv("APP_PASSWORD")),
             app_password_hash=os.getenv("APP_PASSWORD_HASH", "").strip(),
             session_secret=os.getenv("SESSION_SECRET", "").strip(),
             app_totp_secret=os.getenv("APP_TOTP_SECRET", "").strip().replace(" ", "").upper(),

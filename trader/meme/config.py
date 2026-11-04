@@ -31,6 +31,11 @@ UNLOCK_MIN_PROFIT_FACTOR = 1.2
 
 DEFAULT_RPC = "https://api.mainnet-beta.solana.com"
 DEFAULT_JUPITER = "https://lite-api.jup.ag"
+# Med en (gratis) nøgle fra portal.jup.ag bruges api.jup.ag, som har sin egen kvote pr. konto.
+KEYED_JUPITER = "https://api.jup.ag"
+# Jupiters grænser: ca. 30 kald/min uden nøgle og 60 med en gratis nøgle. Vi holder os lidt under.
+JUPITER_RPM_KEYLESS = 25
+JUPITER_RPM_KEYED = 55
 DEXSCREENER_URL = "https://api.dexscreener.com"
 RUGCHECK_URL = "https://api.rugcheck.xyz"
 X_API_URL = "https://api.x.com"
@@ -67,6 +72,7 @@ class MemeSettings:
     rpc_url: str
     jupiter_url: str
     jupiter_api_key: str
+    jupiter_rpm: int
     x_bearer_token: str
     x_daily_requests: int
     bankroll_usd: float
@@ -129,13 +135,16 @@ class MemeSettings:
         main_db = os.getenv("DB_PATH", "trader.db").strip() or "trader.db"
         default_db = str(Path(main_db).expanduser().parent / "meme.db") if main_db != ":memory:" else ":memory:"
         bankroll = max(1.0, _float(os.getenv("MEME_BANKROLL_USD"), 15.0))
+        jupiter_key = os.getenv("JUPITER_API_KEY", "").strip()
+        jupiter_default_rpm = JUPITER_RPM_KEYED if jupiter_key else JUPITER_RPM_KEYLESS
         return cls(
             enabled=_flag(os.getenv("MEME_ENABLED"), True),
             allow_live=_flag(os.getenv("MEME_ALLOW_LIVE"), False),
             private_key=os.getenv("SOLANA_PRIVATE_KEY", "").strip(),
             rpc_url=os.getenv("SOLANA_RPC_URL", "").strip() or DEFAULT_RPC,
-            jupiter_url=(os.getenv("JUPITER_API_URL", "").strip() or DEFAULT_JUPITER).rstrip("/"),
-            jupiter_api_key=os.getenv("JUPITER_API_KEY", "").strip(),
+            jupiter_url=(os.getenv("JUPITER_API_URL", "").strip() or (KEYED_JUPITER if jupiter_key else DEFAULT_JUPITER)).rstrip("/"),
+            jupiter_api_key=jupiter_key,
+            jupiter_rpm=min(6000, max(5, _int(os.getenv("JUPITER_RPM"), jupiter_default_rpm))),
             x_bearer_token=os.getenv("X_BEARER_TOKEN", "").strip(),
             x_daily_requests=max(0, _int(os.getenv("X_DAILY_REQUESTS"), 40)),
             bankroll_usd=bankroll,
@@ -392,6 +401,8 @@ def public_meme_settings(settings: MemeSettings) -> dict:
         "allow_live": settings.allow_live,
         "rpc_is_public": settings.rpc_url == DEFAULT_RPC,
         "jupiter_url": settings.jupiter_url,
+        "jupiter_keyed": bool(settings.jupiter_api_key),
+        "jupiter_rpm": settings.jupiter_rpm,
         "goal_usd_per_month": settings.goal_usd_per_month,
         "confirmation_phrase": MEME_LIVE_PHRASE,
         "unlock_min_trades": UNLOCK_MIN_TRADES,

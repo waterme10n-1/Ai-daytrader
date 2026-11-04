@@ -20,6 +20,7 @@ from trader.meme.clients import (
     DexScreener,
     Jupiter,
     PairInfo,
+    RateLimited,
     RugCheck,
     SolanaRPC,
     SourceError,
@@ -103,6 +104,8 @@ ADAPT_EVERY = 5
 NO_LEARN_EXITS = {"kill", "manual"}
 FEE_MARGIN_USD = 0.05
 
+# Vis beskeden om Jupiters rate limit i ti minutter efter seneste 429.
+JUPITER_ALERT_SECONDS = 600
 SNIPER_LOOP_SECONDS = 5
 SNIPER_DEEP_CHECKS = 4
 SNIPER_SEEN_HOURS = 6
@@ -1221,6 +1224,9 @@ class MemeEngine:
             try:
                 for token in self.clients.jup.top_tokens(category, "1h", 50):
                     add(token.mint, source, token=token)
+            except RateLimited as exc:
+                # Jupiter siger stop. Listen hentes igen senere; det er ikke en fejl i botten.
+                logger.info("Jupiter %s sprunget over: %s", category, exc)
             except SourceError as exc:
                 errors.append(f"Jupiter {category}: {exc}")
         try:
@@ -1336,6 +1342,8 @@ class MemeEngine:
                 for cand in deep:
                     if cand.get("token") is None:
                         cand["token"] = infos.get(cand["mint"])
+            except RateLimited as exc:
+                logger.info("Jupiter token-info sprunget over: %s", exc)
             except SourceError as exc:
                 summary["errors"].append(f"Jupiter token-info: {exc}")
 
@@ -1397,6 +1405,9 @@ class MemeEngine:
         try:
             for token in self.clients.jup.recent_tokens(60):
                 found[token.mint] = {"mint": token.mint, "token": token}
+        except RateLimited as exc:
+            summary["note"] = "Jupiter holder pause (rate limit). Sniperen bruger DexScreener imens."
+            logger.info("Jupiter nye tokens sprunget over: %s", exc)
         except SourceError as exc:
             summary["errors"].append(f"Jupiter nye tokens: {exc}")
         try:
@@ -1430,6 +1441,8 @@ class MemeEngine:
                 for cand in fresh:
                     if cand["token"] is None:
                         cand["token"] = infos.get(cand["mint"])
+            except RateLimited as exc:
+                logger.info("Jupiter token-info sprunget over: %s", exc)
             except SourceError as exc:
                 summary["errors"].append(f"Jupiter token-info: {exc}")
         now_ms = int(now * 1000)
@@ -1477,6 +1490,10 @@ class MemeEngine:
                 summary["bought"] += 1
                 if summary["bought"] >= MAX_BUYS_PER_SCAN:
                     break
+            elif cand.get("retry"):
+                # Kun Jupiters kvote stoppede tjekket. Tokenet er ikke afvist; se på det igen næste runde.
+                seen.pop(cand["mint"], None)
+                self.store.set_json("sniper_seen", seen)
 
     def _save_sniper(self) -> None:
         self.store.set_json("sniper", self.sniper.to_dict())
@@ -1599,8 +1616,13 @@ class MemeEngine:
         lamports = int(decision.size_usd / sol_usd * LAMPORTS_PER_SOL)
         buy_quote = sell_quote = None
         try:
-            buy_quote = self.clients.jup.quote(SOL_MINT, cand["mint"], lamports)
-            sell_quote = self.clients.jup.quote(cand["mint"], SOL_MINT, buy_quote.out_amount)
+            buy_quote = self.clients.jup.quote(SOL_MINT, cand["mint"], lamports, priority="normal")
+            sell_quote = self.clients.jup.quote(cand["mint"], SOL_MINT, buy_quote.out_amount, priority="normal")
+        except RateLimited as exc:
+            # Ikke et dårligt token, bare en fuld kvote. Ingen afvisning i journalen, så det prøves igen.
+            logger.info("Quote sprunget over for %s: %s", cand["mint"], exc)
+            cand["retry"] = True
+            return False
         except SourceError as exc:
             logger.info("Quote fejlede for %s: %s", cand["mint"], exc)
         reasons = roundtrip_rejections(buy_quote, sell_quote, self.params)
@@ -2109,8 +2131,18 @@ class MemeEngine:
                 "next_scan_in": round(next_scan),
                 "scan_seconds": self.settings.scan_seconds,
                 "monitor_seconds": self.settings.monitor_seconds,
+                "jupiter": self._jupiter_usage(),
             },
         }
+
+    def _jupiter_usage(self) -> dict | None:
+        usage = getattr(self.clients.jup, "usage", None)
+        if usage is None:
+            return None
+        try:
+            return usage()
+        except Exception:
+            return None
 
     def _alerts(self) -> list[dict]:
         alerts: list[dict] = []
@@ -2131,8 +2163,19 @@ class MemeEngine:
             alerts.append({"level": "info", "text": "Ingen ANTHROPIC_API_KEY: ingen Claude-research af X og nyheder. Botten kører på regler og RugCheck."})
         elif self.settings.ai_configured and self.researcher.budget_left() < 0.1:
             alerts.append({"level": "info", "text": "Dagens AI-budget er brugt. Resten af dagen kører botten kun på regler."})
-        if not self.settings.x_configured:
+        if not self.settings.x_configured and self.settings.anthropic_api_key:
+            # Uden Claude dækker beskeden ovenfor allerede X; to beskeder om det samme forvirrer.
             alerts.append({"level": "info", "text": "Ingen X_BEARER_TOKEN: X-omtale tjekkes kun gennem Claudes websøgning."})
+        jupiter = self._jupiter_usage()
+        if jupiter and jupiter.get("limited_seconds_ago") is not None and jupiter["limited_seconds_ago"] < JUPITER_ALERT_SECONDS:
+            if jupiter.get("keyed"):
+                text = "Jupiter har sagt stop til for mange kald (429). Botten holder kort pause, sparer på kaldene og prøver igen."
+            else:
+                text = (
+                    "Jupiter begrænser gratis kald uden nøgle (429). Botten holder pause og prøver igen. "
+                    "Lav en gratis nøgle på portal.jup.ag og sæt JUPITER_API_KEY i Railway for en fast og højere grænse."
+                )
+            alerts.append({"level": "info", "text": text})
         if self.settings.rpc_url.startswith("https://api.mainnet-beta.solana.com") and (self._all_wallets() or self.mode == "live"):
             alerts.append({"level": "warning", "text": "Offentlig Solana RPC er langsom og rate-limited. Brug en gratis Helius-nøgle i SOLANA_RPC_URL."})
         diagnostics = self.store.get_json("diagnostics", None)

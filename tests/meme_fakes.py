@@ -127,25 +127,25 @@ class FakeJup:
         self.quotes = 0
         self.recent: list = []
 
-    def sol_usd(self) -> float:
+    def sol_usd(self, **_kw) -> float:
         return self.sol
 
-    def prices(self, mints):
+    def prices(self, mints, **_kw):
         return {}
 
-    def top_tokens(self, category, interval="1h", limit=50):
+    def top_tokens(self, category, interval="1h", limit=50, **_kw):
         return []
 
-    def token_infos(self, mints):
+    def token_infos(self, mints, **_kw):
         return {token.mint: token for token in self.recent if token.mint in mints}
 
-    def recent_tokens(self, limit=60):
+    def recent_tokens(self, limit=60, **_kw):
         return list(self.recent)
 
     def _price(self, mint: str) -> float:
         return float(self.dex.pairs[mint]["priceUsd"])
 
-    def quote(self, input_mint: str, output_mint: str, amount: int, slippage_bps=None) -> Quote:
+    def quote(self, input_mint: str, output_mint: str, amount: int, slippage_bps=None, **_kw) -> Quote:
         self.quotes += 1
         token = output_mint if input_mint == SOL_MINT else input_mint
         if token in self.no_route:

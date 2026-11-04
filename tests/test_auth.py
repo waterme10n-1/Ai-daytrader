@@ -171,3 +171,31 @@ def test_public_bind_refuses_to_start_without_secrets(tmp_path):
     enforce_startup(_settings(tmp_path, host="127.0.0.1", app_username="", app_password="", session_secret=""))
     with pytest.raises(SystemExit):
         enforce_startup(_settings(tmp_path, host="127.0.0.1", app_username="anna", session_secret=""))
+
+
+def test_login_forgives_phone_typing_but_not_wrong_password(client, caplog):
+    # Telefonen skriver "Anna " med stort og mellemrum; det er stadig brugeren.
+    assert _login(client, username="Anna ", password="korrekt-kode ").status_code == 303
+    client.cookies.clear()
+    with caplog.at_level("WARNING", logger="trader.app"):
+        bad = _login(client, username="anna", password="Korrekt-kode")
+    assert bad.status_code == 401
+    assert "adgangskoden passer ikke til APP_PASSWORD" in caplog.text
+    assert "Korrekt-kode" not in caplog.text  # adgangskoden selv skrives aldrig i loggen
+    with caplog.at_level("WARNING", logger="trader.app"):
+        _login(client, username="bent", password="korrekt-kode")
+    assert "brugernavnet passer ikke" in caplog.text
+
+
+def test_login_values_from_railway_lose_quotes_and_spaces(monkeypatch):
+    monkeypatch.setenv("APP_USERNAME", ' "anna" ')
+    monkeypatch.setenv("APP_PASSWORD", "'korrekt kode' ")
+    settings = Settings.from_env()
+    assert settings.app_username == "anna"
+    assert settings.app_password == "korrekt kode"  # mellemrum inde i koden bevares
+
+
+def test_login_form_does_not_autocapitalize_username(client):
+    page = client.get("/login")
+    assert 'autocapitalize="none"' in page.text
+    assert "APP_PASSWORD" in page.text
