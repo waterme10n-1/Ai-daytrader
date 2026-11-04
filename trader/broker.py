@@ -91,6 +91,7 @@ class NewsItem:
     symbols: list[str]
     created_at: datetime
     summary: str
+    url: str = ""
 
 
 @dataclass
@@ -493,6 +494,7 @@ class AlpacaBroker:
                     symbols=list(row.get("symbols") or []),
                     created_at=_parse_ts(created) if created else moment,
                     summary=row.get("summary") or "",
+                    url=row.get("url") or "",
                 )
             )
         return items
@@ -516,6 +518,14 @@ class AlpacaBroker:
 
     def close_all_positions(self) -> None:
         self._request("DELETE", f"{self.base}/v2/positions")
+
+    def close_position(self, symbol: str) -> None:
+        """Lukker én position. Åbne ordrer på symbolet (bracket-ben) annulleres først, ellers er aktierne låst."""
+        orders = self._request("GET", f"{self.base}/v2/orders", params={"status": "open", "symbols": symbol, "nested": "false"})
+        for order in orders if isinstance(orders, list) else []:
+            if order.get("id"):
+                self._request("DELETE", f"{self.base}/v2/orders/{order['id']}")
+        self._request("DELETE", f"{self.base}/v2/positions/{symbol}")
 
     def get_order(self, order_id: str) -> Order:
         body = self._request("GET", f"{self.base}/v2/orders/{order_id}", params={"nested": "true"})
@@ -688,8 +698,13 @@ class SimBroker:
 
     def close_all_positions(self) -> None:
         for symbol in list(self._positions):
-            price = self._open_price(symbol, self.now) or self._positions[symbol].market_price
-            self._exit_symbol(symbol, price, "flatten")
+            self.close_position(symbol)
+
+    def close_position(self, symbol: str) -> None:
+        if symbol not in self._positions:
+            return
+        price = self._open_price(symbol, self.now) or self._positions[symbol].market_price
+        self._exit_symbol(symbol, price, "flatten")
 
     def get_order(self, order_id: str) -> Order:
         found = self._orders.get(order_id)
