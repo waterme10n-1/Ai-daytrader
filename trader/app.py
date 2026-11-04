@@ -10,7 +10,7 @@ from urllib.parse import parse_qs
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from pydantic import BaseModel
 
 from trader.auth import (
@@ -47,6 +47,26 @@ logger = logging.getLogger("trader.app")
 
 STATIC = Path(__file__).resolve().parent / "static" / "index.html"
 MEME_STATIC = Path(__file__).resolve().parent / "static" / "meme.html"
+ICONS = Path(__file__).resolve().parent / "static" / "icons"
+ICON_FILES = frozenset({"icon-192.png", "icon-512.png", "icon-maskable-512.png", "apple-touch-icon.png"})
+# Gør dashboardet til en app på hjemmeskærmen (PWA). Åbner direkte på memebotten.
+MANIFEST = {
+    "name": "Memebot · AI Daytrader",
+    "short_name": "Memebot",
+    "description": "Følg memebotten: egenkapital, positioner, sniper og læring.",
+    "lang": "da",
+    "id": "/meme",
+    "start_url": "/meme",
+    "scope": "/",
+    "display": "standalone",
+    "background_color": "#07090e",
+    "theme_color": "#07090e",
+    "icons": [
+        {"src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+        {"src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+        {"src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"},
+    ],
+}
 
 
 class PhraseBody(BaseModel):
@@ -161,6 +181,22 @@ def create_app(
     @app.get("/healthz")
     def healthz() -> dict:
         return {"ok": True}
+
+    @app.get("/manifest.webmanifest")
+    def manifest() -> JSONResponse:
+        return JSONResponse(MANIFEST, media_type="application/manifest+json", headers={"Cache-Control": "public, max-age=3600"})
+
+    @app.get("/icons/{name}")
+    def app_icon(name: str) -> FileResponse:
+        if name not in ICON_FILES:
+            raise HTTPException(status_code=404, detail="Ukendt ikon.")
+        return FileResponse(ICONS / name, media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
+
+    @app.get("/apple-touch-icon.png")
+    @app.get("/apple-touch-icon-precomposed.png")
+    def apple_icon() -> FileResponse:
+        # iPhone spørger selv efter disse stier, når siden lægges på hjemmeskærmen.
+        return FileResponse(ICONS / "apple-touch-icon.png", media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
 
     @app.get("/login")
     def login_form(request: Request):

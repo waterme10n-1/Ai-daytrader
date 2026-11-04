@@ -5,6 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="dark light">
 <title>Memebot</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#07090e" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f3f5fa" media="(prefers-color-scheme: light)">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Memebot">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%239945ff'/%3E%3Cstop offset='1' stop-color='%2314f195'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='9' fill='url(%23g)'/%3E%3Ctext x='16' y='21.5' text-anchor='middle' font-size='13' font-weight='700' fill='white' font-family='Arial'%3EMB%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -587,6 +595,10 @@
       </form>
       <p class="muted" id="unlock-msg" role="status" style="font-size:0.88rem"></p>
     </div>
+    <div class="card" id="app-card">
+      <div class="card-head"><h2 id="app-title"></h2><button class="btn small primary" type="button" id="app-install" hidden>Installer app</button></div>
+      <div id="app-body"></div>
+    </div>
     <div class="card">
       <div class="card-head"><h2 id="settings-title"></h2><span class="muted">Ændres i miljøvariablerne. Nøgler vises aldrig.</span></div>
       <div class="kv" id="settings"></div>
@@ -658,6 +670,7 @@ const ICONS = {
   brain: '<path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/><path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/><path d="M12 5v13"/>',
   shield: '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1Z"/>',
   grid: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
+  phone: '<rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M11 18h2"/>',
   keyboard: '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M6 9h.01M10 9h.01M14 9h.01M18 9h.01M6 13h.01M18 13h.01M8 17h8"/>',
   sliders: '<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M2 14h4M10 8h4M18 16h4"/>',
   search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
@@ -1358,6 +1371,8 @@ function renderKrav(data) {
     ["Solana RPC", s.rpc_is_public ? "offentlig (langsom)" : "egen"],
     ["Jupiter", s.jupiter_url],
     ["Jupiter-kvote", jupiterQuota(data)],
+    ["RugCheck-kvote", sourceQuota((data.engine || {}).rugcheck)],
+    ["DexScreener-kvote", dexQuota((data.engine || {}).dexscreener)],
   ];
   put("settings", rows.map(([a, b]) => `<div><span>${esc(a)}</span><b>${esc(b)}</b></div>`).join(""));
   document.getElementById("keys-title").innerHTML = icon("keyboard") + "Genveje";
@@ -1370,6 +1385,17 @@ function jupiterQuota(data) {
   if (!j) return `${s.jupiter_rpm} kald/min · ${key}`;
   const pause = j.cooldown_seconds > 0 ? ` · pause ${j.cooldown_seconds} s` : "";
   return `${j.used_last_minute}/${j.per_minute} kald seneste minut${pause} · ${key}`;
+}
+
+function sourceQuota(q) {
+  if (!q) return "—";
+  const pause = q.cooldown_seconds > 0 ? ` · pause ${q.cooldown_seconds} s` : "";
+  return `${q.used_last_minute}/${q.per_minute} kald seneste minut${pause}`;
+}
+function dexQuota(q) {
+  if (!q || !q.pairs) return "—";
+  const pause = q.cooldown_seconds > 0 ? ` · pause ${q.cooldown_seconds} s` : "";
+  return `kurser ${q.pairs.used_last_minute}/${q.pairs.per_minute} · lister ${q.lists.used_last_minute}/${q.lists.per_minute}${pause}`;
 }
 
 /* ---------- Sniper ---------- */
@@ -1874,6 +1900,48 @@ bindDailyHover();
   if (wanted) connectPhantom(true);
   if (p.on) p.on("accountChanged", (pk) => { phantomAddr = pk ? pk.toString() : null; refreshWallet(true); if (state) renderWalletCards(state); });
 })();
+/* ---------- App på hjemmeskærmen ---------- */
+let installPrompt = null;
+function runningAsApp() {
+  try { return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true; } catch (e) { return false; }
+}
+function renderInstall() {
+  document.getElementById("app-title").innerHTML = icon("phone") + "App på hjemmeskærmen";
+  const button = document.getElementById("app-install");
+  button.hidden = !installPrompt || runningAsApp();
+  if (runningAsApp()) {
+    put("app-body", `<p class="muted" style="margin:0;font-size:0.9rem">Du bruger botten som app. Den opdaterer selv hvert 8. sekund, mens den er åben.</p>`);
+    return;
+  }
+  const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const steps = ios
+    ? [["iPhone (Safari)", "Tryk på Del-knappen (firkanten med pilen op) nederst, og vælg <b>Føj til hjemmeskærm</b> → <b>Tilføj</b>."]]
+    : [
+        ["Android (Chrome)", installPrompt ? "Tryk på <b>Installer app</b> her ovenfor." : "Tryk på <b>⋮</b> øverst til højre, og vælg <b>Installer app</b> eller <b>Føj til startskærm</b>."],
+        ["iPhone (Safari)", "Del-knappen (firkanten med pilen op) → <b>Føj til hjemmeskærm</b>."],
+      ];
+  put("app-body", `<p class="muted" style="margin:0 0 10px;font-size:0.9rem">Læg dashboardet på hjemmeskærmen, så åbner det som en app med eget ikon og uden adresselinje. Du logger ind én gang i appen, og så husker den dig i 7 dage.</p>
+    <div class="kv">${steps.map(([who, how]) => `<div><span>${esc(who)}</span><b style="font-weight:500;text-align:right">${how}</b></div>`).join("")}</div>`);
+}
+window.addEventListener("beforeinstallprompt", (event) => {
+  event.preventDefault();
+  installPrompt = event;
+  renderInstall();
+});
+window.addEventListener("appinstalled", () => {
+  installPrompt = null;
+  toast("check", "Appen er installeret", "Du finder Memebot på din hjemmeskærm.");
+  renderInstall();
+});
+document.getElementById("app-install").addEventListener("click", async () => {
+  if (!installPrompt) return;
+  const prompt = installPrompt;
+  installPrompt = null;
+  try { await prompt.prompt(); await prompt.userChoice; } catch (e) {}
+  renderInstall();
+});
+renderInstall();
+
 refresh();
 // Hurtig opdatering, når siden er åben. Kun hvert minut, når fanen ligger i baggrunden (sparer data på mobil).
 let lastPoll = 0;

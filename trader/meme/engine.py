@@ -104,7 +104,7 @@ ADAPT_EVERY = 5
 NO_LEARN_EXITS = {"kill", "manual"}
 FEE_MARGIN_USD = 0.05
 
-# Vis beskeden om Jupiters rate limit i ti minutter efter seneste 429.
+# Vis beskeden om en kildes rate limit (Jupiter, RugCheck, DexScreener) i ti minutter efter seneste 429.
 JUPITER_ALERT_SECONDS = 600
 SNIPER_LOOP_SECONDS = 5
 SNIPER_DEEP_CHECKS = 4
@@ -181,7 +181,7 @@ class MemeClients:
         rpc: Any = None,
     ) -> None:
         self.dex = dex or DexScreener()
-        self.rug = rug or RugCheck()
+        self.rug = rug or RugCheck(settings)
         self.jup = jup or Jupiter(settings)
         self.x = x if x is not None else (XClient(settings.x_bearer_token) if settings.x_configured else None)
         if rpc is not None:
@@ -604,7 +604,7 @@ class MemeEngine:
         mints = [row["mint"] for row in positions]
         pairs: dict[str, PairInfo] = {}
         try:
-            pairs = self.clients.dex.pairs_for(mints)
+            pairs = self.clients.dex.pairs_for(mints, priority="high")
         except SourceError as exc:
             logger.info("DexScreener utilgængelig under overvågning: %s", exc)
         prices = {mint: pair.price_usd for mint, pair in pairs.items()}
@@ -1232,11 +1232,15 @@ class MemeEngine:
         try:
             for row in self.clients.dex.latest_boosts():
                 add(str(row.get("tokenAddress")), "dex_boost", boosted=True)
+        except RateLimited as exc:
+            logger.info("DexScreener boosts sprunget over: %s", exc)
         except SourceError as exc:
             errors.append(f"DexScreener boosts: {exc}")
         try:
             for row in self.clients.dex.latest_profiles():
                 add(str(row.get("tokenAddress")), "dex_profile")
+        except RateLimited as exc:
+            logger.info("DexScreener profiler sprunget over: %s", exc)
         except SourceError as exc:
             errors.append(f"DexScreener profiler: {exc}")
         return found, errors
@@ -1311,6 +1315,11 @@ class MemeEngine:
 
         try:
             pairs = self.clients.dex.pairs_for([cand["mint"] for cand in fresh])
+        except RateLimited as exc:
+            # Intet er afvist endnu, så kandidaterne kommer bare med i næste scanning.
+            summary["note"] = "DexScreener holder pause (rate limit). Kandidaterne tjekkes i næste runde."
+            logger.info("DexScreener par sprunget over: %s", exc)
+            return
         except SourceError as exc:
             summary["errors"].append(f"DexScreener par: {exc}")
             return
@@ -1354,6 +1363,11 @@ class MemeEngine:
             token: TokenInfo | None = cand.get("token")
             try:
                 report = self.clients.rug.report(cand["mint"])
+            except RateLimited as exc:
+                # Uden rug-tjek købes der intet. Kandidaten afvises ikke, men tjekkes igen i næste scanning.
+                summary["note"] = "RugCheck holder pause (rate limit). Resten af kandidaterne tjekkes i næste runde."
+                logger.info("RugCheck sprunget over: %s", exc)
+                break
             except SourceError as exc:
                 summary["errors"].append(f"RugCheck: {exc}")
                 report = None
@@ -1415,6 +1429,8 @@ class MemeEngine:
                 mint = str(row.get("tokenAddress") or "")
                 if mint:
                     found.setdefault(mint, {"mint": mint, "token": None})
+        except RateLimited as exc:
+            logger.info("DexScreener profiler sprunget over: %s", exc)
         except SourceError as exc:
             summary["errors"].append(f"DexScreener profiler: {exc}")
         summary["checked"] = len(found)
@@ -1431,6 +1447,10 @@ class MemeEngine:
             return
         try:
             pairs = self.clients.dex.pairs_for([cand["mint"] for cand in fresh][:60])
+        except RateLimited as exc:
+            summary["note"] = "DexScreener holder pause (rate limit). Sniperen prøver igen om lidt."
+            logger.info("DexScreener par sprunget over: %s", exc)
+            return
         except SourceError as exc:
             summary["errors"].append(f"DexScreener par: {exc}")
             return
@@ -1473,9 +1493,16 @@ class MemeEngine:
         self.store.set_json("sniper_seen", seen)
         passed.sort(key=lambda item: item["pair"].liquidity_usd, reverse=True)
         rug_params = StrategyParams.from_dict({**self.params.to_dict(), "max_top10_pct": cfg.max_top10_pct})
-        for cand in passed[:SNIPER_DEEP_CHECKS]:
+        retry: list[str] = []
+        for index, cand in enumerate(passed[:SNIPER_DEEP_CHECKS]):
             try:
                 report = self.clients.rug.report(cand["mint"], max_age=60.0)
+            except RateLimited as exc:
+                # Ingen køb uden et frisk rug-tjek. Glem, at vi har set disse tokens, så de tjekkes igen.
+                retry.extend(item["mint"] for item in passed[index:SNIPER_DEEP_CHECKS])
+                summary["note"] = "RugCheck holder pause (rate limit). Sniperen tjekker tokenet igen om lidt."
+                logger.info("RugCheck sprunget over: %s", exc)
+                break
             except SourceError as exc:
                 summary["errors"].append(f"RugCheck: {exc}")
                 report = None
@@ -1492,8 +1519,11 @@ class MemeEngine:
                     break
             elif cand.get("retry"):
                 # Kun Jupiters kvote stoppede tjekket. Tokenet er ikke afvist; se på det igen næste runde.
-                seen.pop(cand["mint"], None)
-                self.store.set_json("sniper_seen", seen)
+                retry.append(cand["mint"])
+        if retry:
+            for mint in retry:
+                seen.pop(mint, None)
+            self.store.set_json("sniper_seen", seen)
 
     def _save_sniper(self) -> None:
         self.store.set_json("sniper", self.sniper.to_dict())
@@ -2132,11 +2162,17 @@ class MemeEngine:
                 "scan_seconds": self.settings.scan_seconds,
                 "monitor_seconds": self.settings.monitor_seconds,
                 "jupiter": self._jupiter_usage(),
+                "dexscreener": self._usage_of(self.clients.dex),
+                "rugcheck": self._usage_of(self.clients.rug),
             },
         }
 
     def _jupiter_usage(self) -> dict | None:
-        usage = getattr(self.clients.jup, "usage", None)
+        return self._usage_of(self.clients.jup)
+
+    @staticmethod
+    def _usage_of(client) -> dict | None:
+        usage = getattr(client, "usage", None)
         if usage is None:
             return None
         try:
@@ -2176,6 +2212,12 @@ class MemeEngine:
                     "Lav en gratis nøgle på portal.jup.ag og sæt JUPITER_API_KEY i Railway for en fast og højere grænse."
                 )
             alerts.append({"level": "info", "text": text})
+        rug = self._usage_of(self.clients.rug)
+        if rug and rug.get("limited_seconds_ago") is not None and rug["limited_seconds_ago"] < JUPITER_ALERT_SECONDS:
+            alerts.append({"level": "info", "text": "RugCheck har sagt stop til for mange kald (429). Botten køber intet uden et frisk rug-tjek, så den holder pause og tjekker kandidaterne igen bagefter."})
+        dex = self._usage_of(self.clients.dex)
+        if dex and dex.get("limited_seconds_ago") is not None and dex["limited_seconds_ago"] < JUPITER_ALERT_SECONDS:
+            alerts.append({"level": "info", "text": "DexScreener har sagt stop til for mange kald (429). Botten holder pause, bruger Jupiters kurser imens og prøver igen."})
         if self.settings.rpc_url.startswith("https://api.mainnet-beta.solana.com") and (self._all_wallets() or self.mode == "live"):
             alerts.append({"level": "warning", "text": "Offentlig Solana RPC er langsom og rate-limited. Brug en gratis Helius-nøgle i SOLANA_RPC_URL."})
         diagnostics = self.store.get_json("diagnostics", None)

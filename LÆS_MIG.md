@@ -138,6 +138,8 @@ Efter login lander du på `/meme`. Siden opdaterer sig selv hvert 8. sekund.
 - **Wallet**: bot-wallet'ens saldo, forbind din Phantom, indbetal og hæv, Axiom-genveje, samt wallets botten følger (tilføj og fjern uden genstart).
 - **Indstillinger**: kravene før rigtige penge og alle indstillinger.
 
+**Som app på telefonen.** Åbn dit link på telefonen og log ind. På iPhone (Safari): tryk på Del-knappen (firkanten med pilen op) og vælg **Føj til hjemmeskærm**. På Android (Chrome): tryk på **⋮** og vælg **Installer app**, eller brug knappen **Installer app** under Indstillinger. Så får du et Memebot-ikon, og dashboardet åbner uden adresselinje. Du logger ind én gang i appen, og så husker den dig i 7 dage.
+
 Knapper: **Scan nu**, **Pause køb** (åbne positioner passes stadig) og **Nødstop** (sælger alt). Klokken øverst slår browser-notifikationer til ved køb og salg. Genveje: `1`–`8` skifter fane, `S` scanner, `P` sætter køb på pause, `/` søger i radaren og `T` skifter tema.
 
 ## Forbindelser, sikkerhed og opfølgning
@@ -269,3 +271,8 @@ På Railway: følg afsnittet *Udgiv på Railway* ovenfor. Memebotten gemmer sin 
 Datakilder: DexScreener, RugCheck og Jupiter (`lite-api.jup.ag`) virker uden nøgle. Jupiter tillader dog kun ca. 30 kald i minuttet uden nøgle, og hos Railway deles grænsen med andre servere på samme IP. Ser du "rate limit (429)", så opret en **gratis** nøgle på portal.jup.ag og sæt `JUPITER_API_KEY` i Railway. Så bruges `api.jup.ag` automatisk med 60 kald i minuttet for din egen konto.
 
 Botten holder selv regnskab med kaldene (25 i minuttet uden nøgle, 55 med) og prioriterer: salg og køb går altid forrest, quotes til nye kandidater må bruge 80 % af kvoten, og lister over nye eller trending tokens 60 %. Trending-lister gemmes i 5 minutter. Svarer Jupiter alligevel 429, holder botten pause (15 s, så 30 s og op til 2 minutter) og bruger imens den senest hentede liste. Et token, der kun blev stoppet af kvoten, afvises ikke, men tjekkes igen i næste runde. Under Indstillinger kan du se, hvor mange kald der er brugt det seneste minut.
+
+RugCheck og DexScreener har samme beskyttelse:
+
+- **RugCheck** oplyser ingen fast grænse, så botten bruger højst 30 kald i minuttet (`RUGCHECK_RPM`). Svarer RugCheck 429, holder botten pause og prøver ikke den lille opsummering med det samme, da den tæller i samme kvote. Der købes aldrig uden et frisk rug-tjek. Kandidater, der ikke nåede at blive tjekket, afvises ikke, men tjekkes igen i næste runde, også i sniperen.
+- **DexScreener** tæller lister (nye profiler og boosts, 60 i minuttet) og kurser (300 i minuttet) hver for sig. Botten holder sig til 50 og 240. Listerne gemmes i 10–30 sekunder, så sniperen og scanningen deler ét kald. Kurser til dine åbne positioner går altid forrest. Siger DexScreener stop, bruger overvågningen Jupiters kurser imens.

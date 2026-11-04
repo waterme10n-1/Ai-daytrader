@@ -95,7 +95,7 @@ class FakeDex:
     def latest_profiles(self) -> list[dict]:
         return []
 
-    def pairs_for(self, mints):
+    def pairs_for(self, mints, **_kw):
         if self.fail:
             raise SourceError("DexScreener nede")
         return best_pairs([self.pairs[m] for m in mints if m in self.pairs])
@@ -108,7 +108,7 @@ class FakeRug:
     def __init__(self) -> None:
         self.reports: dict[str, dict] = {}
 
-    def report(self, mint: str, max_age: float = 600.0):
+    def report(self, mint: str, max_age: float = 600.0, **_kw):
         if mint not in self.reports:
             raise SourceError("ingen rapport")
         return parse_rug_report(mint, self.reports[mint])
