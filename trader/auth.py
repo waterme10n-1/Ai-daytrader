@@ -42,8 +42,53 @@ def auth_is_active(settings: Settings) -> bool:
     )
 
 
+def new_totp_secret() -> str:
+    """Ny hemmelighed til en godkendelses-app (Google Authenticator, 1Password, Authy …)."""
+    return base64.b32encode(secrets.token_bytes(20)).decode().rstrip("=")
+
+
+def _totp_key(secret: str) -> bytes:
+    clean = secret.strip().replace(" ", "").upper()
+    return base64.b32decode(clean + "=" * (-len(clean) % 8))
+
+
+def totp_code(secret: str, at: float | None = None, step: int = 30, digits: int = 6) -> str:
+    counter = int((time.time() if at is None else at) // step)
+    digest = hmac.new(_totp_key(secret), counter.to_bytes(8, "big"), hashlib.sha1).digest()
+    offset = digest[-1] & 0x0F
+    value = int.from_bytes(digest[offset : offset + 4], "big") & 0x7FFFFFFF
+    return str(value % 10**digits).zfill(digits)
+
+
+def totp_ok(secret: str, code: str, at: float | None = None, window: int = 1) -> bool:
+    """Godkender koden for nu og ét 30-sekunders vindue før og efter (uret kan gå lidt skævt)."""
+    code = "".join(ch for ch in str(code or "") if ch.isdigit())
+    if not secret or len(code) != 6:
+        return False
+    moment = time.time() if at is None else at
+    try:
+        return any(hmac.compare_digest(totp_code(secret, moment + shift * 30), code) for shift in range(-window, window + 1))
+    except (ValueError, TypeError):
+        return False
+
+
+def totp_uri(secret: str, account: str = "memebot", issuer: str = "AI Daytrader") -> str:
+    from urllib.parse import quote
+
+    return f"otpauth://totp/{quote(issuer)}:{quote(account)}?secret={secret}&issuer={quote(issuer)}&digits=6&period=30"
+
+
+def totp_enabled(settings: Settings) -> bool:
+    return bool(getattr(settings, "app_totp_secret", ""))
+
+
 def enforce_startup(settings: Settings) -> None:
     """Offentligt bind og halve login-opsætninger stopper processen."""
+    if totp_enabled(settings):
+        try:
+            _totp_key(settings.app_totp_secret)
+        except (ValueError, TypeError) as exc:
+            raise SystemExit("APP_TOTP_SECRET er ikke en gyldig base32-hemmelighed. Lav en ny med new_totp_secret().") from exc
     has_user = bool(settings.app_username)
     has_password = bool(settings.app_password or settings.app_password_hash)
     has_secret = len(settings.session_secret) >= MIN_SECRET_LENGTH
@@ -229,7 +274,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
 
-def render_login(csrf: str, error: str = "", username: str = "") -> str:
+def render_login(csrf: str, error: str = "", username: str = "", totp: bool = False) -> str:
     page = _LOGIN_HTML
     hidden = "" if error else "hidden"
     return (
@@ -237,7 +282,13 @@ def render_login(csrf: str, error: str = "", username: str = "") -> str:
         .replace("__ERROR__", escape(error))
         .replace("__USERNAME__", escape(username, quote=True))
         .replace("__ERROR_HIDDEN__", hidden)
+        .replace("__TOTP__", _TOTP_FIELD if totp else "")
     )
+
+
+_TOTP_FIELD = """<label>Kode fra din godkendelses-app
+      <input name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9 ]{6,7}" maxlength="7" required placeholder="123 456">
+    </label>"""
 
 
 _LOGIN_HTML = """<!DOCTYPE html>
@@ -245,68 +296,61 @@ _LOGIN_HTML = """<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
 <title>Log ind · AI Daytrader</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%231c1712'/%3E%3Ctext x='16' y='22' text-anchor='middle' font-size='13' fill='%23f3eee6' font-family='Georgia'%3EDT%3C/text%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%239945ff'/%3E%3Cstop offset='1' stop-color='%2314f195'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='9' fill='url(%23g)'/%3E%3Ctext x='16' y='21.5' text-anchor='middle' font-size='13' font-weight='700' fill='white' font-family='Arial'%3EDT%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,560;9..144,640&family=Outfit:wght@380;500;640&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #e8e1d4; --bg-2: #f7f3eb; --ink: #1c1712; --muted: #665e54;
-    --line: #d8d0c3; --accent: #1d4636; --bad: #9d342c; --chip: #efe7da;
+    --bg: #f3f5fa; --surface: #ffffff; --surface-2: #f7f8fc; --text: #0d1120; --muted: #636b82;
+    --border: rgba(16, 22, 45, 0.12); --accent: #7537ee; --bad: #d23350; --bad-soft: rgba(210, 51, 80, 0.1);
+    --glow-1: rgba(153, 69, 255, 0.14); --glow-2: rgba(20, 241, 149, 0.1);
     color-scheme: light;
   }
   html[data-theme="dark"] {
-    --bg: #121410; --bg-2: #1c1f1a; --ink: #f3eee6; --muted: #b7ae9f;
-    --line: #32382e; --accent: #e0c27a; --bad: #f0a49c; --chip: #262b22;
+    --bg: #07090e; --surface: #0e121a; --surface-2: #121722; --text: #eef1f8; --muted: #8189a0;
+    --border: rgba(255, 255, 255, 0.1); --accent: #a77bff; --bad: #ff6680; --bad-soft: rgba(255, 102, 128, 0.12);
+    --glow-1: rgba(153, 69, 255, 0.22); --glow-2: rgba(20, 241, 149, 0.1);
     color-scheme: dark;
   }
   * { box-sizing: border-box; }
   body {
-    margin: 0; min-height: 100vh;
-    font-family: "Outfit", "Avenir Next", "Segoe UI", sans-serif;
-    color: var(--ink);
+    margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px 16px;
+    font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--text);
     background:
-      radial-gradient(900px 420px at 0% -10%, rgba(196, 161, 90, 0.22), transparent 55%),
+      radial-gradient(900px 480px at 10% -10%, var(--glow-1), transparent 60%),
+      radial-gradient(800px 420px at 100% 110%, var(--glow-2), transparent 55%),
       var(--bg);
   }
-  main { width: min(440px, calc(100% - 32px)); margin: 0 auto; padding: 64px 0 48px; }
-  .brand { display: flex; gap: 14px; align-items: center; }
+  main { width: min(400px, 100%); }
+  .brand { display: flex; gap: 12px; align-items: center; margin-bottom: 22px; }
   .mark {
-    width: 46px; height: 46px; display: grid; place-items: center;
-    border: 1.5px solid var(--ink);
-    font-family: "Fraunces", Georgia, serif; font-weight: 640;
+    width: 44px; height: 44px; border-radius: 13px; display: grid; place-items: center;
+    background: linear-gradient(135deg, #9945ff, #14f195); color: #fff; font-weight: 700;
+    box-shadow: 0 8px 24px rgba(153, 69, 255, 0.35);
   }
-  h1 { font-family: "Fraunces", Georgia, serif; font-weight: 560; font-size: 1.7rem; margin: 0; }
-  .brand p { margin: 2px 0 0; color: var(--muted); }
-  .badge {
-    display: inline-block; margin: 28px 0 18px;
-    border: 2px solid var(--accent); color: var(--accent);
-    padding: 8px 14px 6px;
-    font-family: "Fraunces", Georgia, serif;
-    font-size: 1.7rem; letter-spacing: 0.14em; line-height: 1;
-    transform: rotate(-1.4deg);
-  }
+  h1 { font-size: 1.3rem; margin: 0; }
+  .brand p { margin: 2px 0 0; color: var(--muted); font-size: 0.9rem; }
   form {
-    background: var(--bg-2); padding: 18px 18px 16px;
-    box-shadow: 0 16px 40px rgba(70, 48, 16, 0.06);
-    display: grid; gap: 12px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 18px;
+    padding: 22px; display: grid; gap: 14px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.18);
   }
-  label { display: grid; gap: 6px; font-size: 0.92rem; color: var(--muted); }
+  label { display: grid; gap: 6px; font-size: 0.86rem; color: var(--muted); font-weight: 500; }
   input {
-    font: inherit; color: var(--ink); background: var(--bg);
-    border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px;
+    font: inherit; color: var(--text); background: var(--surface-2);
+    border: 1px solid var(--border); border-radius: 11px; height: 44px; padding: 0 12px;
   }
   input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   button[type="submit"] {
-    font: inherit; cursor: pointer; border: 1px solid var(--accent);
-    background: var(--accent); color: #f7f3eb; border-radius: 8px; padding: 10px 12px;
+    font: inherit; font-weight: 600; cursor: pointer; border: 0; height: 44px; border-radius: 11px;
+    color: #fff; background: linear-gradient(135deg, #8a3ffc, #12c98a); box-shadow: 0 8px 24px rgba(117, 55, 238, 0.3);
   }
-  html[data-theme="dark"] button[type="submit"] { color: #1c1712; }
-  .error { margin: 0; padding: 10px 12px; border-left: 3px solid var(--bad); background: var(--chip); }
+  .error { margin: 0; padding: 10px 12px; border-radius: 11px; background: var(--bad-soft); color: var(--bad); font-size: 0.9rem; }
   .theme {
-    margin-top: 18px; background: transparent; color: var(--ink);
-    border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; cursor: pointer; font: inherit;
+    margin: 16px auto 0; display: block; background: transparent; color: var(--muted);
+    border: 1px solid var(--border); border-radius: 999px; padding: 5px 14px; cursor: pointer; font: inherit; font-size: 0.86rem;
   }
   [hidden] { display: none; }
 </style>
@@ -317,10 +361,9 @@ _LOGIN_HTML = """<!DOCTYPE html>
     <div class="mark">DT</div>
     <div>
       <h1>AI Daytrader</h1>
-      <p>Åbning og lukning · kun for dig</p>
+      <p>Memebot og aktier · kun for dig</p>
     </div>
   </div>
-  <div class="badge">LOG IND</div>
   <form method="post" action="/login" autocomplete="on">
     <p class="error" __ERROR_HIDDEN__>__ERROR__</p>
     <input type="hidden" name="csrf" value="__CSRF__">
@@ -330,24 +373,39 @@ _LOGIN_HTML = """<!DOCTYPE html>
     <label>Adgangskode
       <input name="password" type="password" autocomplete="current-password" required>
     </label>
+    __TOTP__
     <button type="submit">Log ind</button>
   </form>
-  <button class="theme" id="theme" type="button">Mørk</button>
+  <button class="theme" id="theme" type="button">Lyst tema</button>
 </main>
 <script>
 function applyTheme(theme) {
   document.documentElement.dataset.theme = theme;
-  localStorage.setItem("daytrader-theme", theme);
-  document.getElementById("theme").textContent = theme === "dark" ? "Lys" : "Mørk";
+  try { localStorage.setItem("meme-theme", theme); } catch (e) {}
+  document.getElementById("theme").textContent = theme === "dark" ? "Lyst tema" : "Mørkt tema";
 }
-const query = new URLSearchParams(location.search).get("theme");
-const stored = localStorage.getItem("daytrader-theme");
-const preferred = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-applyTheme(query === "dark" || query === "light" ? query : (stored || preferred));
-document.getElementById("theme").addEventListener("click", () => {
+var stored = null;
+try { stored = localStorage.getItem("meme-theme"); } catch (e) {}
+var query = new URLSearchParams(location.search).get("theme");
+applyTheme(query === "dark" || query === "light" ? query : (stored || "dark"));
+document.getElementById("theme").addEventListener("click", function () {
   applyTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
 });
 </script>
 </body>
 </html>
 """
+
+
+if __name__ == "__main__":  # python -m trader.auth totp
+    import sys
+
+    if len(sys.argv) > 1 and sys.argv[1] == "totp":
+        new_secret = new_totp_secret()
+        print("Sæt denne hemmelige variabel i Railway:")
+        print(f"APP_TOTP_SECRET={new_secret}")
+        print()
+        print("Tilføj den i din godkendelses-app (manuel nøgle eller link):")
+        print(totp_uri(new_secret))
+    else:
+        print("Brug: python -m trader.auth totp")

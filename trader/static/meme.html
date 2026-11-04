@@ -1,0 +1,1877 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Memebot</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%239945ff'/%3E%3Cstop offset='1' stop-color='%2314f195'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='9' fill='url(%23g)'/%3E%3Ctext x='16' y='21.5' text-anchor='middle' font-size='13' font-weight='700' fill='white' font-family='Arial'%3EMB%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f3f5fa; --surface: #ffffff; --surface-2: #f7f8fc; --raised: #eceff6;
+    --border: rgba(16, 22, 45, 0.09); --border-strong: rgba(16, 22, 45, 0.18);
+    --text: #0d1120; --text-2: #424a63; --muted: #636b82;
+    --accent: #7537ee; --accent-2: #0b9c6c; --accent-soft: rgba(117, 55, 238, 0.1);
+    --up: #0a915f; --up-soft: rgba(10, 145, 95, 0.11);
+    --down: #d23350; --down-soft: rgba(210, 51, 80, 0.1);
+    --warn: #a86a0c; --warn-soft: rgba(196, 128, 18, 0.13);
+    --info: #2862cc; --info-soft: rgba(40, 98, 204, 0.1);
+    --glow-1: rgba(153, 69, 255, 0.13); --glow-2: rgba(20, 241, 149, 0.1);
+    --shadow: 0 1px 2px rgba(16, 22, 45, 0.04), 0 8px 28px rgba(16, 22, 45, 0.06);
+    --grad: linear-gradient(135deg, #8a3ffc 0%, #12c98a 100%);
+    --radius: 18px;
+    color-scheme: light;
+  }
+  html[data-theme="dark"] {
+    --bg: #07090e; --surface: #0e121a; --surface-2: #121722; --raised: #1a2030;
+    --border: rgba(255, 255, 255, 0.07); --border-strong: rgba(255, 255, 255, 0.15);
+    --text: #eef1f8; --text-2: #b3bacb; --muted: #8189a0;
+    --accent: #a77bff; --accent-2: #27e3a4; --accent-soft: rgba(167, 123, 255, 0.13);
+    --up: #2fdc9d; --up-soft: rgba(47, 220, 157, 0.12);
+    --down: #ff6680; --down-soft: rgba(255, 102, 128, 0.12);
+    --warn: #ffc15a; --warn-soft: rgba(255, 193, 90, 0.12);
+    --info: #7fb0ff; --info-soft: rgba(127, 176, 255, 0.12);
+    --glow-1: rgba(153, 69, 255, 0.2); --glow-2: rgba(20, 241, 149, 0.09);
+    --shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 12px 40px rgba(0, 0, 0, 0.35);
+    --grad: linear-gradient(135deg, #9945ff 0%, #14f195 100%);
+    color-scheme: dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #07090e; --surface: #0e121a; --surface-2: #121722; --raised: #1a2030;
+      --border: rgba(255, 255, 255, 0.07); --border-strong: rgba(255, 255, 255, 0.15);
+      --text: #eef1f8; --text-2: #b3bacb; --muted: #8189a0;
+      --accent: #a77bff; --accent-2: #27e3a4; --accent-soft: rgba(167, 123, 255, 0.13);
+      --up: #2fdc9d; --up-soft: rgba(47, 220, 157, 0.12);
+      --down: #ff6680; --down-soft: rgba(255, 102, 128, 0.12);
+      --warn: #ffc15a; --warn-soft: rgba(255, 193, 90, 0.12);
+      --info: #7fb0ff; --info-soft: rgba(127, 176, 255, 0.12);
+      --glow-1: rgba(153, 69, 255, 0.2); --glow-2: rgba(20, 241, 149, 0.09);
+      color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; min-height: 100vh; color: var(--text); line-height: 1.5;
+    font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 15px;
+    background:
+      radial-gradient(1100px 520px at 8% -12%, var(--glow-1), transparent 60%),
+      radial-gradient(900px 480px at 100% 0%, var(--glow-2), transparent 55%),
+      var(--bg);
+    background-attachment: fixed;
+  }
+  a { color: inherit; }
+  button, input { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
+  .num { font-variant-numeric: tabular-nums; }
+  .display { font-family: "Space Grotesk", "Inter", sans-serif; letter-spacing: -0.02em; }
+  .up { color: var(--up); }
+  .down { color: var(--down); }
+  .muted { color: var(--muted); }
+  .wrap { width: min(1240px, calc(100% - 32px)); margin: 0 auto; }
+  svg.i { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+  svg.i.sm { width: 15px; height: 15px; }
+
+  /* Topbar */
+  .topbar { position: sticky; top: 0; z-index: 30; backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4); background: color-mix(in srgb, var(--bg) 72%, transparent); border-bottom: 1px solid var(--border); }
+  .topbar .wrap { display: flex; align-items: center; gap: 14px; padding: 12px 0; flex-wrap: wrap; }
+  .logo { width: 38px; height: 38px; border-radius: 11px; background: var(--grad); display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 14px; box-shadow: 0 6px 20px rgba(153, 69, 255, 0.35); }
+  .brand { display: flex; align-items: center; gap: 12px; margin-right: auto; }
+  .brand h1 { margin: 0; font-size: 1.15rem; font-weight: 700; }
+  .brand p { margin: 0; color: var(--muted); font-size: 0.82rem; }
+  .pill { display: inline-flex; align-items: center; gap: 8px; height: 34px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); font-size: 0.86rem; white-space: nowrap; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
+  .dot.ok { background: var(--up); box-shadow: 0 0 0 0 var(--up); animation: pulse 2.2s infinite; }
+  .dot.warn { background: var(--warn); }
+  .dot.bad { background: var(--down); }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--up) 60%, transparent); } 70% { box-shadow: 0 0 0 7px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
+  .mode { font-weight: 700; letter-spacing: 0.06em; font-size: 0.76rem; text-transform: uppercase; }
+  .mode.paper { color: var(--info); border-color: color-mix(in srgb, var(--info) 40%, transparent); background: var(--info-soft); }
+  .mode.live { color: #fff; background: var(--down); border-color: var(--down); animation: livepulse 1.6s infinite; }
+  @keyframes livepulse { 50% { box-shadow: 0 0 0 5px var(--down-soft); } }
+  .icon-btn { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 11px; border: 1px solid var(--border); background: var(--surface); color: var(--text-2); text-decoration: none; }
+  .icon-btn:hover { color: var(--text); border-color: var(--border-strong); }
+  .icon-btn[aria-pressed="true"] { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent); background: var(--accent-soft); }
+
+  /* Kort og grid */
+  main { padding: 18px 0 60px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); min-width: 0; }
+  .card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+  .card h2 { margin: 0; font-size: 1rem; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .card h2 .i { color: var(--accent); }
+  .label { color: var(--muted); font-size: 0.76rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+  .grid { display: grid; gap: 14px; }
+  .hero { grid-template-columns: minmax(0, 2.1fr) minmax(0, 1fr); margin-bottom: 14px; }
+  .big { font-size: clamp(2.2rem, 5vw, 3.2rem); font-weight: 700; line-height: 1.05; margin: 6px 0 10px; }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; }
+  .chip { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 999px; font-size: 0.84rem; font-weight: 600; background: var(--raised); color: var(--text-2); white-space: nowrap; }
+  .chip.up { background: var(--up-soft); color: var(--up); }
+  .chip.down { background: var(--down-soft); color: var(--down); }
+  .chip.warn { background: var(--warn-soft); color: var(--warn); }
+  .chip.info { background: var(--info-soft); color: var(--info); }
+  .chip.accent { background: var(--accent-soft); color: var(--accent); }
+  .seg { display: inline-flex; padding: 3px; border-radius: 11px; background: var(--raised); gap: 2px; }
+  .seg button { border: 0; background: transparent; padding: 4px 11px; border-radius: 8px; font-size: 0.82rem; color: var(--text-2); }
+  .seg button[aria-pressed="true"] { background: var(--surface); color: var(--text); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12); }
+
+  /* Graf */
+  .chart-box { position: relative; margin-top: 8px; }
+  .chart-box svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .axis { fill: var(--muted); font-size: 11px; font-family: "Inter", sans-serif; }
+  .tip { position: absolute; pointer-events: none; background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: 10px; padding: 6px 10px; font-size: 0.82rem; box-shadow: var(--shadow); white-space: nowrap; transform: translate(-50%, -110%); opacity: 0; transition: opacity 0.12s; z-index: 5; }
+  .tip b { display: block; font-size: 0.95rem; }
+
+  /* Mål-ring */
+  .goal { display: flex; flex-direction: column; gap: 12px; }
+  .goal-top { display: flex; gap: 16px; align-items: center; }
+  .ring { position: relative; width: 116px; height: 116px; flex: none; }
+  .ring svg { width: 116px; height: 116px; transform: rotate(-90deg); }
+  .ring .center { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; }
+  .ring .center b { font-size: 1.35rem; display: block; line-height: 1.1; }
+  .rows { display: grid; gap: 6px; font-size: 0.88rem; }
+  .rows div { display: flex; justify-content: space-between; gap: 10px; }
+  .rows span:first-child { color: var(--muted); }
+  .note { font-size: 0.8rem; color: var(--muted); margin: 0; padding: 9px 11px; border-radius: 11px; background: var(--raised); }
+
+  /* KPI */
+  .kpis { grid-template-columns: repeat(6, minmax(0, 1fr)); margin-bottom: 14px; }
+  .kpi { padding: 14px 16px; }
+  .kpi .v { font-size: 1.45rem; font-weight: 700; margin: 4px 0 2px; }
+  .kpi .s { font-size: 0.8rem; color: var(--muted); }
+  .meter { height: 6px; border-radius: 999px; background: var(--raised); overflow: hidden; margin-top: 8px; }
+  .meter i { display: block; height: 100%; background: var(--grad); border-radius: 999px; }
+
+  /* Alerts */
+  .alerts { display: grid; gap: 8px; margin-bottom: 14px; }
+  .alert { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 13px; border: 1px solid var(--border); background: var(--surface); font-size: 0.88rem; }
+  .alert .i { margin-top: 1px; }
+  .alert.info .i { color: var(--info); }
+  .alert.warning { background: var(--warn-soft); border-color: color-mix(in srgb, var(--warn) 30%, transparent); }
+  .alert.warning .i { color: var(--warn); }
+  .alert.error { background: var(--down-soft); border-color: color-mix(in srgb, var(--down) 30%, transparent); }
+  .alert.error .i { color: var(--down); }
+  .alert .x { margin-left: auto; border: 0; background: transparent; color: var(--muted); padding: 0 2px; }
+  .alert-more { border: 0; background: transparent; color: var(--muted); font-size: 0.84rem; padding: 2px 4px; justify-self: start; }
+
+  /* Toolbar og faner */
+  .toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+  .tabs { display: flex; gap: 2px; padding: 4px; border-radius: 14px; background: var(--surface); border: 1px solid var(--border); overflow-x: auto; scrollbar-width: none; max-width: 100%; }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab { border: 0; background: transparent; padding: 7px 10px; border-radius: 10px; color: var(--text-2); font-weight: 500; font-size: 0.9rem; display: inline-flex; gap: 7px; align-items: center; white-space: nowrap; }
+  .tab:hover { color: var(--text); }
+  .tab[aria-selected="true"] { background: var(--accent-soft); color: var(--accent); }
+  .tab .count { background: var(--raised); color: var(--text-2); border-radius: 999px; padding: 0 7px; font-size: 0.75rem; }
+  .tab[aria-selected="true"] .count { background: var(--accent); color: #fff; }
+  .actions { display: flex; gap: 8px; margin-left: auto; flex-wrap: wrap; }
+  .btn { display: inline-flex; align-items: center; gap: 7px; height: 38px; padding: 0 14px; border-radius: 11px; border: 1px solid var(--border-strong); background: var(--surface); font-weight: 600; font-size: 0.88rem; white-space: nowrap; }
+  .btn:hover { border-color: var(--text-2); }
+  .btn.primary { border: 0; color: #fff; background: var(--grad); box-shadow: 0 6px 20px rgba(117, 55, 238, 0.28); }
+  .btn.danger { color: var(--down); border-color: color-mix(in srgb, var(--down) 45%, transparent); }
+  .btn.danger:hover { background: var(--down-soft); }
+  .btn.small { height: 30px; padding: 0 10px; font-size: 0.8rem; border-radius: 9px; }
+  .btn:disabled { opacity: 0.55; cursor: progress; }
+  .panel[hidden] { display: none; }
+
+  /* Oversigt */
+  .overview { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .span-2 { grid-column: span 2; }
+  .row-2 { grid-row: span 2; }
+  .funnel { display: grid; gap: 9px; }
+  .stage { display: grid; grid-template-columns: 150px 1fr 48px; gap: 10px; align-items: center; font-size: 0.88rem; }
+  .stage .bar { height: 26px; border-radius: 8px; background: var(--raised); overflow: hidden; }
+  .stage .bar i { display: block; height: 100%; border-radius: 8px; background: var(--grad); min-width: 2px; transition: width 0.4s ease; }
+  .stage b { text-align: right; }
+  .feed { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; max-height: 520px; overflow-y: auto; }
+  .feed li { display: grid; grid-template-columns: 30px 1fr; gap: 10px; padding: 8px 4px; border-bottom: 1px solid var(--border); font-size: 0.86rem; }
+  .feed li:last-child { border-bottom: 0; }
+  .feed .ico { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; background: var(--raised); color: var(--text-2); }
+  .feed .ico.buy { background: var(--up-soft); color: var(--up); }
+  .feed .ico.sell { background: var(--accent-soft); color: var(--accent); }
+  .feed .ico.warning { background: var(--warn-soft); color: var(--warn); }
+  .feed .ico.error { background: var(--down-soft); color: var(--down); }
+  .feed .when { color: var(--muted); font-size: 0.76rem; }
+  .list { display: grid; gap: 8px; }
+  .list-row { display: grid; grid-template-columns: minmax(110px, 1fr) 2fr 36px 76px; gap: 10px; align-items: center; font-size: 0.86rem; }
+  .list-row .bar { height: 8px; border-radius: 999px; background: var(--raised); overflow: hidden; }
+  .list-row .bar i { display: block; height: 100%; background: var(--accent); border-radius: 999px; }
+  .list-row .r { text-align: right; }
+  .empty { display: grid; place-items: center; text-align: center; gap: 6px; padding: 26px 12px; color: var(--muted); font-size: 0.9rem; }
+  .empty .i { width: 28px; height: 28px; color: var(--accent); opacity: 0.8; }
+  .lesson-hero { font-size: 0.95rem; line-height: 1.55; margin: 0; }
+
+  /* Positioner */
+  .pos-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); }
+  .pos-head { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
+  .sym { font-size: 1.3rem; font-weight: 700; }
+  .pnl-big { font-size: 1.6rem; font-weight: 700; text-align: right; line-height: 1.1; }
+  .links { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+  .links a { font-size: 0.76rem; padding: 2px 8px; border-radius: 999px; background: var(--raised); color: var(--text-2); text-decoration: none; display: inline-flex; gap: 4px; align-items: center; }
+  .links a:hover { color: var(--text); }
+  .range { position: relative; height: 64px; margin: 18px 4px 6px; }
+  .range .track { position: absolute; left: 0; right: 0; top: 22px; height: 8px; border-radius: 999px; background: linear-gradient(90deg, var(--down-soft), var(--raised) 35%, var(--up-soft)); border: 1px solid var(--border); }
+  .range .mk { position: absolute; top: 14px; width: 2px; height: 24px; border-radius: 2px; transform: translateX(-1px); }
+  .range .mk.stop { background: var(--down); }
+  .range .mk.entry { background: var(--muted); }
+  .range .mk.tp { background: var(--up); }
+  .range .mk.trail { background: var(--warn); }
+  .range .mk-l { position: absolute; top: 42px; font-size: 0.7rem; color: var(--muted); transform: translateX(-50%); white-space: nowrap; }
+  .range .peak { position: absolute; top: 2px; transform: translateX(-50%); font-size: 0.7rem; color: var(--text-2); white-space: nowrap; }
+  .range .now { position: absolute; top: 17px; width: 18px; height: 18px; border-radius: 50%; transform: translateX(-50%); border: 3px solid var(--surface); box-shadow: 0 0 0 2px currentColor, 0 0 16px currentColor; background: currentColor; transition: left 0.5s ease; }
+  .stats3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 10px 0; }
+  .stats3 div { background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px; padding: 8px 10px; }
+  .stats3 span { display: block; font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  .stats3 b { font-size: 0.98rem; }
+  .why { font-size: 0.84rem; color: var(--text-2); margin: 8px 0 0; }
+  details > summary { cursor: pointer; color: var(--accent); font-size: 0.84rem; list-style: none; }
+  details > summary::-webkit-details-marker { display: none; }
+
+  /* Tabeller */
+  .filters { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+  .filters button { border: 1px solid var(--border); background: var(--surface-2); border-radius: 999px; padding: 4px 11px; font-size: 0.82rem; color: var(--text-2); display: inline-flex; gap: 6px; align-items: center; }
+  .filters button[aria-pressed="true"] { border-color: color-mix(in srgb, var(--accent) 55%, transparent); background: var(--accent-soft); color: var(--accent); }
+  .filters .n { font-size: 0.74rem; opacity: 0.8; }
+  .search { margin-left: auto; position: relative; }
+  .search input { height: 34px; width: 240px; max-width: 100%; border-radius: 10px; border: 1px solid var(--border); background: var(--surface-2); padding: 0 10px 0 32px; }
+  .search .i { position: absolute; left: 9px; top: 8px; color: var(--muted); }
+  .table-wrap { overflow-x: auto; border-radius: 12px; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+  th { text-align: left; font-size: 0.72rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); font-weight: 600; padding: 8px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; position: sticky; top: 0; background: var(--surface); }
+  td { padding: 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tr.clickable { cursor: pointer; }
+  tr.clickable:hover td { background: var(--surface-2); }
+  tr.detail td { background: var(--surface-2); }
+  .tok { font-weight: 600; }
+  .tok small { display: block; color: var(--muted); font-weight: 400; font-size: 0.76rem; white-space: nowrap; }
+  .score { display: inline-flex; align-items: center; gap: 7px; }
+  .score .bar { width: 46px; height: 6px; border-radius: 999px; background: var(--raised); overflow: hidden; }
+  .score .bar i { display: block; height: 100%; background: var(--accent); }
+  .stage-tag { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 0.76rem; font-weight: 600; white-space: nowrap; background: var(--raised); color: var(--text-2); }
+  .stage-tag.ok { background: var(--up-soft); color: var(--up); }
+  .stage-tag.rug { background: var(--down-soft); color: var(--down); }
+  .stage-tag.claude { background: var(--accent-soft); color: var(--accent); }
+  .stage-tag.risiko, .stage-tag.rute { background: var(--warn-soft); color: var(--warn); }
+  .mini-links { display: inline-flex; gap: 4px; }
+  .mini-links a, .mini-links button { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 8px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-2); text-decoration: none; font-size: 0.68rem; font-weight: 700; }
+  .mini-links a:hover, .mini-links button:hover { color: var(--text); border-color: var(--border-strong); }
+
+  /* Læring */
+  .learn { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); }
+  .timeline { list-style: none; margin: 0; padding: 0 0 0 18px; position: relative; display: grid; gap: 12px; max-height: 640px; overflow-y: auto; }
+  .timeline::before { content: ""; position: absolute; left: 5px; top: 6px; bottom: 6px; width: 2px; background: var(--border); }
+  .timeline li { position: relative; font-size: 0.88rem; }
+  .timeline li::before { content: ""; position: absolute; left: -18px; top: 6px; width: 12px; height: 12px; border-radius: 50%; background: var(--surface); border: 2px solid var(--muted); }
+  .timeline li.claude::before { border-color: var(--accent); background: var(--accent); }
+  .timeline li.parameter::before { border-color: var(--warn); }
+  .timeline li.handel::before { border-color: var(--accent-2); }
+  .timeline .meta { display: flex; gap: 8px; align-items: center; color: var(--muted); font-size: 0.76rem; margin-bottom: 2px; }
+  .weights { display: grid; gap: 7px; }
+  .weight { display: grid; grid-template-columns: minmax(120px, 1.2fr) 1fr 52px; gap: 10px; align-items: center; font-size: 0.84rem; }
+  .wbar { position: relative; height: 10px; border-radius: 999px; background: var(--raised); }
+  .wbar .zero { position: absolute; left: 50%; top: -3px; bottom: -3px; width: 1px; background: var(--border-strong); }
+  .wbar .fill { position: absolute; top: 0; bottom: 0; border-radius: 999px; }
+  .wbar .start { position: absolute; top: -4px; bottom: -4px; width: 2px; border-radius: 2px; background: var(--text); opacity: 0.4; }
+  .weight .r { text-align: right; }
+  .changed { color: var(--accent); font-weight: 700; }
+
+  /* Wallets og krav */
+  .addform { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+  .addform input, .unlock input { flex: 1 1 280px; height: 40px; border-radius: 11px; border: 1px solid var(--border-strong); background: var(--surface-2); padding: 0 12px; }
+  .wallet-row { display: grid; grid-template-columns: minmax(0, 1.4fr) repeat(3, minmax(60px, 0.6fr)) auto; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 0.86rem; }
+  .wallet-row:last-child { border-bottom: 0; }
+  .addr { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.82rem; }
+  .steps { display: grid; gap: 8px; margin: 12px 0; }
+  .step { display: grid; grid-template-columns: 26px 1fr auto; gap: 10px; align-items: center; padding: 10px 12px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--border); font-size: 0.88rem; }
+  .step .ck { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--raised); color: var(--muted); }
+  .step.ok .ck { background: var(--up-soft); color: var(--up); }
+  .step em { font-style: normal; color: var(--muted); font-size: 0.82rem; text-align: right; overflow-wrap: anywhere; }
+  .unlock { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.82em; background: var(--raised); padding: 2px 6px; border-radius: 6px; }
+  .kv { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; }
+  .kv div { padding: 10px 12px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--border); }
+  .kv span { display: block; font-size: 0.74rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  .kv b { font-weight: 600; font-size: 0.9rem; overflow-wrap: anywhere; }
+  kbd { font-family: ui-monospace, Menlo, monospace; font-size: 0.78rem; padding: 1px 6px; border-radius: 6px; border: 1px solid var(--border-strong); background: var(--surface-2); }
+
+  /* Sniper */
+  .switch { position: relative; width: 46px; height: 26px; border-radius: 999px; border: 1px solid var(--border-strong); background: var(--raised); padding: 0; flex: none; }
+  .switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: var(--muted); transition: transform 0.2s, background 0.2s; }
+  .switch[aria-checked="true"] { background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
+  .switch[aria-checked="true"]::after { transform: translateX(20px); background: var(--accent); }
+  .sn-grid { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); }
+  .mini-stats { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
+  .mini-stats div { background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; }
+  .mini-stats > div > span { display: block; font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  .mini-stats b { font-size: 1.1rem; }
+  .target-big { font-size: clamp(2.4rem, 6vw, 3.4rem); font-weight: 700; line-height: 1; background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .presets { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0; }
+  .presets button { border: 1px solid var(--border); background: var(--surface-2); border-radius: 999px; padding: 4px 12px; font-size: 0.84rem; font-weight: 600; color: var(--text-2); }
+  .presets button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); border-color: color-mix(in srgb, var(--accent) 50%, transparent); }
+  .field { display: grid; gap: 7px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .field:last-child { border-bottom: 0; }
+  .field-top { display: flex; justify-content: space-between; gap: 10px; align-items: center; font-size: 0.88rem; }
+  .field-top b { font-size: 1rem; }
+  .field input[type="range"] { width: 100%; accent-color: var(--accent); }
+  .field input[type="number"] { width: 130px; height: 36px; border-radius: 10px; border: 1px solid var(--border-strong); background: var(--surface-2); padding: 0 10px; }
+  .field .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 0.84rem; }
+  .preview { margin-top: 14px; padding: 12px 14px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--border); font-size: 0.88rem; display: grid; gap: 5px; }
+  .preview .row { display: flex; justify-content: space-between; gap: 12px; }
+  .savebar { display: flex; gap: 8px; align-items: center; justify-content: flex-end; flex-wrap: wrap; }
+  .dirty { color: var(--warn); font-size: 0.86rem; margin-right: auto; display: inline-flex; gap: 6px; align-items: center; }
+
+  .grid-table td.cell { text-align: center; font-variant-numeric: tabular-nums; border-radius: 8px; }
+  .grid-table td.cell b { display: block; }
+  .grid-table td.cell small { color: var(--muted); }
+  .grid-table td.best { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .grid-table td.current { box-shadow: inset 0 0 0 2px var(--border-strong); }
+  pre.report { white-space: pre-wrap; font-family: inherit; font-size: 0.88rem; background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px; padding: 12px; margin: 10px 0 0; }
+  .check-row { display: grid; grid-template-columns: 26px 1fr auto; gap: 10px; align-items: start; padding: 9px 0; border-bottom: 1px solid var(--border); font-size: 0.88rem; }
+  .check-row:last-child { border-bottom: 0; }
+  .check-row .ck { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--down-soft); color: var(--down); }
+  .check-row.ok .ck { background: var(--up-soft); color: var(--up); }
+  .check-row.optional:not(.ok) .ck { background: var(--warn-soft); color: var(--warn); }
+  .check-row .hint { color: var(--warn); font-size: 0.82rem; margin-top: 2px; }
+
+  /* Toasts */
+  .toasts { position: fixed; right: 16px; bottom: 16px; display: grid; gap: 8px; z-index: 50; width: min(360px, calc(100% - 32px)); }
+  .toast { display: grid; grid-template-columns: 34px 1fr; gap: 10px; align-items: center; padding: 12px 14px; border-radius: 14px; background: var(--surface); border: 1px solid var(--border-strong); box-shadow: 0 14px 40px rgba(0, 0, 0, 0.3); animation: slidein 0.25s ease; font-size: 0.88rem; }
+  .toast .ico { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); }
+  .toast.up .ico { background: var(--up-soft); color: var(--up); }
+  .toast.down .ico { background: var(--down-soft); color: var(--down); }
+  .toast b { display: block; }
+  @keyframes slidein { from { transform: translateY(12px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+  footer { color: var(--muted); font-size: 0.8rem; text-align: center; padding: 10px 0 30px; }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+  @media (max-width: 1080px) {
+    .kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .overview { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .row-2 { grid-row: auto; }
+  }
+  @media (max-width: 820px) {
+    .hero, .learn, .overview { grid-template-columns: minmax(0, 1fr); }
+    .span-2 { grid-column: auto; }
+    .actions { margin-left: 0; }
+    .brand p { display: none; }
+    .search { margin-left: 0; width: 100%; }
+    .search input { width: 100%; }
+    .wallet-row { grid-template-columns: 1fr 1fr; }
+    .sn-grid { grid-template-columns: minmax(0, 1fr); }
+    .mini-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  }
+  @media (max-width: 560px) {
+    .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .stage { grid-template-columns: 104px 1fr 40px; }
+    .pos-grid { grid-template-columns: minmax(0, 1fr); }
+    .goal-top { flex-direction: column; align-items: flex-start; }
+    .list-row { grid-template-columns: 1fr 1fr 30px 64px; }
+    .hide-sm { display: none; }
+    .mini-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="wrap">
+    <div class="brand">
+      <div class="logo" aria-hidden="true">MB</div>
+      <div>
+        <h1>Memebot</h1>
+        <p>Solana · rug-tjek · X-research · copy-trading · læring</p>
+      </div>
+    </div>
+    <span class="pill" id="status-pill"><span class="dot" id="status-dot"></span><span id="status-text">Forbinder…</span></span>
+    <span class="pill mode paper" id="mode-pill">Papir</span>
+    <span class="pill num hide-sm" id="sol-pill">SOL —</span>
+    <button class="icon-btn" id="notify" type="button" aria-pressed="false" title="Notifikationer i browseren" aria-label="Notifikationer"></button>
+    <button class="icon-btn" id="theme" type="button" title="Skift tema" aria-label="Skift tema"></button>
+    <a class="icon-btn" href="/" title="Aktie-daytrader" aria-label="Aktie-daytrader" id="stocks-link"></a>
+    <button class="icon-btn" id="logout" type="button" title="Log ud" aria-label="Log ud" hidden></button>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="alerts" id="alerts"></div>
+
+  <section class="grid hero">
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <div class="label">Egenkapital</div>
+          <div class="big display num" id="equity">—</div>
+          <div class="chips" id="equity-chips"></div>
+        </div>
+        <div class="seg" role="group" aria-label="Tidsrum" id="range">
+          <button type="button" data-range="24h" aria-pressed="true">24 t</button>
+          <button type="button" data-range="7d" aria-pressed="false">7 d</button>
+          <button type="button" data-range="all" aria-pressed="false">Alt</button>
+        </div>
+      </div>
+      <div class="chart-box" id="equity-chart"><div class="tip" id="equity-tip"></div><div id="equity-svg"></div></div>
+    </div>
+    <div class="card goal" id="goal"></div>
+  </section>
+
+  <section class="grid kpis" id="kpis"></section>
+
+  <div class="toolbar">
+    <nav class="tabs" role="tablist" aria-label="Sektioner" id="tabs"></nav>
+    <div class="actions">
+      <button class="btn primary" id="scan" type="button"></button>
+      <button class="btn" id="pause" type="button"></button>
+      <button class="btn danger" id="kill" type="button"></button>
+    </div>
+  </div>
+
+  <section class="panel grid overview" id="panel-oversigt" role="tabpanel">
+    <div class="card span-2">
+      <div class="card-head"><h2 id="funnel-title"></h2><span class="muted" id="funnel-when"></span></div>
+      <div class="funnel" id="funnel"></div>
+      <div class="chips" id="funnel-errors" style="margin-top:12px"></div>
+    </div>
+    <div class="card row-2">
+      <div class="card-head"><h2 id="feed-title"></h2></div>
+      <ul class="feed" id="feed"></ul>
+    </div>
+    <div class="card">
+      <div class="card-head"><h2 id="daily-title"></h2><span class="muted">pr. dag (UTC)</span></div>
+      <div class="chart-box" id="daily-box"><div class="tip" id="daily-tip"></div><div id="daily"></div></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h2 id="exits-title"></h2></div>
+      <div class="list" id="exits"></div>
+    </div>
+    <div class="card span-2">
+      <div class="card-head"><h2 id="open-title"></h2><button class="btn small" type="button" data-goto="positioner">Se alle</button></div>
+      <div id="open-mini"></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h2 id="lesson-title"></h2><button class="btn small" type="button" data-goto="laering">Mere</button></div>
+      <div id="lesson-latest"></div>
+    </div>
+  </section>
+
+  <section class="panel" id="panel-positioner" role="tabpanel" hidden>
+    <div class="pos-grid" id="positions"></div>
+  </section>
+
+  <section class="panel grid" id="panel-sniper" role="tabpanel" hidden>
+    <div class="card">
+      <div class="card-head">
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><h2 id="sniper-title"></h2><button class="switch" id="sniper-switch" type="button" role="switch" aria-checked="false" aria-label="Sniper til eller fra"></button><span class="muted" id="sniper-state" style="font-size:0.88rem"></span></div>
+        <span class="muted" id="sniper-when" style="font-size:0.86rem"></span>
+      </div>
+      <div class="mini-stats num" id="sniper-stats"></div>
+      <div class="chips" id="sniper-scan" style="margin-top:12px"></div>
+    </div>
+    <div class="grid sn-grid">
+      <div class="card">
+        <div class="card-head"><h2 id="sniper-goal-title"></h2><span class="muted" style="font-size:0.84rem">Gælder også åbne snipes</span></div>
+        <div id="sniper-goal"></div>
+        <div class="preview num" id="sniper-preview"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2 id="sniper-filter-title"></h2><span class="chip warn">læring = kan strammes automatisk</span></div>
+        <div id="sniper-filters"></div>
+      </div>
+    </div>
+    <div class="card savebar">
+      <span class="dirty" id="sniper-dirty" hidden></span>
+      <button class="btn" type="button" id="sniper-reset">Nulstil til standard</button>
+      <button class="btn primary" type="button" id="sniper-save">Gem indstillinger</button>
+    </div>
+    <div class="card">
+      <div class="card-head"><h2 id="opt-title"></h2><span class="muted" id="opt-note" style="font-size:0.86rem"></span></div>
+      <div id="opt"></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h2 id="sniper-seen-title"></h2><span class="muted" style="font-size:0.86rem">Helt nye tokens, og hvorfor de blev købt eller sprunget over</span></div>
+      <div class="table-wrap" id="sniper-seen"></div>
+    </div>
+  </section>
+
+  <section class="panel card" id="panel-radar" role="tabpanel" hidden>
+    <div class="card-head"><h2 id="radar-title"></h2><span class="muted">Alle tokens botten har set på, og hvor de faldt fra</span></div>
+    <div class="filters"><div id="radar-filters" style="display:contents"></div><label class="search"><svg class="i sm" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><input id="radar-search" type="search" placeholder="Søg symbol eller adresse" aria-label="Søg i radaren"></label></div>
+    <div class="table-wrap" id="radar"></div>
+  </section>
+
+  <section class="panel card" id="panel-journal" role="tabpanel" hidden>
+    <div class="card-head"><h2 id="journal-title"></h2><div class="chips" id="journal-sum"></div></div>
+    <div class="filters" id="journal-filters"></div>
+    <div class="table-wrap" id="journal"></div>
+  </section>
+
+  <section class="panel grid learn" id="panel-laering" role="tabpanel" hidden>
+    <div class="card">
+      <div class="card-head"><h2 id="lessons-title"></h2></div>
+      <ul class="timeline" id="lessons"></ul>
+    </div>
+    <div class="grid" style="align-content:start">
+      <div class="card">
+        <div class="card-head"><h2 id="weights-title"></h2><span class="muted" id="weights-note"></span></div>
+        <div class="weights" id="weights"></div>
+        <p class="muted" style="font-size:0.8rem;margin:12px 0 0">Grøn trækker mod køb, rød trækker væk. Den lodrette streg er startværdien.</p>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2 id="sources-title"></h2></div>
+        <div class="table-wrap" id="sources"></div>
+      </div>
+    </div>
+    <div class="card" style="grid-column:1/-1">
+      <div class="card-head"><h2 id="shadow-title"></h2><span class="muted" id="shadow-note" style="font-size:0.86rem"></span></div>
+      <p class="muted" style="margin:0 0 12px;font-size:0.88rem">Botten følger kursen på tokens, den afviste, i 6 timer og regner ud, hvad der ville være sket med dens egne salgsregler. Så lærer den også af de chancer, den gik glip af, og ser, om filtrene rammer rigtigt.</p>
+      <div class="table-wrap" id="shadow-summary"></div>
+      <details style="margin-top:12px"><summary>Seneste skyggehandler</summary><div class="table-wrap" id="shadow-recent" style="margin-top:10px"></div></details>
+    </div>
+    <div class="card" style="grid-column:1/-1">
+      <div class="card-head"><h2 id="params-title"></h2><span class="muted">Læringen må kun flytte dem inden for grænserne</span></div>
+      <div class="table-wrap" id="params"></div>
+    </div>
+  </section>
+
+  <section class="panel grid" id="panel-wallets" role="tabpanel" hidden>
+    <div class="grid sn-grid">
+      <div class="card">
+        <div class="card-head"><h2 id="botw-title"></h2><span class="chip" id="botw-chip"></span></div>
+        <div id="botw"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2 id="ph-title"></h2><span class="chip" id="ph-chip"></span></div>
+        <div id="ph"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h2 id="wallets-title"></h2></div>
+      <p class="muted" style="margin:0 0 12px;font-size:0.88rem">Find dygtige traders på fx GMGN, Birdeye eller Kolscan og tjek selv deres historik. Botten kopierer kun nye køb, og kun hvis tokenet består alle tjek. Wallets, der giver tab over tid, bliver slået fra automatisk.</p>
+      <form class="addform" id="wallet-form">
+        <input id="wallet-input" placeholder="Solana-adresse på en wallet, du vil følge" autocomplete="off" spellcheck="false" aria-label="Wallet-adresse">
+        <button class="btn primary" type="submit" id="wallet-add"></button>
+      </form>
+      <details style="margin:-4px 0 14px"><summary>Indsæt mange adresser på én gang (fx fra Axioms wallet tracker)</summary>
+        <form class="addform" id="bulk-form" style="margin-top:10px">
+          <textarea id="bulk-input" rows="4" placeholder="Én adresse pr. linje" spellcheck="false" aria-label="Flere wallet-adresser" style="flex:1 1 100%;border-radius:11px;border:1px solid var(--border-strong);background:var(--surface-2);padding:10px 12px;font:inherit;font-family:ui-monospace,Menlo,monospace;font-size:0.82rem"></textarea>
+          <button class="btn" type="submit">Importér</button>
+        </form>
+      </details>
+      <div id="wallets"></div>
+    </div>
+    <div class="grid sn-grid">
+      <div class="card">
+        <div class="card-head"><h2 id="axiom-title"></h2></div>
+        <div id="axiom"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2 id="blocked-title"></h2></div>
+        <div id="blocked"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel grid" id="panel-krav" role="tabpanel" hidden>
+    <div class="card">
+      <div class="card-head"><h2 id="unlock-title"></h2><span class="chip" id="unlock-progress"></span></div>
+      <p class="muted" style="margin:0;font-size:0.88rem">Botten må først handle med rigtige penge, når papirhandel med rigtige kurser har vist overskud. Alle krav tjekkes i koden, ikke kun her.</p>
+      <div class="meter"><i id="unlock-meter" style="width:0%"></i></div>
+      <div class="steps" id="steps"></div>
+      <form class="unlock" id="unlock-form">
+        <label for="phrase" style="flex-basis:100%;font-size:0.88rem">Skriv præcis: <code id="phrase-label"></code></label>
+        <input id="phrase" autocomplete="off" spellcheck="false" placeholder="Bekræftelsessætning">
+        <button class="btn" type="submit">Slå rigtige penge til</button>
+        <button class="btn danger" type="button" id="to-paper" hidden>Tilbage til papirpenge</button>
+      </form>
+      <p class="muted" id="unlock-msg" role="status" style="font-size:0.88rem"></p>
+    </div>
+    <div class="card">
+      <div class="card-head"><h2 id="settings-title"></h2><span class="muted">Ændres i miljøvariablerne. Nøgler vises aldrig.</span></div>
+      <div class="kv" id="settings"></div>
+    </div>
+    <div class="grid sn-grid">
+      <div class="card">
+        <div class="card-head"><h2 id="diag-title"></h2><button class="btn small primary" type="button" id="diag-run"></button></div>
+        <div id="diag"></div>
+      </div>
+      <div class="grid" style="align-content:start">
+        <div class="card"><div class="card-head"><h2 id="sec-title"></h2><span class="chip" id="sec-chip"></span></div><div id="sec"></div></div>
+        <div class="card"><div class="card-head"><h2 id="exec-title"></h2></div><div class="kv" id="exec"></div></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h2 id="tg-title"></h2><button class="btn small" type="button" id="report-now">Vis dagsrapport nu</button></div>
+      <div id="tg"></div>
+      <pre class="report" id="report-text" hidden></pre>
+    </div>
+    <div class="card">
+      <div class="card-head"><h2 id="keys-title"></h2></div>
+      <div class="kv">
+        <div><span>Skift fane</span><b><kbd>1</kbd> – <kbd>8</kbd></b></div>
+        <div><span>Scan nu</span><b><kbd>S</kbd></b></div>
+        <div><span>Pause / fortsæt køb</span><b><kbd>P</kbd></b></div>
+        <div><span>Søg i radaren</span><b><kbd>/</kbd></b></div>
+        <div><span>Skift tema</span><b><kbd>T</kbd></b></div>
+      </div>
+    </div>
+  </section>
+
+  <footer>Memecoins er ekstremt risikable, og de fleste nye tokens går mod nul. Papirresultater er ingen garanti. Sæt kun penge ind, du kan tåle at tabe.</footer>
+</main>
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<script>
+"use strict";
+const ICONS = {
+  bell: '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
+  bellOff: '<path d="M8.7 3A6 6 0 0 1 18 8a21.3 21.3 0 0 0 .6 5"/><path d="M17 17H3s3-2 3-9a4.67 4.67 0 0 1 .3-1.7"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/><path d="m2 2 20 20"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>',
+  moon: '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
+  logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/>',
+  stocks: '<path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/>',
+  scan: '<path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/>',
+  pause: '<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>',
+  play: '<path d="m6 4 14 8-14 8Z"/>',
+  stop: '<path d="M7.86 2h8.28L22 7.86v8.28L16.14 22H7.86L2 16.14V7.86Z"/><path d="M12 8v4M12 16h.01"/>',
+  ext: '<path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
+  copy: '<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
+  ban: '<circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/>',
+  upr: '<path d="M7 17 17 7"/><path d="M7 7h10v10"/>',
+  downr: '<path d="m7 7 10 10"/><path d="M17 7v10H7"/>',
+  info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>',
+  alert: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4M12 17h.01"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
+  x: '<path d="M18 6 6 18M6 6l12 12"/>',
+  plus: '<circle cx="12" cy="12" r="10"/><path d="M8 12h8M12 8v8"/>',
+  minus: '<circle cx="12" cy="12" r="10"/><path d="M8 12h8"/>',
+  spark: '<path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/><circle cx="12" cy="12" r="3"/>',
+  wallet: '<path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/>',
+  funnel: '<path d="M3 4h18l-7 8.5V19l-4 2v-8.5Z"/>',
+  activity: '<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',
+  bars: '<path d="M3 3v18h18"/><rect x="7" y="10" width="3" height="7" rx="1"/><rect x="13" y="6" width="3" height="11" rx="1"/>',
+  door: '<path d="M13 4h3a2 2 0 0 1 2 2v14"/><path d="M2 20h3"/><path d="M13 20h9"/><path d="M10 12v.01"/><path d="M13 4.56v16.88a.5.5 0 0 1-.62.49L5.76 20.3A1 1 0 0 1 5 19.32V5.6a1 1 0 0 1 .76-.97l6.62-1.56a.5.5 0 0 1 .62.49Z"/>',
+  coins: '<circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18"/><path d="M7 6h1v4"/>',
+  radar: '<path d="M19.07 4.93A10 10 0 0 0 6.99 3.34"/><path d="M4 6h.01"/><path d="M2.29 9.62A10 10 0 1 0 21.31 8.35"/><path d="M16.24 7.76A6 6 0 1 0 8.23 16.67"/><path d="M12 18h.01"/><path d="M17.99 11.66A6 6 0 0 1 15.77 16.67"/><circle cx="12" cy="12" r="2"/><path d="m13.41 10.59 5.66-5.66"/>',
+  book: '<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2Z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7Z"/>',
+  brain: '<path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/><path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/><path d="M12 5v13"/>',
+  shield: '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1Z"/>',
+  grid: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
+  keyboard: '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M6 9h.01M10 9h.01M14 9h.01M18 9h.01M6 13h.01M18 13h.01M8 17h8"/>',
+  sliders: '<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M2 14h4M10 8h4M18 16h4"/>',
+  search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+  target: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+  plug: '<path d="M12 22v-5"/><path d="M9 8V2"/><path d="M15 8V2"/><path d="M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8Z"/>',
+  lock: '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+  zap: '<path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/>',
+  chat: '<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>',
+  ghost: '<path d="M9 10h.01M15 10h.01"/><path d="M12 2a8 8 0 0 0-8 8v12l3-3 2.5 2.5L12 19l2.5 2.5L17 19l3 3V10a8 8 0 0 0-8-8z"/>',
+  send: '<path d="M14.5 21.7a.5.5 0 0 0 .9-.1l6.5-19a.5.5 0 0 0-.6-.6l-19 6.5a.5.5 0 0 0-.1.9l7.9 3.2a2 2 0 0 1 1.1 1.1Z"/><path d="m21.9 2.1-10.9 10.9"/>',
+  down: '<path d="M12 5v14"/><path d="m19 12-7 7-7-7"/>',
+  link: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
+  save: '<path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/><path d="M7 3v4a1 1 0 0 0 1 1h7"/>',
+};
+function icon(name, cls) { return `<svg class="i${cls ? " " + cls : ""}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ""}</svg>`; }
+
+const TABS = [
+  ["oversigt", "Oversigt", "grid"],
+  ["positioner", "Positioner", "coins"],
+  ["sniper", "Sniper", "target"],
+  ["radar", "Radar", "radar"],
+  ["journal", "Journal", "book"],
+  ["laering", "Læring", "brain"],
+  ["wallets", "Wallet", "wallet"],
+  ["krav", "Indstillinger", "shield"],
+];
+const STAGES = { "købt": "Købt", sniper: "Sniper-filter", marked: "Markedsfilter", rug: "Rug-tjek", score: "Score", rute: "Exit-rute", claude: "Claude", risiko: "Risiko", "køb": "Køb fejlede" };
+const STAGE_CLASS = { "købt": "ok", rug: "rug", claude: "claude", risiko: "risiko", rute: "rute", sniper: "risiko" };
+const KIND = { handel: "Handel", parameter: "Parameter", claude: "Claude", skygge: "Skyggehandel" };
+const VERDICT = { missed: ["Misset chance", "up"], dodged: ["Godt valgt", "info"], neutral: ["Neutral", ""], taken: ["Købt", "accent"] };
+
+const fmtMoney = new Intl.NumberFormat("da-DK", { style: "currency", currency: "USD", currencyDisplay: "narrowSymbol", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmtMoney4 = new Intl.NumberFormat("da-DK", { style: "currency", currency: "USD", currencyDisplay: "narrowSymbol", minimumFractionDigits: 2, maximumFractionDigits: 4 });
+const fmtPct = new Intl.NumberFormat("da-DK", { style: "percent", minimumFractionDigits: 0, maximumFractionDigits: 1 });
+const fmtNum = new Intl.NumberFormat("da-DK", { maximumFractionDigits: 2 });
+const fmtInt = new Intl.NumberFormat("da-DK", { maximumFractionDigits: 0 });
+
+let state = null;
+let active = "oversigt";
+let range = "24h";
+let radarStage = "alle";
+let radarQuery = "";
+let journalFilter = "alle";
+const expanded = new Set();
+const dismissed = new Set();
+let showAllAlerts = false;
+let seenOpen = null;
+let seenClosed = null;
+let countdown = 0;
+let countdownBase = 0;
+let pollFailed = false;
+const cache = {};
+const charts = { equity: null, daily: null };
+
+const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const isNum = (v) => v != null && !Number.isNaN(Number(v));
+const money = (v) => (isNum(v) ? fmtMoney.format(Number(v)) : "—");
+const money4 = (v) => (isNum(v) ? fmtMoney4.format(Number(v)) : "—");
+const signed = (v) => (isNum(v) ? (Number(v) > 0 ? "+" : "") + fmtMoney.format(Number(v)) : "—");
+const pct = (v) => (isNum(v) ? fmtPct.format(Number(v)) : "—");
+const spct = (v) => (isNum(v) ? (Number(v) > 0 ? "+" : "") + fmtPct.format(Number(v)) : "—");
+const tone = (v) => (!isNum(v) || Number(v) === 0 ? "" : Number(v) > 0 ? "up" : "down");
+const short = (a) => (a ? a.slice(0, 4) + "…" + a.slice(-4) : "");
+const safeMint = (m) => (/^[1-9A-HJ-NP-Za-km-z]{20,64}$/.test(m || "") ? m : "");
+function stamp(v) { if (!v) return "—"; const d = new Date(v); return Number.isNaN(d.getTime()) ? String(v) : d.toLocaleString("da-DK", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }); }
+function ago(v) {
+  if (!v) return "—";
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return String(v);
+  const s = Math.round((Date.now() - d.getTime()) / 1000);
+  if (s < 45) return "lige nu";
+  if (s < 3600) return `for ${Math.round(s / 60)} min. siden`;
+  if (s < 86400) return `for ${Math.round(s / 3600)} t. siden`;
+  return stamp(v);
+}
+function minutes(m) {
+  if (!isNum(m)) return "—";
+  const v = Math.round(Number(m));
+  if (v < 60) return `${v} min.`;
+  const h = Math.floor(v / 60), r = v % 60;
+  return r ? `${h} t. ${r} min.` : `${h} t.`;
+}
+function put(id, html) {
+  if (cache[id] === html) return;
+  cache[id] = html;
+  document.getElementById(id).innerHTML = html;
+}
+function empty(text, ic) { return `<div class="empty">${icon(ic || "spark")}<span>${esc(text)}</span></div>`; }
+function tokenLinks(mint, pairUrl) {
+  const m = safeMint(mint);
+  if (!m) return "";
+  const dex = pairUrl && /^https:\/\/dexscreener\.com\//.test(pairUrl) ? pairUrl : `https://dexscreener.com/solana/${m}`;
+  return `<span class="mini-links">
+    <a href="${esc(dex)}" target="_blank" rel="noopener noreferrer" title="Graf på DexScreener">DS</a>
+    <a href="https://rugcheck.xyz/tokens/${m}" target="_blank" rel="noopener noreferrer" title="Rapport på RugCheck">RC</a>
+    <a href="https://solscan.io/token/${m}" target="_blank" rel="noopener noreferrer" title="Token på Solscan">SS</a>
+    <a href="https://x.com/search?q=${m}&amp;f=live" target="_blank" rel="noopener noreferrer" title="Søg på X">X</a>
+    ${axiomLink(m, pairUrl)}
+  </span>`;
+}
+function axiomLink(mint, pairUrl) {
+  const tpl = state && state.settings && state.settings.axiom_link;
+  if (!tpl || !/^https:\/\//.test(tpl)) return "";
+  const fromUrl = pairUrl && /^https:\/\/dexscreener\.com\/solana\//.test(pairUrl) ? pairUrl.split("/").pop().split("?")[0] : "";
+  const pair = safeMint(fromUrl) || mint;
+  const url = tpl.replace("{pair}", encodeURIComponent(pair)).replace("{mint}", encodeURIComponent(mint));
+  return `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer" title="Åbn i Axiom">AX</a>`;
+}
+
+/* ---------- Tema og faner ---------- */
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  try { localStorage.setItem("meme-theme", theme); } catch (e) {}
+  document.getElementById("theme").innerHTML = icon(theme === "dark" ? "sun" : "moon");
+  for (const key of Object.keys(cache)) delete cache[key];
+  if (state) render(state);
+}
+function setTab(name, push) {
+  if (!TABS.some(([id]) => id === name)) name = "oversigt";
+  active = name;
+  if (name === "wallets") refreshWallet(true);
+  for (const [id] of TABS) {
+    const panel = document.getElementById("panel-" + id);
+    panel.hidden = id !== name;
+  }
+  document.querySelectorAll(".tab").forEach((b) => b.setAttribute("aria-selected", b.dataset.tab === name ? "true" : "false"));
+  if (push && location.hash !== "#" + name) history.replaceState(null, "", "#" + name);
+}
+function renderTabs(data) {
+  const counts = { positioner: (data.positions || []).length, sniper: data.sniper ? data.sniper.stats.open : 0, journal: data.kpis.trades, wallets: (data.copy_wallets || []).length };
+  const html = TABS.map(([id, label, ic], i) => `<button class="tab" role="tab" type="button" data-tab="${id}" aria-selected="${id === active}" title="Tast ${i + 1}">${icon(ic, "sm")}${esc(label)}${counts[id] ? `<span class="count">${counts[id]}</span>` : ""}</button>`).join("");
+  put("tabs", html);
+}
+
+/* ---------- Grafer ---------- */
+function equityChart(points, bankroll) {
+  const box = document.getElementById("equity-svg");
+  if (!points || points.length < 2) {
+    charts.equity = null;
+    put("equity-svg", empty("Kurven tegnes, når botten har kørt lidt. Der gemmes et punkt hvert 5. minut.", "activity"));
+    return;
+  }
+  const w = Math.max(320, box.clientWidth || 760), h = 250, pl = 58, pr = 10, pt = 12, pb = 26;
+  const vals = points.map((p) => Number(p.equity));
+  let min = Math.min(...vals, bankroll), max = Math.max(...vals, bankroll);
+  if (max - min < 0.4) { min -= 0.2; max += 0.2; }
+  const pad = (max - min) * 0.12; min -= pad; max += pad;
+  const t0 = new Date(points[0].ts).getTime(), t1 = new Date(points[points.length - 1].ts).getTime();
+  const span = Math.max(1, t1 - t0);
+  const iw = w - pl - pr, ih = h - pt - pb;
+  const x = (p) => pl + ((new Date(p.ts).getTime() - t0) / span) * iw;
+  const y = (v) => pt + ((max - v) / (max - min)) * ih;
+  const last = vals[vals.length - 1];
+  const color = last >= bankroll ? "var(--up)" : "var(--down)";
+  const line = points.map((p, i) => `${i ? "L" : "M"}${x(p).toFixed(1)},${y(Number(p.equity)).toFixed(1)}`).join(" ");
+  const area = `${line} L${(pl + iw).toFixed(1)},${(pt + ih).toFixed(1)} L${pl},${(pt + ih).toFixed(1)} Z`;
+  const grid = [0, 0.5, 1].map((s) => { const v = min + (max - min) * (1 - s); const yy = y(v).toFixed(1); return `<line x1="${pl}" x2="${w - pr}" y1="${yy}" y2="${yy}" stroke="var(--border)"/><text class="axis num" x="${pl - 8}" y="${(Number(yy) + 4).toFixed(1)}" text-anchor="end">${esc(money(v))}</text>`; }).join("");
+  const by = y(bankroll).toFixed(1);
+  const t = (ms) => new Date(ms).toLocaleString("da-DK", range === "24h" ? { hour: "2-digit", minute: "2-digit" } : { day: "2-digit", month: "short" });
+  const html = `<svg viewBox="0 0 ${w} ${h}" role="img" aria-label="Egenkapital over tid, fra ${esc(money(vals[0]))} til ${esc(money(last))}">
+    <defs><linearGradient id="eqfill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${color}" stop-opacity="0.28"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>
+    ${grid}
+    <line x1="${pl}" x2="${w - pr}" y1="${by}" y2="${by}" stroke="var(--muted)" stroke-dasharray="4 5" opacity="0.7"/>
+    <text class="axis" x="${w - pr}" y="${Number(by) - 6}" text-anchor="end">start ${esc(money(bankroll))}</text>
+    <path d="${area}" fill="url(#eqfill)"/>
+    <path d="${line}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+    <circle cx="${x(points[points.length - 1]).toFixed(1)}" cy="${y(last).toFixed(1)}" r="4.5" fill="${color}" stroke="var(--surface)" stroke-width="2"/>
+    <line id="eq-cross" x1="0" x2="0" y1="${pt}" y2="${pt + ih}" stroke="var(--border-strong)" opacity="0"/>
+    <circle id="eq-dot" r="5" fill="${color}" stroke="var(--surface)" stroke-width="2" opacity="0"/>
+    <text class="axis" x="${pl}" y="${h - 6}">${esc(t(t0))}</text>
+    <text class="axis" x="${w - pr}" y="${h - 6}" text-anchor="end">${esc(t(t1))}</text>
+    <rect id="eq-hit" x="${pl}" y="${pt}" width="${iw}" height="${ih}" fill="transparent"/>
+  </svg>`;
+  charts.equity = { points, x, y, w, pl, iw };
+  put("equity-svg", html);
+}
+function bindEquityHover() {
+  const box = document.getElementById("equity-chart");
+  const tip = document.getElementById("equity-tip");
+  box.addEventListener("pointermove", (ev) => {
+    const c = charts.equity;
+    const svg = box.querySelector("svg");
+    if (!c || !svg) return;
+    const rect = svg.getBoundingClientRect();
+    const scale = c.w / rect.width;
+    const px = (ev.clientX - rect.left) * scale;
+    if (px < c.pl - 4 || px > c.pl + c.iw + 4) { hideEq(); return; }
+    let best = c.points[0], bd = Infinity;
+    for (const p of c.points) { const d = Math.abs(c.x(p) - px); if (d < bd) { bd = d; best = p; } }
+    const cx = c.x(best), cy = c.y(Number(best.equity));
+    const cross = svg.querySelector("#eq-cross"), dot = svg.querySelector("#eq-dot");
+    cross.setAttribute("x1", cx); cross.setAttribute("x2", cx); cross.setAttribute("opacity", "1");
+    dot.setAttribute("cx", cx); dot.setAttribute("cy", cy); dot.setAttribute("opacity", "1");
+    const bankroll = state ? state.kpis.bankroll : 0;
+    tip.innerHTML = `<b class="num">${esc(money(best.equity))}</b><span class="${tone(best.equity - bankroll)}">${esc(signed(best.equity - bankroll))}</span> · <span class="muted">${esc(stamp(best.ts))}</span>`;
+    const half = (tip.offsetWidth || 160) / 2 + 4;
+    tip.style.left = `${Math.max(half, Math.min(rect.width - half, cx / scale))}px`;
+    tip.style.top = `${Math.max(tip.offsetHeight + 6, (cy / scale) + 8)}px`;
+    tip.style.opacity = "1";
+  });
+  box.addEventListener("pointerleave", hideEq);
+  function hideEq() {
+    tip.style.opacity = "0";
+    const svg = box.querySelector("svg");
+    if (!svg) return;
+    const cross = svg.querySelector("#eq-cross"), dot = svg.querySelector("#eq-dot");
+    if (cross) cross.setAttribute("opacity", "0");
+    if (dot) dot.setAttribute("opacity", "0");
+  }
+}
+function dailyChart(rows) {
+  if (!rows || !rows.length) { charts.daily = null; put("daily", empty("Ingen lukkede handler endnu.", "bars")); return; }
+  const data = rows.slice(-14);
+  const w = 420, h = 190, pl = 46, pr = 6, pt = 10, pb = 24;
+  const ext = Math.max(0.5, ...data.map((r) => Math.abs(r.pnl)));
+  const iw = w - pl - pr, ih = h - pt - pb;
+  const zero = pt + ih / 2;
+  const slot = iw / data.length, bw = Math.max(6, Math.min(26, slot - 6));
+  const bars = data.map((r, i) => {
+    const hgt = Math.max(2, (Math.abs(r.pnl) / ext) * (ih / 2));
+    const x0 = pl + i * slot + (slot - bw) / 2;
+    const y0 = r.pnl >= 0 ? zero - hgt : zero;
+    const fill = r.pnl >= 0 ? "var(--up)" : "var(--down)";
+    return `<rect x="${x0.toFixed(1)}" y="${y0.toFixed(1)}" width="${bw.toFixed(1)}" height="${hgt.toFixed(1)}" rx="4" fill="${fill}"/><rect class="hit" data-i="${i}" x="${(pl + i * slot).toFixed(1)}" y="${pt}" width="${slot.toFixed(1)}" height="${ih}" fill="transparent"/>`;
+  }).join("");
+  const lab = (d) => { const p = String(d).split("-"); return p.length === 3 ? `${p[2]}.${p[1]}` : d; };
+  const html = `<svg viewBox="0 0 ${w} ${h}" role="img" aria-label="Resultat pr. dag">
+    <line x1="${pl}" x2="${w - pr}" y1="${zero}" y2="${zero}" stroke="var(--border-strong)"/>
+    <text class="axis num" x="${pl - 6}" y="${pt + 8}" text-anchor="end">${esc(signed(ext))}</text>
+    <text class="axis num" x="${pl - 6}" y="${zero + 4}" text-anchor="end">0</text>
+    <text class="axis num" x="${pl - 6}" y="${pt + ih}" text-anchor="end">${esc(signed(-ext))}</text>
+    ${bars}
+    <text class="axis" x="${pl}" y="${h - 6}">${esc(lab(data[0].day))}</text>
+    <text class="axis" x="${w - pr}" y="${h - 6}" text-anchor="end">${esc(lab(data[data.length - 1].day))}</text>
+  </svg>`;
+  charts.daily = { data, w, slot, pl };
+  put("daily", html);
+}
+function bindDailyHover() {
+  const box = document.getElementById("daily-box");
+  const tip = document.getElementById("daily-tip");
+  box.addEventListener("pointermove", (ev) => {
+    const c = charts.daily;
+    const hit = ev.target.closest && ev.target.closest(".hit");
+    if (!c || !hit) { tip.style.opacity = "0"; return; }
+    const r = c.data[Number(hit.dataset.i)];
+    const svg = box.querySelector("svg");
+    const scale = c.w / svg.getBoundingClientRect().width;
+    tip.innerHTML = `<b class="num ${tone(r.pnl)}">${esc(signed(r.pnl))}</b><span class="muted">${esc(r.day)} · ${esc(r.trades)} handler</span>`;
+    const half = (tip.offsetWidth || 140) / 2 + 4;
+    const width = svg.getBoundingClientRect().width;
+    tip.style.left = `${Math.max(half, Math.min(width - half, (c.pl + (Number(hit.dataset.i) + 0.5) * c.slot) / scale))}px`;
+    tip.style.top = "64px";
+    tip.style.opacity = "1";
+  });
+  box.addEventListener("pointerleave", () => { tip.style.opacity = "0"; });
+}
+
+/* ---------- Sektioner ---------- */
+function renderHeader(data) {
+  const e = data.engine;
+  const dot = document.getElementById("status-dot");
+  let cls = "ok", text;
+  if (pollFailed) { cls = "bad"; text = "Ingen forbindelse"; }
+  else if (!e.running) { cls = ""; text = "Motoren er stoppet"; }
+  else if (data.kill_switch) { cls = "bad"; text = "Nødstop"; }
+  else if (data.halted_drawdown || data.halted_day) { cls = "warn"; text = "Tabsgrænse ramt"; }
+  else if (data.paused) { cls = "warn"; text = "Køb på pause"; }
+  else if (e.last_error) { cls = "warn"; text = "Kører · fejl i datakilde"; }
+  else text = countdown > 0 ? `Kører · scanner om ${countdown} s` : "Kører · scanner…";
+  dot.className = "dot " + cls;
+  document.getElementById("status-text").textContent = text;
+  const mode = document.getElementById("mode-pill");
+  mode.textContent = data.mode === "live" ? "Live" : "Papir";
+  mode.className = "pill mode " + (data.mode === "live" ? "live" : "paper");
+  document.getElementById("sol-pill").textContent = "SOL " + (e.sol_usd ? money(e.sol_usd) : "—");
+  document.title = `${money(data.kpis.equity)} · Memebot${data.mode === "live" ? " · LIVE" : ""}`;
+}
+function renderAlerts(data) {
+  const scanErrors = ((data.engine.last_scan || {}).errors || []).slice(0, 2).map((t) => ({ level: "warning", text: "Datakilde: " + t }));
+  const all = (data.alerts || []).concat(scanErrors).filter((a) => !dismissed.has(a.text));
+  const order = { error: 0, warning: 1, info: 2 };
+  all.sort((a, b) => (order[a.level] ?? 3) - (order[b.level] ?? 3));
+  const important = all.filter((a) => a.level !== "info");
+  const shown = showAllAlerts ? all : (important.length ? important : all.slice(0, 1));
+  const hiddenCount = all.length - shown.length;
+  const ic = { error: "alert", warning: "alert", info: "info" };
+  const html = shown.map((a) => `<div class="alert ${esc(a.level)}">${icon(ic[a.level] || "info")}<span>${esc(a.text)}</span><button class="x" type="button" data-dismiss="${esc(a.text)}" aria-label="Skjul">${icon("x", "sm")}</button></div>`).join("")
+    + (hiddenCount > 0 ? `<button class="alert-more" type="button" id="more-alerts">Vis ${hiddenCount} ${hiddenCount === 1 ? "besked" : "beskeder"} mere</button>` : "");
+  put("alerts", html);
+}
+function renderHero(data) {
+  const k = data.kpis;
+  document.getElementById("equity").textContent = money(k.equity);
+  put("equity-chips", `
+    <span class="chip ${tone(k.total_pnl)}">${icon(k.total_pnl >= 0 ? "upr" : "downr", "sm")}${esc(signed(k.total_pnl))} · ${esc(spct(k.return_pct))} i alt</span>
+    <span class="chip ${tone(k.today_pnl)}">I dag ${esc(signed(k.today_pnl))}</span>
+    <span class="chip">${esc(data.mode === "live" ? "Rigtige penge" : "Papirpenge")} · start ${esc(money(k.bankroll))}</span>`);
+  const series = (data.equity || {})[range] || [];
+  equityChart(series, k.bankroll);
+
+  const g = data.goal;
+  const p = Math.max(0, Math.min(1, g.progress || 0));
+  const r = 50, c = 2 * Math.PI * r;
+  const need = k.bankroll ? ((g.need_per_month || g.target) / k.bankroll) * 100 : 0;
+  put("goal", `
+    <div class="card-head" style="margin:0"><h2>${icon("spark")}Mål: betal Claude Max</h2><span class="chip accent">${esc(money(g.target))}/md</span></div>
+    <div class="goal-top">
+      <div class="ring" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(p * 100)}" aria-label="Fremskridt mod månedsmålet">
+        <svg viewBox="0 0 116 116"><defs><linearGradient id="ringg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9945ff"/><stop offset="1" stop-color="#14f195"/></linearGradient></defs>
+          <circle cx="58" cy="58" r="${r}" fill="none" stroke="var(--raised)" stroke-width="11"/>
+          <circle cx="58" cy="58" r="${r}" fill="none" stroke="url(#ringg)" stroke-width="11" stroke-linecap="round" stroke-dasharray="${(c * p).toFixed(1)} ${c.toFixed(1)}"/></svg>
+        <div class="center"><div><b class="display num">${esc(pct(p))}</b><span class="muted" style="font-size:0.74rem">af målet</span></div></div>
+      </div>
+      <div class="rows num" style="flex:1;width:100%">
+        <div><span>Netto denne måned</span><b class="${tone(g.month_net)}">${esc(signed(g.month_net))}</b></div>
+        <div><span>Handler</span><span class="${tone(g.month_realized)}">${esc(signed(g.month_realized))}</span></div>
+        <div><span>AI-udgifter</span><span>${esc(money4(g.month_ai))}</span></div>
+        <div><span>Hosting og abonnementer</span><span title="${esc(money(g.fixed_monthly))} pr. måned, regnet med for de dage der er gået">${esc(money(g.month_fixed))}</span></div>
+        <div><span>Fremskrevet måned</span><span class="${tone(g.projection)}">${esc(signed(g.projection))}</span></div>
+      </div>
+    </div>
+    <div style="margin-top:auto">
+      <div class="label" style="margin-bottom:8px">Pengene lige nu</div>
+      <div class="rows num">
+        <div><span>${data.mode === "live" ? "SOL i wallet" : "Kontant (papir)"}</span><span>${esc(data.mode === "live" ? (data.engine.wallet_sol == null ? "—" : fmtNum.format(data.engine.wallet_sol) + " SOL") : money(data.engine.paper_cash))}</span></div>
+        <div><span>I åbne positioner</span><span>${esc(money((data.positions || []).reduce((a, p) => a + Number(p.mark_usd || 0), 0)))}</span></div>
+        <div><span>Realiseret i alt</span><span class="${tone(k.realized)}">${esc(signed(k.realized))}</span></div>
+        <div><span>AI-udgifter i alt</span><span>${esc(money4(k.ai_total))}</span></div>
+      </div>
+    </div>
+    <p class="note">${g.fixed_monthly ? `For at betale Claude Max skal botten tjene ${esc(money(g.need_per_month))} om måneden, fordi hosting og abonnementer koster ${esc(money(g.fixed_monthly))}. ` : ""}Kræver over ${esc(fmtInt.format(need))} % afkast om måneden på ${esc(money(k.bankroll))}. Regn ikke med det.${data.mode === "paper" ? " Tæller først rigtigt, når botten handler live." : ""}</p>`);
+}
+function renderKpis(data) {
+  const k = data.kpis, s = data.settings;
+  const pf = k.profit_factor_infinite ? "∞" : (k.profit_factor == null ? "—" : fmtNum.format(k.profit_factor));
+  const st = k.streak || {};
+  const streak = st.count ? `${st.count} ${st.kind === "win" ? (st.count === 1 ? "gevinst" : "gevinster") : "tab"} i træk` : "ingen handler endnu";
+  const used = s.ai_configured && s.ai_daily_budget_usd ? Math.min(1, (k.ai_today || 0) / s.ai_daily_budget_usd) : 0;
+  const tiles = [
+    ["Gevinstprocent", k.win_rate == null ? "—" : pct(k.win_rate), `${k.wins} vindere · ${k.losses} tabere`, ""],
+    ["Profitfaktor", pf, `bedste ${signed(k.best)} · værste ${signed(k.worst)}`, ""],
+    ["Handler", fmtInt.format(k.trades), `${k.open} åbne · ${money(k.deployed)} i spil`, ""],
+    ["Gns. holdetid", minutes(k.avg_hold_minutes), streak, ""],
+    ["Gebyrer", money4(k.fees_total), "netværk og prioritet", ""],
+    ["AI i dag", money4(k.ai_today), s.ai_configured ? `budget ${money(s.ai_daily_budget_usd)} · netto efter AI ${signed(k.net_after_ai)}` : "Claude er slået fra", s.ai_configured ? `<div class="meter"><i style="width:${(used * 100).toFixed(0)}%"></i></div>` : ""],
+  ];
+  put("kpis", tiles.map(([l, v, sub, extra]) => `<div class="card kpi"><div class="label">${esc(l)}</div><div class="v display num">${esc(v)}</div><div class="s">${esc(sub)}</div>${extra}</div>`).join(""));
+}
+function renderActions(data) {
+  document.getElementById("scan").innerHTML = icon("scan", "sm") + "Scan";
+  document.getElementById("scan").title = "Scan nu (S)";
+  document.getElementById("pause").innerHTML = data.paused ? icon("play", "sm") + "Fortsæt" : icon("pause", "sm") + "Pause";
+  document.getElementById("pause").title = data.paused ? "Fortsæt nye køb (P)" : "Sæt nye køb på pause. Åbne positioner passes stadig (P)";
+  document.getElementById("kill").innerHTML = data.kill_switch ? icon("play", "sm") + "Genoptag" : icon("stop", "sm") + "Nødstop";
+  document.getElementById("kill").dataset.mode = data.kill_switch || data.halted_drawdown ? "resume" : "kill";
+  document.getElementById("kill").className = "btn " + (data.kill_switch || data.halted_drawdown ? "" : "danger");
+  if (data.halted_drawdown && !data.kill_switch) document.getElementById("kill").innerHTML = icon("play", "sm") + "Genoptag";
+  document.getElementById("to-paper").hidden = data.mode !== "live";
+}
+function renderOverview(data) {
+  const scan = data.engine.last_scan || {};
+  document.getElementById("funnel-title").innerHTML = icon("funnel") + "Seneste scanning" + (data.sniper ? ` <button class="chip ${data.sniper.enabled ? "accent" : ""}" type="button" data-goto="sniper" style="border:0;cursor:pointer">${icon("target", "sm")}Sniper ${data.sniper.enabled ? "til · mål " + spct(data.sniper.settings.take_profit_pct) : "fra"}</button>` : "");
+  document.getElementById("funnel-when").textContent = data.engine.last_scan_at ? ago(data.engine.last_scan_at) : "venter på første scanning";
+  const steps = [["Fundet", scan.discovered], ["Ikke set for nylig", scan.fresh], ["Bestod markedsfiltre", scan.market_ok], ["Bestod rug-tjek", scan.rug_ok], ["Høj nok score", scan.scored], ["Købt", scan.bought]];
+  const top = Math.max(1, scan.discovered || 0);
+  put("funnel", scan.discovered == null ? empty(scan.note || "Den første scanning kører inden for et minut.", "funnel") : steps.map(([l, v]) => `<div class="stage"><span>${esc(l)}</span><div class="bar"><i style="width:${((v || 0) / top * 100).toFixed(1)}%"></i></div><b class="num">${esc(v ?? 0)}</b></div>`).join(""));
+  put("funnel-errors", (scan.errors || []).slice(0, 4).map((t) => `<span class="chip warn" title="${esc(t)}">${icon("alert", "sm")}${esc(t.split(":")[0])}</span>`).join("") + (scan.note ? `<span class="chip warn">${esc(scan.note)}</span>` : ""));
+
+  document.getElementById("feed-title").innerHTML = icon("activity") + "Aktivitet";
+  const events = (data.events || []).slice(0, 18);
+  put("feed", events.length ? events.map((ev) => {
+    let cls = ev.level, ic = ev.level === "error" ? "x" : ev.level === "warning" ? "alert" : "info";
+    if (ev.level === "trade") { const buy = /^Købt/.test(ev.message); cls = buy ? "buy" : "sell"; ic = buy ? "plus" : "minus"; }
+    return `<li><span class="ico ${esc(cls)}">${icon(ic, "sm")}</span><div><div>${esc(ev.message)}</div><div class="when">${esc(ago(ev.ts))}</div></div></li>`;
+  }).join("") : `<li style="display:block">${empty("Intet endnu.", "activity")}</li>`);
+
+  document.getElementById("daily-title").innerHTML = icon("bars") + "Dagligt resultat";
+  dailyChart(data.daily_pnl);
+
+  document.getElementById("exits-title").innerHTML = icon("door") + "Hvorfor botten solgte";
+  const exits = data.exits || [];
+  const maxc = Math.max(1, ...exits.map((x) => x.count));
+  put("exits", exits.length ? exits.map((x) => `<div class="list-row"><span>${esc(x.label)}</span><div class="bar"><i style="width:${(x.count / maxc * 100).toFixed(0)}%"></i></div><b class="num r">${esc(x.count)}</b><span class="num r ${tone(x.pnl)}">${esc(signed(x.pnl))}</span></div>`).join("") : empty("Ingen salg endnu.", "door"));
+
+  document.getElementById("open-title").innerHTML = icon("coins") + "Åbne positioner";
+  const pos = data.positions || [];
+  put("open-mini", pos.length ? `<div class="table-wrap"><table><thead><tr><th>Token</th><th>Indsat</th><th>Nu</th><th class="hide-sm">Top</th><th class="hide-sm">Holdt</th></tr></thead><tbody>${pos.map((p) => `<tr><td class="tok">${esc(p.symbol)}<small>${esc(p.source)}</small></td><td class="num">${esc(money(p.cost_usd))}</td><td class="num ${tone(p.change_pct)}">${esc(spct(p.change_pct))}<small class="muted" style="display:block">${esc(signed(p.unrealized_usd))}</small></td><td class="num hide-sm">${esc(spct(p.peak_pct))}</td><td class="hide-sm">${esc(minutes(p.minutes))}</td></tr>`).join("")}</tbody></table></div>` : empty("Ingen åbne positioner. Botten køber kun, når et token består alle tjek.", "shield"));
+
+  document.getElementById("lesson-title").innerHTML = icon("brain") + "Seneste lektion";
+  const lesson = (data.lessons || [])[0];
+  put("lesson-latest", lesson ? `<div class="meta muted" style="font-size:0.78rem;margin-bottom:6px"><span class="chip accent">${esc(KIND[lesson.kind] || lesson.kind)}</span> ${esc(ago(lesson.ts))}</div><p class="lesson-hero">${esc(lesson.text)}</p>` : empty("Lektionerne kommer efter de første lukkede handler.", "brain"));
+}
+function placeLabels(marks, pos) {
+  const order = ["stop", "tp", "trail", "entry"];
+  const placed = [];
+  for (const name of order) {
+    const m = marks.find(([cls]) => cls === name);
+    if (!m) continue;
+    const x = pos(m[1]);
+    if (placed.every(([v]) => Math.abs(pos(v) - x) >= 17)) placed.push([m[1], m[2]]);
+  }
+  return placed;
+}
+function rangeMeter(p) {
+  const stop = p.stop_pct, tp = p.tp_pct, trail = p.trail_pct;
+  const lo = Math.min(stop - 0.08, p.change_pct - 0.05);
+  const hi = Math.max(tp == null ? 0.5 : tp + 0.12, p.peak_pct + 0.1, p.change_pct + 0.1);
+  const pos = (v) => Math.max(0, Math.min(100, ((v - lo) / (hi - lo)) * 100));
+  const now = p.change_pct;
+  const color = now >= 0 ? "var(--up)" : "var(--down)";
+  const marks = [
+    [`stop`, stop, `Stop ${spct(stop)}`],
+    [`entry`, 0, "Købt"],
+  ];
+  if (tp != null) marks.push(["tp", tp, `${p.strategy === "sniper" ? "Mål" : "Delsalg"} ${spct(tp)}`]);
+  if (trail != null) marks.push(["trail", trail, `Trail ${spct(trail)}`]);
+  return `<div class="range" aria-label="Kurs ${esc(spct(now))} mellem stop ${esc(spct(stop))} og mål">
+    <div class="track"></div>
+    ${marks.map(([cls, v, l]) => `<span class="mk ${cls}" style="left:${pos(v).toFixed(1)}%" title="${esc(l)}"></span>`).join("")}
+    ${placeLabels(marks, pos).map(([v, l]) => `<span class="mk-l" style="left:${pos(v).toFixed(1)}%">${esc(l)}</span>`).join("")}
+    ${p.peak_pct > 0.02 ? `<span class="peak" style="left:${pos(p.peak_pct).toFixed(1)}%">▼ top ${esc(spct(p.peak_pct))}</span>` : ""}
+    <span class="now" style="left:${pos(now).toFixed(1)}%;color:${color}" title="Nu ${esc(spct(now))}"></span>
+  </div>`;
+}
+function renderPositions(data) {
+  const pos = data.positions || [];
+  put("positions", pos.length ? pos.map((p) => {
+    const hold = p.max_hold_minutes ? Math.min(1, (p.minutes || 0) / p.max_hold_minutes) : 0;
+    return `<article class="card">
+      <div class="pos-head">
+        <div><div class="sym display">${esc(p.symbol)}${p.strategy === "sniper" ? ' <span class="chip accent" style="vertical-align:middle">' + icon("target", "sm") + "Sniper</span>" : ""}</div><div class="muted" style="font-size:0.82rem">${esc(p.name || "")} · ${esc(p.source)}${p.partial ? ' · <span class="up">delsalg taget</span>' : ""}</div>${p.watching ? `<div class="chips" style="margin-top:6px"><span class="chip info" title="Botten sælger, hvis udvikleren eller topholderne sælger ud">${icon("shield", "sm")}Overvåger udvikleren</span></div>` : ""}${tokenLinks(p.mint, p.pair_url)}</div>
+        <div><div class="pnl-big display num ${tone(p.change_pct)}">${esc(spct(p.change_pct))}</div><div class="num ${tone(p.unrealized_usd)}" style="text-align:right;font-size:0.86rem">${esc(signed(p.unrealized_usd))}</div></div>
+      </div>
+      ${rangeMeter(p)}
+      <div class="stats3 num">
+        <div><span>Indsat</span><b>${esc(money(p.cost_usd))}</b></div>
+        <div><span>Værdi nu</span><b>${esc(money(p.mark_usd + (p.proceeds_usd || 0)))}</b></div>
+        <div><span>Likviditet</span><b>${esc(p.liquidity_usd ? fmtInt.format(p.liquidity_usd) + " $" : "—")}</b></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:0.8rem" class="muted"><span>Holdt ${esc(minutes(p.minutes))}</span><span>maks. ${esc(minutes(p.max_hold_minutes))}</span></div>
+      <div class="meter"><i style="width:${(hold * 100).toFixed(0)}%"></i></div>
+      <details style="margin-top:12px"><summary>Hvorfor købte botten?</summary><p class="why">${esc(p.reasoning || "")}</p>${p.ai_summary ? `<p class="why"><b>Claude:</b> ${esc(p.ai_summary)}</p>` : ""}</details>
+      <div style="display:flex;justify-content:flex-end;margin-top:10px"><button class="btn small danger" type="button" data-sell="${esc(p.id)}" data-symbol="${esc(p.symbol)}">${icon("minus", "sm")}Sælg nu</button></div>
+    </article>`;
+  }).join("") : `<div class="card">${empty("Ingen åbne positioner lige nu. Når botten køber, kan du følge hver position her med stop, mål og trailing stop.", "coins")}</div>`);
+}
+function renderRadar(data) {
+  document.getElementById("radar-title").innerHTML = icon("radar") + "Radar";
+  const rows = data.candidates || [];
+  const counts = { alle: rows.length };
+  for (const r of rows) counts[r.stage] = (counts[r.stage] || 0) + 1;
+  const stages = ["alle", "købt", "marked", "rug", "score", "rute", "claude", "risiko"];
+  put("radar-filters", stages.filter((st) => st === "alle" || counts[st]).map((st) => `<button type="button" data-stage="${st}" aria-pressed="${st === radarStage}">${esc(st === "alle" ? "Alle" : STAGES[st] || st)}<span class="n">${counts[st] || 0}</span></button>`).join(""));
+  const q = radarQuery.trim().toLowerCase();
+  const list = rows.filter((r) => (radarStage === "alle" || r.stage === radarStage) && (!q || String(r.symbol || "").toLowerCase().includes(q) || String(r.mint || "").toLowerCase().includes(q)));
+  put("radar", list.length ? `<table><thead><tr><th>Tid</th><th>Token</th><th>Trin</th><th>Score</th><th>Begrundelse</th><th></th></tr></thead><tbody>${list.slice(0, 200).map((c) => `<tr>
+      <td class="muted" style="white-space:nowrap">${esc(ago(c.ts))}</td>
+      <td class="tok">${esc(c.symbol || short(c.mint))}<small>${esc(c.source)}</small></td>
+      <td><span class="stage-tag ${STAGE_CLASS[c.stage] || ""}">${esc(STAGES[c.stage] || c.stage)}</span></td>
+      <td>${c.score == null ? '<span class="muted">—</span>' : `<span class="score"><span class="bar"><i style="width:${Math.round(c.score * 100)}%"></i></span><span class="num">${esc(fmtNum.format(c.score))}</span></span>`}</td>
+      <td style="min-width:260px">${esc(c.reason)}</td>
+      <td style="white-space:nowrap">${tokenLinks(c.mint, c.pair_url)} <span class="mini-links"><button type="button" data-block="${esc(c.mint)}" data-symbol="${esc(c.symbol || "")}" title="Bloker tokenet">${icon("ban", "sm")}</button></span></td>
+    </tr>`).join("")}</tbody></table>` : empty(rows.length ? "Ingen kandidater matcher filteret." : "Ingen kandidater endnu. Den første scanning kører inden for et minut.", "radar"));
+}
+function renderJournal(data) {
+  document.getElementById("journal-title").innerHTML = icon("book") + "Handelsjournal";
+  const trades = data.trades || [];
+  const wins = trades.filter((t) => t.pnl_usd > 0), losses = trades.filter((t) => t.pnl_usd <= 0);
+  const net = trades.reduce((a, t) => a + Number(t.pnl_usd || 0), 0);
+  put("journal-sum", `<span class="chip up">${wins.length} vindere</span><span class="chip down">${losses.length} tabere</span><span class="chip ${tone(net)}">netto ${esc(signed(net))}</span>`);
+  put("journal-filters", [["alle", "Alle"], ["vindere", "Vindere"], ["tabere", "Tabere"]].map(([id, l]) => `<button type="button" data-jf="${id}" aria-pressed="${id === journalFilter}">${esc(l)}</button>`).join(""));
+  const list = trades.filter((t) => journalFilter === "alle" || (journalFilter === "vindere" ? t.pnl_usd > 0 : t.pnl_usd <= 0));
+  put("journal", list.length ? `<table><thead><tr><th>Lukket</th><th>Token</th><th>Indsat</th><th>Resultat</th><th class="hide-sm">Top</th><th class="hide-sm">Holdt</th><th>Udgang</th></tr></thead><tbody>${list.map((t) => {
+    const open = expanded.has(t.id);
+    const sigs = (t.signatures || []).filter((s) => /^[1-9A-HJ-NP-Za-km-z]{40,100}$/.test(s));
+    return `<tr class="clickable" data-row="${esc(t.id)}" aria-expanded="${open}">
+      <td class="muted" style="white-space:nowrap">${esc(stamp(t.closed_at))}</td>
+      <td class="tok">${esc(t.symbol)}<small>${esc(t.source)}</small></td>
+      <td class="num">${esc(money(t.cost_usd))}</td>
+      <td class="num ${tone(t.pnl_usd)}"><b>${esc(signed(t.pnl_usd))}</b><small style="display:block">${esc(spct(t.pnl_pct))}</small></td>
+      <td class="num hide-sm">${esc(spct(t.peak_pct))}</td>
+      <td class="hide-sm">${esc(minutes(t.hold_minutes))}</td>
+      <td>${esc(t.exit_reason)}</td>
+    </tr>${open ? `<tr class="detail"><td colspan="7"><p class="why" style="margin-top:0">${esc(t.reasoning || "")}</p>${t.ai_summary ? `<p class="why"><b>Claude:</b> ${esc(t.ai_summary)}</p>` : ""}<div class="links">${tokenLinks(t.mint, t.pair_url)}${sigs.map((s) => `<a href="https://solscan.io/tx/${s}" target="_blank" rel="noopener noreferrer">${icon("ext", "sm")}tx ${esc(short(s))}</a>`).join("")}</div></td></tr>` : ""}`;
+  }).join("")}</tbody></table>` : empty(trades.length ? "Ingen handler matcher filteret." : "Ingen lukkede handler endnu.", "book"));
+}
+function renderLearning(data) {
+  document.getElementById("lessons-title").innerHTML = icon("brain") + "Lektioner";
+  const lessons = data.lessons || [];
+  put("lessons", lessons.length ? lessons.map((l) => `<li class="${esc(l.kind)}"><div class="meta"><span class="chip ${l.kind === "claude" ? "accent" : l.kind === "parameter" ? "warn" : l.kind === "skygge" ? "info" : ""}">${esc(KIND[l.kind] || l.kind)}</span>${esc(ago(l.ts))}</div><div>${esc(l.text)}</div></li>`).join("") : `<li style="list-style:none">${empty("Ingen lektioner endnu. Efter hver lukket handel skriver botten, hvad den lærte.", "brain")}</li>`);
+
+  document.getElementById("weights-title").innerHTML = icon("sliders") + "Signalvægte";
+  document.getElementById("weights-note").textContent = `${data.model.updates} opdateringer`;
+  const scale = (v) => 50 + (Math.max(-3, Math.min(3, v)) / 3) * 50;
+  put("weights", (data.model.weights || []).map((w) => {
+    const a = scale(0), b = scale(w.weight), left = Math.min(a, b), width = Math.abs(b - a);
+    const moved = Math.abs(w.weight - w.start) > 0.005;
+    return `<div class="weight"><span>${esc(w.label)}</span><div class="wbar" title="Start ${esc(fmtNum.format(w.start))}"><span class="zero"></span><span class="fill" style="left:${left}%;width:${width}%;background:${w.weight >= 0 ? "var(--up)" : "var(--down)"}"></span><span class="start" style="left:${scale(w.start)}%"></span></div><span class="num r ${moved ? "changed" : ""}">${w.weight > 0 ? "+" : ""}${esc(fmtNum.format(w.weight))}</span></div>`;
+  }).join(""));
+
+  document.getElementById("sources-title").innerHTML = icon("funnel") + "Kilder";
+  const src = data.sources || [];
+  put("sources", src.length ? `<table><thead><tr><th>Kilde</th><th>Handler</th><th>Gevinst%</th><th>Resultat</th></tr></thead><tbody>${src.map((r) => `<tr><td>${esc(r.label)}${r.muted ? ' <span class="stage-tag rug">slået fra</span>' : ""}</td><td class="num">${esc(r.trades)}</td><td class="num">${esc(r.win_rate == null ? "—" : pct(r.win_rate))}</td><td class="num ${tone(r.pnl)}">${esc(signed(r.pnl))}</td></tr>`).join("")}</tbody></table>` : empty("Ingen data endnu.", "funnel"));
+
+  document.getElementById("params-title").innerHTML = icon("sliders") + "Strategiparametre";
+  put("params", `<table><thead><tr><th>Parameter</th><th>Nu</th><th>Start</th><th>Grænser</th></tr></thead><tbody>${(data.params || []).map((p) => {
+    const moved = Math.abs(p.value - p.default) > 1e-9;
+    return `<tr><td>${esc(p.label)}</td><td class="num ${moved ? "changed" : ""}">${esc(fmtNum.format(p.value))}</td><td class="num muted">${esc(fmtNum.format(p.default))}</td><td class="num muted">${esc(fmtNum.format(p.bounds[0]))} – ${esc(fmtNum.format(p.bounds[1]))}</td></tr>`;
+  }).join("")}</tbody></table>`);
+}
+/* ---------- Phantom og bot-wallet ---------- */
+let phantomAddr = null;
+let walletInfo = null;
+let walletFetchedAt = 0;
+function phantomProvider() {
+  const p = (window.phantom && window.phantom.solana) || window.solana;
+  return p && p.isPhantom ? p : null;
+}
+function phantomBrowseLink() {
+  return `https://phantom.app/ul/browse/${encodeURIComponent(location.href)}?ref=${encodeURIComponent(location.origin)}`;
+}
+async function refreshWallet(force) {
+  if (!force && Date.now() - walletFetchedAt < 15000) return;
+  walletFetchedAt = Date.now();
+  try {
+    const q = phantomAddr ? `?phantom=${encodeURIComponent(phantomAddr)}` : "";
+    const r = await fetch("/api/meme/wallet" + q, { cache: "no-store", credentials: "same-origin" });
+    if (r.ok) { walletInfo = await r.json(); if (state) renderWalletCards(state); }
+  } catch (e) { /* næste runde prøver igen */ }
+}
+async function connectPhantom(silent) {
+  const p = phantomProvider();
+  if (!p) { if (!silent) toast("down", "Phantom blev ikke fundet", "Installér Phantom, eller åbn siden i Phantom-appen."); return; }
+  try {
+    const res = await p.connect(silent ? { onlyIfTrusted: true } : undefined);
+    phantomAddr = res.publicKey.toString();
+    try { localStorage.setItem("meme-phantom", "1"); } catch (e) {}
+    if (!silent) toast("", "Phantom er forbundet", short(phantomAddr));
+    refreshWallet(true);
+  } catch (err) {
+    if (!silent) toast("down", "Phantom blev ikke forbundet", err && err.message ? err.message : "Afvist");
+  }
+}
+async function disconnectPhantom() {
+  const p = phantomProvider();
+  try { if (p) await p.disconnect(); } catch (e) {}
+  phantomAddr = null;
+  try { localStorage.setItem("meme-phantom", "0"); } catch (e) {}
+  if (walletInfo) walletInfo.phantom = null;
+  if (state) renderWalletCards(state);
+}
+async function depositFromPhantom(sol) {
+  const p = phantomProvider();
+  if (!p || !phantomAddr) { toast("down", "Forbind Phantom først", ""); return; }
+  const usd = state && state.engine.sol_usd ? ` (ca. ${money(sol * state.engine.sol_usd)})` : "";
+  if (!confirm(`Send ${fmtNum.format(sol)} SOL${usd} fra din Phantom til bot-wallet'en?\n\nPhantom viser beløbet, før du godkender.`)) return;
+  try {
+    const tx = await post("/api/meme/wallet/deposit", { from_address: phantomAddr, sol });
+    const res = await p.request({ method: "signAndSendTransaction", params: { message: tx.message } });
+    const sig = res && (res.signature || res);
+    toast("up", `${fmtNum.format(tx.sol)} SOL er sendt til botten`, sig ? "tx " + short(String(sig)) : "");
+    setTimeout(() => refreshWallet(true), 4000);
+    setTimeout(() => refreshWallet(true), 15000);
+  } catch (err) {
+    toast("down", "Indbetalingen blev ikke sendt", err && err.message ? err.message : "Afvist i Phantom");
+  }
+}
+function copyBtn(text, label) {
+  return `<a href="#" data-copy="${esc(text)}">${icon("copy", "sm")}${esc(label || "Kopiér")}</a>`;
+}
+function renderWalletCards(data) {
+  const kept = {};
+  for (const id of ["dep-sol", "withdraw-sol"]) { const el = document.getElementById(id); if (el && el.value) kept[id] = [el.value, document.activeElement === el]; }
+  drawWalletCards(data);
+  for (const [id, [value, focused]] of Object.entries(kept)) { const el = document.getElementById(id); if (el && !el.value) { el.value = value; if (focused) el.focus(); } }
+}
+function drawWalletCards(data) {
+  const w = walletInfo || data.wallet || {};
+  const solUsd = data.engine.sol_usd || null;
+  document.getElementById("botw-title").innerHTML = icon("wallet") + "Bot-wallet";
+  const chip = document.getElementById("botw-chip");
+  chip.textContent = w.configured ? (data.mode === "live" ? "handler live" : "klar · papir") : "ikke sat op";
+  chip.className = "chip " + (w.configured ? (data.mode === "live" ? "down" : "info") : "warn");
+  if (!w.configured) {
+    put("botw", `<p class="muted" style="margin:0 0 10px;font-size:0.88rem">Botten handler fra sin egen konto i din Phantom. Så kan du følge hver handel direkte i Phantom-appen, og din hovedkonto er aldrig i spil.</p>
+      <div class="steps">
+        <div class="step"><span class="ck">1</span><span>Phantom → Konti → <b>Opret ny konto</b>. Kald den fx «Memebot».</span><em></em></div>
+        <div class="step"><span class="ck">2</span><span>Indstillinger → Administrer konti → Memebot → <b>Vis privat nøgle</b>.</span><em></em></div>
+        <div class="step"><span class="ck">3</span><span>Indsæt nøglen som hemmelig variabel <code>SOLANA_PRIVATE_KEY</code> i Railway, og genstart.</span><em></em></div>
+        <div class="step"><span class="ck">4</span><span>Kom tilbage hertil og indbetal fra din hovedkonto med «Forbind Phantom».</span><em></em></div>
+      </div>
+      <p class="note">Send aldrig nøglen i en chat, en mail eller til nogen. Del aldrig din recovery-sætning. ${w.error ? esc(w.error) : ""}</p>`);
+  } else {
+    const sol = w.sol, usd = w.usd ?? (sol != null && solUsd ? sol * solUsd : null);
+    const target = w.withdraw_address;
+    const freeSol = sol != null ? Math.max(0, sol - (w.reserve_sol || 0) - 0.00001) : 0;
+    const overBankroll = solUsd ? Math.max(0, freeSol - data.kpis.bankroll / solUsd) : 0;
+    const sweep = w.sweep_above_usd > 0
+      ? `Automatisk udbetaling er slået til: alt over ${money(data.kpis.bankroll)} + ${money(w.sweep_above_usd)} sendes til din Phantom højst hver halve time (kun live).`
+      : "Automatisk udbetaling er slået fra. Sæt MEME_SWEEP_ABOVE_USD for at få gevinster sendt til din Phantom af sig selv.";
+    put("botw", `
+      <div class="label">Saldo</div>
+      <div class="big display num" style="font-size:2.2rem">${sol == null ? "—" : esc(fmtNum.format(sol)) + " SOL"}</div>
+      <div class="chips" style="margin-bottom:12px"><span class="chip">${esc(usd == null ? "henter…" : "≈ " + money(usd))}</span><span class="chip">reserve ${esc(fmtNum.format(w.reserve_sol || 0))} SOL til gebyrer</span>${w.swept_total_usd ? `<span class="chip up">udbetalt i alt ${esc(money(w.swept_total_usd))}</span>` : ""}</div>
+      <div class="addr" style="overflow-wrap:anywhere">${esc(w.address)}</div>
+      <div class="links">${copyBtn(w.address, "Kopiér adresse")}<a href="https://solscan.io/account/${esc(safeMint(w.address))}" target="_blank" rel="noopener noreferrer">${icon("ext", "sm")}Solscan</a></div>
+      <div class="field" style="margin-top:12px">
+        <div class="field-top"><span>${icon("down", "sm")} Hæv til din Phantom</span><span class="muted addr">${target ? esc(short(target)) : ""}</span></div>
+        ${target ? `<div class="row"><input type="number" id="withdraw-sol" min="0.001" step="0.01" placeholder="SOL" aria-label="Beløb i SOL at hæve" style="width:130px;height:36px;border-radius:10px;border:1px solid var(--border-strong);background:var(--surface-2);padding:0 10px">
+          <button class="btn small" type="button" data-wfill="${freeSol.toFixed(4)}">Alt (${esc(fmtNum.format(freeSol))})</button>
+          ${overBankroll > 0.0005 ? `<button class="btn small" type="button" data-wfill="${overBankroll.toFixed(4)}">Over bankroll (${esc(fmtNum.format(overBankroll))})</button>` : ""}
+          <button class="btn small primary" type="button" id="withdraw-go">${icon("send", "sm")}Hæv</button></div>`
+        : `<p class="muted" style="margin:0;font-size:0.84rem">${esc(w.withdraw_error || "")} Botten sender kun penge til den adresse, du selv har sat i Railway, så ingen kan omdirigere dem fra dashboardet.${phantomAddr ? ` Din forbundne Phantom: <code>${esc(phantomAddr)}</code> ${copyBtn("MEME_WITHDRAW_ADDRESS=" + phantomAddr, "Kopiér linje")}` : " Forbind Phantom for at se din adresse."}</p>`}
+      </div>
+      <p class="note" style="margin-top:10px">${esc(sweep)}</p>`);
+  }
+
+  document.getElementById("ph-title").innerHTML = icon("ghost") + "Din Phantom";
+  const p = phantomProvider();
+  const phChip = document.getElementById("ph-chip");
+  phChip.textContent = phantomAddr ? "forbundet" : p ? "ikke forbundet" : "ikke fundet";
+  phChip.className = "chip " + (phantomAddr ? "up" : "");
+  if (!p) {
+    put("ph", `<p class="muted" style="margin:0 0 12px;font-size:0.88rem">Phantom blev ikke fundet i denne browser. På computeren skal Phantom-udvidelsen være installeret. På mobilen åbner du dashboardet inde i Phantom-appen.</p>
+      <div class="links"><a href="https://phantom.com/download" target="_blank" rel="noopener noreferrer">${icon("ext", "sm")}Hent Phantom</a><a href="${esc(phantomBrowseLink())}">${icon("ghost", "sm")}Åbn i Phantom-appen</a></div>`);
+  } else if (!phantomAddr) {
+    put("ph", `<p class="muted" style="margin:0 0 12px;font-size:0.88rem">Forbind din hovedkonto for at indbetale til botten med ét klik. Botten kan aldrig hæve fra din Phantom: hver indbetaling skal du selv godkende i Phantom.</p>
+      <button class="btn primary" type="button" id="ph-connect">${icon("link", "sm")}Forbind Phantom</button>`);
+  } else {
+    const same = w.address && phantomAddr === w.address;
+    const phSol = w.phantom && w.phantom.address === phantomAddr ? w.phantom.sol : null;
+    put("ph", `
+      <div class="label">Forbundet konto</div>
+      <div class="addr" style="overflow-wrap:anywhere;margin:4px 0">${esc(phantomAddr)}</div>
+      <div class="chips" style="margin-bottom:12px"><span class="chip">${esc(phSol == null ? "saldo henter…" : fmtNum.format(phSol) + " SOL")}</span>${phSol != null && solUsd ? `<span class="chip">≈ ${esc(money(phSol * solUsd))}</span>` : ""}</div>
+      ${same ? `<p class="note" style="color:var(--warn)">Du har valgt bot-kontoen i Phantom. Skift til din hovedkonto for at indbetale.</p>` : !w.configured ? `<p class="note">Sæt bot-wallet'en op først (se til venstre), så kan du indbetale herfra.</p>` : `
+      <div class="field">
+        <div class="field-top"><span>${icon("send", "sm")} Indbetal til botten</span><span class="muted" id="dep-usd"></span></div>
+        <div class="presets">${[0.05, 0.1, 0.25].map((v) => `<button type="button" data-dep="${v}">${esc(fmtNum.format(v))} SOL${solUsd ? ` · ${esc(money(v * solUsd))}` : ""}</button>`).join("")}</div>
+        <div class="row"><input type="number" id="dep-sol" min="0.001" max="${esc(w.max_deposit_sol || 20)}" step="0.01" placeholder="SOL" aria-label="Beløb i SOL at indbetale" style="width:130px;height:36px;border-radius:10px;border:1px solid var(--border-strong);background:var(--surface-2);padding:0 10px">
+          <button class="btn small primary" type="button" id="dep-go">${icon("ghost", "sm")}Godkend i Phantom</button></div>
+        <span class="muted" style="font-size:0.8rem">Botten bruger højst ${esc(money(data.kpis.bankroll))} i alt. Læg ca. 0,03 SOL ekstra oveni til gebyrer.</span>
+      </div>`}
+      <div class="links" style="margin-top:10px">${copyBtn(phantomAddr, "Kopiér adresse")}<a href="#" id="ph-disconnect">${icon("x", "sm")}Afbryd</a></div>`);
+  }
+
+  document.getElementById("axiom-title").innerHTML = icon("link") + "Axiom";
+  put("axiom", `<p class="muted" style="margin:0 0 10px;font-size:0.88rem">Axiom har ingen officiel API til bots, så botten handler ikke gennem Axiom. Men de spiller fint sammen:</p>
+    <div class="steps">
+      <div class="step"><span class="ck">AX</span><span>Tryk <b>AX</b> ved et token i positioner, radar og journal for at åbne det i Axiom.</span><em></em></div>
+      <div class="step"><span class="ck">${icon("wallet", "sm")}</span><span>Tilføj bot-wallet'en i Axioms <b>wallet tracker</b> for at følge dens handler dér.${w.address ? " " + copyBtn(w.address, "Kopiér adresse") : ""}</span><em></em></div>
+      <div class="step"><span class="ck">${icon("plus", "sm")}</span><span>Find dygtige traders i Axiom og indsæt deres adresser under <b>Fulgte wallets</b> herover.</span><em></em></div>
+    </div>`);
+}
+
+function renderWallets(data) {
+  renderWalletCards(data);
+  document.getElementById("wallets-title").innerHTML = icon("wallet") + "Fulgte wallets";
+  document.getElementById("wallet-add").innerHTML = icon("plus", "sm") + "Følg";
+  const ws = data.copy_wallets || [];
+  put("wallets", ws.length ? ws.map((w) => `<div class="wallet-row">
+      <div><div class="addr">${esc(short(w.wallet))}</div><div class="links"><a href="https://solscan.io/account/${esc(safeMint(w.wallet))}" target="_blank" rel="noopener noreferrer">Solscan</a><a href="https://gmgn.ai/sol/address/${esc(safeMint(w.wallet))}" target="_blank" rel="noopener noreferrer">GMGN</a><a href="#" data-copy="${esc(w.wallet)}">${icon("copy", "sm")}Kopiér</a></div></div>
+      <div><span class="label">Handler</span><div class="num">${esc(w.trades)}</div></div>
+      <div><span class="label">Gevinst%</span><div class="num">${esc(w.win_rate == null ? "—" : pct(w.win_rate))}</div></div>
+      <div><span class="label">Resultat</span><div class="num ${tone(w.pnl)}">${esc(signed(w.pnl))}</div></div>
+      <div style="text-align:right">${w.muted ? '<span class="stage-tag rug">slået fra</span> ' : ""}${w.origin === "ui" ? `<button class="btn small" type="button" data-unfollow="${esc(w.wallet)}">Stop</button>` : '<span class="chip">fra .env</span>'}</div>
+    </div>`).join("") : empty("Ingen wallets følges endnu. Indsæt en adresse ovenfor.", "wallet"));
+
+  document.getElementById("blocked-title").innerHTML = icon("ban") + "Blokerede tokens";
+  const bl = data.blacklist || [];
+  put("blocked", bl.length ? bl.map((b) => `<div class="wallet-row" style="grid-template-columns:1fr auto"><div><b>${esc(b.symbol)}</b> <span class="addr muted">${esc(short(b.mint))}</span><div class="muted" style="font-size:0.78rem">blokeret ${esc(ago(b.ts))}</div></div><button class="btn small" type="button" data-unblock="${esc(b.mint)}">Fjern blokering</button></div>`).join("") : empty("Ingen blokerede tokens. Tryk på forbudsikonet i radaren for at blokere et token.", "ban"));
+}
+function renderKrav(data) {
+  document.getElementById("unlock-title").innerHTML = icon("shield") + "Krav før rigtige penge";
+  const items = (data.unlock && data.unlock.items) || [];
+  const done = items.filter((i) => i.ok).length;
+  document.getElementById("unlock-progress").textContent = `${done} af ${items.length} opfyldt`;
+  document.getElementById("unlock-meter").style.width = items.length ? `${(done / items.length * 100).toFixed(0)}%` : "0%";
+  put("steps", items.map((i) => `<div class="step ${i.ok ? "ok" : ""}"><span class="ck">${icon(i.ok ? "check" : "minus", "sm")}</span><span>${esc(i.label)}</span><em>${esc(i.detail)}</em></div>`).join(""));
+  document.getElementById("phrase-label").textContent = (data.unlock && data.unlock.phrase) || "";
+
+  document.getElementById("settings-title").innerHTML = icon("sliders") + "Indstillinger";
+  const s = data.settings;
+  const rows = [
+    ["Bankroll (hårdt loft)", money(s.bankroll_usd)],
+    ["Pr. handel", money(s.position_usd)],
+    ["Maks. åbne / køb pr. dag", `${s.max_open} / ${s.max_trades_per_day}`],
+    ["Dagligt tabsstop", `${pct(s.daily_loss_pct)} af bankroll`],
+    ["Samlet tabsstop", `${pct(s.max_drawdown_pct)} af bankroll`],
+    ["SOL-reserve til gebyrer", `${s.sol_reserve} SOL`],
+    ["Slippage / prioritetsgebyr", `${s.slippage_bps / 100} % / ${fmtInt.format(s.priority_fee_lamports)} lamports`],
+    ["Scanning / overvågning", `hvert ${s.scan_seconds}. / ${s.monitor_seconds}. sekund`],
+    ["Claude", s.ai_configured ? `${s.ai_model} · ${s.ai_effort} · ${money(s.ai_daily_budget_usd)}/dag` : "fra"],
+    ["X API", s.x_configured ? `til · ${s.x_daily_requests} søgninger/dag` : "fra"],
+    ["Wallet-nøgle", s.wallet_configured ? "sat" : "ikke sat"],
+    ["MEME_ALLOW_LIVE", s.allow_live ? "ja" : "nej"],
+    ["Solana RPC", s.rpc_is_public ? "offentlig (langsom)" : "egen"],
+    ["Jupiter", s.jupiter_url],
+  ];
+  put("settings", rows.map(([a, b]) => `<div><span>${esc(a)}</span><b>${esc(b)}</b></div>`).join(""));
+  document.getElementById("keys-title").innerHTML = icon("keyboard") + "Genveje";
+}
+
+/* ---------- Sniper ---------- */
+let sniperDraft = null;
+let sniperDirty = false;
+let sniperKey = "";
+const TP_PRESETS = [0.25, 0.5, 1, 2, 3, 5];
+const UNIT = { pct: "%", usd: "$", min: "min.", sec: "sek.", int: "" };
+function snFields(data) { const m = {}; for (const f of data.sniper.fields) m[f.name] = f; return m; }
+function toUi(f, v) { return f.kind === "pct" ? Math.round(v * 1000) / 10 : v; }
+function fromUi(f, v) { return f.kind === "pct" ? v / 100 : v; }
+function numberField(f, step) {
+  const v = toUi(f, sniperDraft[f.name]);
+  const lo = toUi(f, f.bounds[0]), hi = toUi(f, f.bounds[1]);
+  const def = toUi(f, f.default);
+  return `<div class="field"><div class="field-top"><span>${esc(f.label)}${f.learnable ? ' <span class="chip warn">læring</span>' : ""}</span></div>
+    <div class="row"><input type="number" min="${lo}" max="${hi}" step="${step}" value="${esc(v)}" data-sf="${f.name}" aria-label="${esc(f.label)}"><span class="muted">${esc(UNIT[f.kind] || "")} · ${esc(fmtNum.format(lo))}–${esc(fmtNum.format(hi))}${v !== def ? ` · standard ${esc(fmtNum.format(def))}` : ""}</span></div></div>`;
+}
+function sliderField(f, step, show) {
+  const v = toUi(f, sniperDraft[f.name]);
+  const lo = toUi(f, f.bounds[0]), hi = toUi(f, f.bounds[1]);
+  return `<div class="field"><div class="field-top"><span>${esc(f.label)}</span><b class="num" data-show="${f.name}">${esc(show(sniperDraft[f.name]))}</b></div>
+    <input type="range" min="${lo}" max="${hi}" step="${step}" value="${esc(v)}" data-sf="${f.name}" aria-label="${esc(f.label)}"></div>`;
+}
+function boolField(f) {
+  return `<div class="field"><div class="field-top"><span>${esc(f.label)}</span><button class="switch" type="button" role="switch" aria-checked="${sniperDraft[f.name] ? "true" : "false"}" data-sb="${f.name}" aria-label="${esc(f.label)}"></button></div></div>`;
+}
+const SHOW = {
+  take_profit_pct: (v) => spct(v),
+  sell_fraction: (v) => (v >= 0.999 ? "Sælg alt" : `${pct(v)} sælges, resten følger toppen`),
+  stop_loss_pct: (v) => spct(-v),
+};
+function renderSniperForm(data) {
+  const f = snFields(data);
+  const tpValue = sniperDraft.take_profit_pct;
+  put("sniper-goal", `
+    <div class="label">Sælg når gevinsten er</div>
+    <div class="target-big display num" data-show="take_profit_pct">${esc(spct(tpValue))}</div>
+    <div class="presets" id="tp-presets">${TP_PRESETS.map((v) => `<button type="button" data-tp="${v}" aria-pressed="${Math.abs(v - tpValue) < 1e-9}">${esc(spct(v))}</button>`).join("")}</div>
+    <input type="range" min="${toUi(f.take_profit_pct, f.take_profit_pct.bounds[0])}" max="${toUi(f.take_profit_pct, f.take_profit_pct.bounds[1])}" step="5" value="${esc(toUi(f.take_profit_pct, tpValue))}" data-sf="take_profit_pct" aria-label="Gevinstmål i procent" style="width:100%;accent-color:var(--accent)">
+    ${sliderField(f.sell_fraction, 5, SHOW.sell_fraction)}
+    ${sliderField(f.stop_loss_pct, 1, SHOW.stop_loss_pct)}
+    ${numberField(f.position_usd, 0.5)}
+    ${numberField(f.max_hold_minutes, 5)}`);
+  put("sniper-filters", [
+    numberField(f.min_age_seconds, 10),
+    numberField(f.max_age_minutes, 1),
+    numberField(f.min_liquidity_usd, 500),
+    numberField(f.min_holders, 1),
+    numberField(f.max_top10_pct, 1),
+    boolField(f.require_socials),
+    boolField(f.use_claude),
+  ].join(""));
+}
+function renderPreview() {
+  if (!sniperDraft) return;
+  const size = Number(sniperDraft.position_usd), tp = Number(sniperDraft.take_profit_pct), frac = Number(sniperDraft.sell_fraction), sl = Number(sniperDraft.stop_loss_pct);
+  const win = size * tp * frac;
+  const loss = size * sl;
+  const breakeven = sl / (tp + sl);
+  put("sniper-preview", `
+    <div class="row"><span class="muted">Køb pr. snipe</span><b>${esc(money(size))}</b></div>
+    <div class="row"><span class="muted">Ved målet (${esc(spct(tp))})</span><b class="up">${esc(signed(win))}${frac < 0.999 ? " + resten" : ""}</b></div>
+    <div class="row"><span class="muted">Ved stop-loss (${esc(spct(-sl))})</span><b class="down">${esc(signed(-loss))}</b></div>
+    <div class="row"><span class="muted">For at gå i nul skal målet rammes i mindst</span><b>${esc(pct(breakeven))} af snipes</b></div>
+    <span class="muted" style="font-size:0.8rem">Før gebyrer og slippage. De fleste nye tokens rammer aldrig målet.</span>`);
+  document.getElementById("sniper-dirty").hidden = !sniperDirty;
+  document.getElementById("sniper-dirty").innerHTML = icon("alert", "sm") + "Ændringerne er ikke gemt";
+}
+function renderSniper(data) {
+  const sn = data.sniper;
+  if (!sn) return;
+  document.getElementById("sniper-title").innerHTML = icon("target") + "Sniper";
+  const sw = document.getElementById("sniper-switch");
+  sw.setAttribute("aria-checked", sn.enabled ? "true" : "false");
+  document.getElementById("sniper-state").textContent = sn.enabled
+    ? `Leder efter nye tokens hvert ${sn.scan_seconds}. sekund`
+    : "Slået fra. Tænd for at købe nye tokens, der består alle tjek.";
+  const last = sn.last || {};
+  document.getElementById("sniper-when").textContent = last.at ? "seneste kig " + ago(last.at) : "";
+  const st = sn.stats;
+  put("sniper-stats", [
+    ["Snipes", fmtInt.format(st.trades)],
+    ["Ramte målet", fmtInt.format(st.targets)],
+    ["Gevinstprocent", st.win_rate == null ? "—" : pct(st.win_rate)],
+    ["Resultat", `<span class="${tone(st.pnl)}">${esc(signed(st.pnl))}</span>`],
+    ["Åbne", `${st.open} / ${sn.max_open}`],
+    ["I dag", `${st.today} / ${sn.max_per_day}`],
+  ].map(([l, v]) => `<div><span>${esc(l)}</span><b>${v}</b></div>`).join(""));
+  const steps = [["Tjekket", last.checked], ["Nye", last.new], ["Unge nok", last.young], ["Bestod alle tjek", last.passed], ["Købt", last.bought]];
+  put("sniper-scan", last.checked == null ? `<span class="chip">${esc(last.note || (sn.enabled ? "Venter på første kig…" : "Sniperen er slået fra"))}</span>` :
+    steps.map(([l, v], i) => `<span class="chip ${i === 4 && v ? "up" : ""}">${esc(l)} <b class="num">${esc(v ?? 0)}</b></span>${i < 4 ? '<span class="muted">→</span>' : ""}`).join("")
+    + (last.note ? `<span class="chip warn">${esc(last.note)}</span>` : "")
+    + (last.errors || []).slice(0, 3).map((t) => `<span class="chip warn" title="${esc(t)}">${icon("alert", "sm")}${esc(t.split(":")[0])}</span>`).join(""));
+  document.getElementById("sniper-goal-title").innerHTML = icon("target") + "Dit gevinstmål";
+  document.getElementById("sniper-filter-title").innerHTML = icon("shield") + "Filtre for nye tokens";
+  const key = JSON.stringify(sn.settings) + JSON.stringify(sn.fields.map((f) => f.bounds));
+  if (!sniperDirty && key !== sniperKey) {
+    sniperKey = key;
+    sniperDraft = { ...sn.settings };
+    renderSniperForm(data);
+  }
+  renderPreview();
+  document.getElementById("sniper-seen-title").innerHTML = icon("radar") + "Nye tokens botten har set";
+  const rows = (data.candidates || []).filter((c) => c.source === "Sniper: ny token");
+  put("sniper-seen", rows.length ? `<table><thead><tr><th>Tid</th><th>Token</th><th>Trin</th><th>Begrundelse</th><th></th></tr></thead><tbody>${rows.slice(0, 120).map((c) => `<tr>
+      <td class="muted" style="white-space:nowrap">${esc(ago(c.ts))}</td>
+      <td class="tok">${esc(c.symbol || short(c.mint))}</td>
+      <td><span class="stage-tag ${STAGE_CLASS[c.stage] || ""}">${esc(STAGES[c.stage] || c.stage)}</span></td>
+      <td style="min-width:260px">${esc(c.reason)}</td>
+      <td style="white-space:nowrap">${tokenLinks(c.mint, c.pair_url)}</td></tr>`).join("")}</tbody></table>` : empty(sn.enabled ? "Ingen nye tokens endnu. Botten kigger hvert 10. sekund og venter mindst et minut efter lancering." : "Tænd for sniperen for at se nye tokens her.", "target"));
+}
+function setDraft(name, value) {
+  if (!state || !sniperDraft) return;
+  const f = snFields(state)[name];
+  if (!f) return;
+  let v = Number(value);
+  if (Number.isNaN(v)) return;
+  v = fromUi(f, v);
+  sniperDraft[name] = v;
+  sniperDirty = true;
+  document.querySelectorAll(`[data-sf="${name}"]`).forEach((el) => { if (document.activeElement !== el) el.value = toUi(f, v); });
+  document.querySelectorAll(`[data-show="${name}"]`).forEach((el) => { el.textContent = (SHOW[name] || ((x) => fmtNum.format(x)))(v); });
+  if (name === "take_profit_pct") document.querySelectorAll("#tp-presets button").forEach((b) => b.setAttribute("aria-pressed", Math.abs(Number(b.dataset.tp) - v) < 1e-9 ? "true" : "false"));
+  renderPreview();
+}
+
+/* ---------- Skyggehandler og målberegner ---------- */
+function renderShadows(data) {
+  const sh = data.shadows || {};
+  document.getElementById("shadow-title").innerHTML = icon("ghost") + "Skyggehandler";
+  document.getElementById("shadow-note").textContent = `${sh.active || 0} følges lige nu`;
+  const rows = (sh.summary || []).filter((r) => r.stage !== "købt");
+  put("shadow-summary", rows.length ? `<table><thead><tr><th>Afvist ved</th><th>Fulgt</th><th>Faldt bagefter</th><th>Steg over 10 %</th><th>Gns. hvis købt</th></tr></thead><tbody>${rows.map((r) => `<tr>
+      <td>${esc(STAGES[r.stage] || r.stage)}</td><td class="num">${esc(r.n)}</td>
+      <td class="num"><span class="chip info">${esc(r.dodged)} godt valgt</span></td>
+      <td class="num"><span class="chip ${r.missed ? "up" : ""}">${esc(r.missed)} misset</span></td>
+      <td class="num ${tone(r.avg)}">${esc(spct(r.avg))}</td></tr>`).join("")}</tbody></table>` : empty("Ingen færdige skyggehandler endnu. De første er klar 6 timer efter, at botten har afvist et token.", "ghost"));
+  const recent = sh.recent || [];
+  put("shadow-recent", recent.length ? `<table><thead><tr><th>Startet</th><th>Token</th><th>Afvist ved</th><th>Top</th><th>Nu</th><th>Hvis købt</th><th></th></tr></thead><tbody>${recent.map((r) => {
+    const v = VERDICT[r.verdict] || ["Følges", ""];
+    return `<tr><td class="muted" style="white-space:nowrap">${esc(ago(r.ts))}</td><td class="tok">${esc(r.symbol)}<small>${esc(r.strategy === "sniper" ? "sniper" : "momentum")}</small></td>
+      <td>${esc(STAGES[r.stage] || r.stage)}</td><td class="num">${esc(spct(r.peak_pct))}</td><td class="num ${tone(r.last_pct)}">${esc(spct(r.last_pct))}${r.rugged ? ' <span class="stage-tag rug">rug</span>' : ""}</td>
+      <td class="num ${tone(r.sim_pnl_pct)}">${r.status === "done" ? esc(spct(r.sim_pnl_pct)) + `<small class="muted" style="display:block">${esc(r.sim_exit || "")}</small>` : '<span class="muted">følges</span>'}</td>
+      <td><span class="chip ${v[1]}">${esc(r.status === "done" ? v[0] : "Følges")}</span></td></tr>`;
+  }).join("")}</tbody></table>` : empty("Ingen endnu.", "ghost"));
+}
+function renderOptimizer(data) {
+  const opt = data.shadows && data.shadows.optimizer;
+  document.getElementById("opt-title").innerHTML = icon("bars") + "Hvilket mål ville have virket?";
+  if (!opt) { put("opt", empty("Skyggehandler er slået fra (MEME_SHADOWS=false).", "bars")); document.getElementById("opt-note").textContent = ""; return; }
+  document.getElementById("opt-note").textContent = `bygget på ${opt.n} tokens, botten købte eller næsten købte`;
+  if (!opt.enough) {
+    const done = Math.min(100, Math.round(opt.n / 20 * 100));
+    put("opt", `<p class="muted" style="margin:0 0 8px;font-size:0.88rem">Botten samler selv kursforløb for de tokens, den køber eller næsten køber. Med mindst 20 forløb regner den ud, hvilket gevinstmål og stop der ville have tjent mest.</p><div class="meter"><i style="width:${done}%"></i></div><p class="muted" style="font-size:0.84rem">${esc(opt.n)} af 20 forløb indsamlet.</p>`);
+    return;
+  }
+  const cells = {};
+  for (const c of opt.cells) cells[c.tp + ":" + c.sl] = c;
+  const cur = opt.current || {};
+  const best = opt.best || {};
+  const ext = Math.max(0.05, ...opt.cells.map((c) => Math.abs(c.avg || 0)));
+  const bg = (v) => (v == null ? "" : `background:color-mix(in srgb, ${v >= 0 ? "var(--up)" : "var(--down)"} ${Math.round(Math.min(1, Math.abs(v) / ext) * 28)}%, transparent)`);
+  const same = (a, b) => Math.abs((a || 0) - (b || 0)) < 1e-9;
+  put("opt", `<div class="table-wrap"><table class="grid-table"><thead><tr><th>Mål / stop</th>${opt.stops.map((sl) => `<th>${esc(spct(-sl))}</th>`).join("")}</tr></thead><tbody>${opt.targets.map((tp) => `<tr><th>${esc(spct(tp))}</th>${opt.stops.map((sl) => {
+      const c = cells[tp + ":" + sl] || {};
+      const isBest = same(best.tp, tp) && same(best.sl, sl);
+      const isCur = same(cur.tp, tp) && same(cur.sl, sl);
+      return `<td class="cell ${isBest ? "best" : ""} ${isCur ? "current" : ""}" style="${bg(c.avg)}" title="${esc(c.n)} forløb${isCur ? " · dit nuværende mål" : ""}${isBest ? " · bedst" : ""}"><b class="${tone(c.avg)}">${esc(spct(c.avg))}</b><small>${esc(pct(c.win_rate))} vinder</small></td>`;
+    }).join("")}</tr>`).join("")}</tbody></table></div>
+    <div class="savebar" style="margin-top:12px;justify-content:space-between">
+      <span class="muted" style="font-size:0.84rem;flex:1 1 300px">Gennemsnit pr. snipe efter gebyrer og slippage. Dit nuværende mål (${esc(spct(cur.tp))} / ${esc(spct(-(cur.sl || 0)))}) gav <b class="${tone(cur.avg)}">${esc(spct(cur.avg))}</b>. Bedst: ${esc(spct(best.tp))} / ${esc(spct(-best.sl))} med <b class="${tone(best.avg)}">${esc(spct(best.avg))}</b>. Fortiden er ingen garanti, og kurserne måles hvert minut.</span>
+      ${best.tp != null && !(same(best.tp, cur.tp) && same(best.sl, cur.sl)) ? `<button class="btn small primary" type="button" id="opt-apply" data-tp="${best.tp}" data-sl="${best.sl}">Brug ${esc(spct(best.tp))} / ${esc(spct(-best.sl))}</button>` : ""}
+    </div>`);
+}
+
+/* ---------- Indstillinger: forbindelser, sikkerhed, udførelse, Telegram ---------- */
+function renderDiagnostics(data) {
+  document.getElementById("diag-title").innerHTML = icon("plug") + "Forbindelser";
+  const btn = document.getElementById("diag-run");
+  if (!btn.disabled) btn.innerHTML = icon("scan", "sm") + "Test forbindelser";
+  const d = data.diagnostics;
+  put("diag", !d ? empty("Ikke testet endnu. Botten tester selv ved opstart, eller tryk på knappen.", "plug")
+    : `<p class="muted" style="margin:0 0 6px;font-size:0.86rem">${esc(d.ok)} af ${esc(d.total)} virker · testet ${esc(ago(d.at))}</p>` +
+      d.checks.map((c) => `<div class="check-row ${c.ok ? "ok" : ""} ${c.optional ? "optional" : ""}"><span class="ck">${icon(c.ok ? "check" : c.optional ? "alert" : "x", "sm")}</span><div><b>${esc(c.label)}</b><div class="muted">${esc(c.detail)}</div>${!c.ok && c.hint ? `<div class="hint">${esc(c.hint)}</div>` : ""}</div><span class="muted num">${esc(c.ms)} ms</span></div>`).join(""));
+}
+function renderSecurity(data) {
+  document.getElementById("sec-title").innerHTML = icon("lock") + "Sikkerhed";
+  const on = data.security && data.security.totp;
+  const chip = document.getElementById("sec-chip");
+  chip.textContent = on ? "to-trins-login til" : "to-trins-login fra";
+  chip.className = "chip " + (on ? "up" : "warn");
+  put("sec", on
+    ? `<p class="muted" style="margin:0;font-size:0.88rem">Login kræver en kode fra din godkendelses-app. Før rigtige penge slås til, og før der hæves, spørger siden om en ny kode.</p>`
+    : `<p class="muted" style="margin:0 0 8px;font-size:0.88rem">Slå to-trins-login til, før botten handler med rigtige penge. Så kan ingen logge ind, hæve eller slå rigtige penge til med kun din adgangskode.</p>
+       <div class="steps"><div class="step"><span class="ck">1</span><span>Kør <code>python -m trader.auth totp</code> på din computer.</span><em></em></div>
+       <div class="step"><span class="ck">2</span><span>Tilføj nøglen i en godkendelses-app (Google Authenticator, 1Password, Authy).</span><em></em></div>
+       <div class="step"><span class="ck">3</span><span>Sæt <code>APP_TOTP_SECRET</code> i Railway og genstart.</span><em></em></div></div>`);
+}
+function renderExecution(data) {
+  document.getElementById("exec-title").innerHTML = icon("zap") + "Udførelse og papir";
+  const s = data.settings;
+  const rows = [
+    ["Sendes via", s.execution === "jito" ? `Jito (tip ${fmtInt.format(s.jito_tip_lamports)} lamports)` : "RPC med prioritetsgebyr"],
+    ["Hastesalg", "stop-loss og rug: højere gebyr, og et nyt forsøg med dobbelt slippage"],
+    ["Papir: fejlede handler", pct(s.paper_fail_rate)],
+    ["Papir: ekstra slippage", `${fmtNum.format(s.paper_slippage_pct)} % (+${fmtNum.format(s.paper_sniper_extra_pct)} % for snipes)`],
+    ["Udviklerovervågning", s.dev_watch ? "til" : "fra"],
+    ["Skyggehandler", s.shadows ? "til" : "fra"],
+  ];
+  put("exec", rows.map(([a, b]) => `<div><span>${esc(a)}</span><b>${esc(b)}</b></div>`).join(""));
+}
+function renderTelegram(data) {
+  document.getElementById("tg-title").innerHTML = icon("chat") + "Telegram";
+  const s = data.settings;
+  const hour = s.report_hour_utc;
+  const local = hour >= 0 ? new Date(Date.UTC(2026, 0, 1, hour)).toLocaleTimeString("da-DK", { hour: "2-digit", minute: "2-digit" }) : null;
+  const commands = [["/status", "egenkapital og tilstand"], ["/positioner", "åbne positioner"], ["/pause · /fortsaet", "stop eller fortsæt nye køb"], ["/saelg BONK", "sælg en position"], ["/nodstop ja", "sælg alt"], ["/sniper til · fra", "tænd og sluk sniperen"], ["/maal 150", "sniperens gevinstmål i %"], ["/rapport", "dagsrapporten nu"]];
+  put("tg", `<p class="muted" style="margin:0 0 10px;font-size:0.88rem">Med <code>TELEGRAM_BOT_TOKEN</code> og <code>TELEGRAM_CHAT_ID</code> får du besked ved køb og salg${hour >= 0 ? ` og en dagsrapport kl. ${esc(local)} (din tid)` : ""}. ${s.telegram_commands ? "Du kan også styre botten med kommandoer. Kun beskeder fra din egen chat besvares, og der kan ikke hæves penge herfra." : "Kommandoer er slået fra (MEME_TELEGRAM_COMMANDS=false)."}</p>
+    ${s.telegram_commands ? `<div class="kv">${commands.map(([c, d]) => `<div><span>${esc(d)}</span><b><code>${esc(c)}</code></b></div>`).join("")}</div>` : ""}`);
+}
+async function askCode() {
+  if (!(state && state.security && state.security.totp)) return "";
+  const code = prompt("Kode fra din godkendelses-app (6 cifre):");
+  if (code == null) throw new Error("Annulleret");
+  return code.trim();
+}
+
+/* ---------- Nye handler: toasts og notifikationer ---------- */
+function notifyEnabled() { try { return localStorage.getItem("meme-notify") === "1" && "Notification" in window && Notification.permission === "granted"; } catch (e) { return false; } }
+function renderBell() {
+  const on = notifyEnabled();
+  const b = document.getElementById("notify");
+  b.innerHTML = icon(on ? "bell" : "bellOff");
+  b.setAttribute("aria-pressed", on ? "true" : "false");
+  b.hidden = !("Notification" in window);
+}
+function toast(kind, title, body) {
+  const box = document.getElementById("toasts");
+  const el = document.createElement("div");
+  el.className = "toast " + kind;
+  el.innerHTML = `<span class="ico">${icon(kind === "up" ? "upr" : kind === "down" ? "downr" : kind === "buy" ? "plus" : "check")}</span><div><b>${esc(title)}</b><span class="muted">${esc(body)}</span></div>`;
+  box.appendChild(el);
+  setTimeout(() => el.remove(), 7000);
+  if (notifyEnabled() && document.hidden) { try { new Notification(title, { body }); } catch (e) {} }
+}
+function detectChanges(data) {
+  const open = new Set((data.positions || []).map((p) => p.id));
+  const closed = new Set((data.trades || []).map((t) => t.id));
+  if (seenOpen && seenClosed) {
+    for (const p of data.positions || []) if (!seenOpen.has(p.id)) toast("buy", `Købt ${p.symbol}`, `${money(p.cost_usd)} · ${p.source}`);
+    for (const t of data.trades || []) if (!seenClosed.has(t.id)) toast(t.pnl_usd > 0 ? "up" : "down", `Solgt ${t.symbol} ${signed(t.pnl_usd)}`, `${spct(t.pnl_pct)} · ${t.exit_reason}`);
+  }
+  seenOpen = open; seenClosed = closed;
+}
+
+/* ---------- Render og netværk ---------- */
+function render(data) {
+  state = data;
+  renderHeader(data);
+  renderAlerts(data);
+  renderTabs(data);
+  renderHero(data);
+  renderKpis(data);
+  renderActions(data);
+  renderOverview(data);
+  renderPositions(data);
+  renderSniper(data);
+  renderRadar(data);
+  renderJournal(data);
+  renderLearning(data);
+  renderWallets(data);
+  renderKrav(data);
+  renderShadows(data);
+  renderOptimizer(data);
+  renderDiagnostics(data);
+  renderSecurity(data);
+  renderExecution(data);
+  renderTelegram(data);
+}
+function csrfToken() { const m = document.cookie.match(/(?:^|; )dt_csrf=([^;]*)/); return m ? decodeURIComponent(m[1]) : ""; }
+async function refresh() {
+  try {
+    const r = await fetch("/api/meme/status", { cache: "no-store", credentials: "same-origin" });
+    if (r.status === 401) { location.assign("/login"); return; }
+    if (!r.ok) { const b = await r.json().catch(() => ({})); throw new Error(b.detail || "HTTP " + r.status); }
+    const data = await r.json();
+    pollFailed = false;
+    countdown = data.engine.next_scan_in || 0;
+    countdownBase = Date.now();
+    detectChanges(data);
+    render(data);
+  } catch (err) {
+    pollFailed = true;
+    if (state) renderHeader(state);
+    else document.getElementById("status-text").textContent = "Ingen forbindelse: " + err.message;
+  }
+}
+async function post(url, payload) {
+  const r = await fetch(url, { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken() }, body: JSON.stringify(payload || {}) });
+  if (r.status === 401) { location.assign("/login"); throw new Error("Log ind for at fortsætte."); }
+  const body = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(typeof body.detail === "string" ? body.detail : "Handlingen fejlede.");
+  return body;
+}
+async function act(fn, ok) {
+  try { const body = await fn(); if (body && body.kpis) render(body); else if (body && body.status) render(body.status); if (ok) toast("", ok, ""); }
+  catch (err) { toast("down", "Det gik ikke", err.message); }
+}
+
+/* ---------- Hændelser ---------- */
+document.getElementById("tabs").addEventListener("click", (ev) => { const b = ev.target.closest(".tab"); if (b) setTab(b.dataset.tab, true); });
+document.addEventListener("click", (ev) => {
+  const t = ev.target.closest("[data-goto],[data-dismiss],#more-alerts,[data-stage],[data-jf],[data-row],[data-sell],[data-block],[data-unblock],[data-unfollow],[data-copy],[data-range]");
+  if (!t) return;
+  if (t.dataset.goto) setTab(t.dataset.goto, true);
+  else if (t.dataset.dismiss) { dismissed.add(t.dataset.dismiss); render(state); }
+  else if (t.id === "more-alerts") { showAllAlerts = true; render(state); }
+  else if (t.dataset.stage) { radarStage = t.dataset.stage; render(state); }
+  else if (t.dataset.jf) { journalFilter = t.dataset.jf; render(state); }
+  else if (t.dataset.range) { range = t.dataset.range; document.querySelectorAll("#range button").forEach((b) => b.setAttribute("aria-pressed", b.dataset.range === range ? "true" : "false")); render(state); }
+  else if (t.dataset.row) { const id = Number(t.dataset.row); expanded.has(id) ? expanded.delete(id) : expanded.add(id); render(state); }
+  else if (t.dataset.sell) {
+    const sym = t.dataset.symbol;
+    if (confirm(`Sælg ${sym} nu?`)) act(async () => {
+      const b = await post("/api/meme/sell", { id: Number(t.dataset.sell) });
+      if (b.sell === "queued") toast("", `${sym} sælges om få sekunder`, "Botten er midt i en runde og sælger lige efter.");
+      else toast("up", `${sym} er solgt`, "");
+      return b;
+    });
+  }
+  else if (t.dataset.block) { if (confirm(`Bloker ${t.dataset.symbol || "tokenet"}? Botten køber det aldrig.`)) act(() => post("/api/meme/blacklist", { mint: t.dataset.block, symbol: t.dataset.symbol, action: "block" }), "Tokenet er blokeret"); }
+  else if (t.dataset.unblock) act(() => post("/api/meme/blacklist", { mint: t.dataset.unblock, action: "unblock" }), "Blokeringen er fjernet");
+  else if (t.dataset.unfollow) { if (confirm("Stop med at følge denne wallet?")) act(() => post("/api/meme/wallets", { wallet: t.dataset.unfollow, action: "remove" }), "Wallet fjernet"); }
+  else if (t.dataset.copy) { ev.preventDefault(); navigator.clipboard && navigator.clipboard.writeText(t.dataset.copy).then(() => toast("", "Adressen er kopieret", short(t.dataset.copy))).catch(() => {}); }
+});
+document.addEventListener("input", (ev) => {
+  if (ev.target.id === "radar-search") { radarQuery = ev.target.value; cache.radar = null; renderRadar(state); }
+  else if (ev.target.dataset && ev.target.dataset.sf) setDraft(ev.target.dataset.sf, ev.target.value);
+});
+document.getElementById("panel-sniper").addEventListener("click", (ev) => {
+  const preset = ev.target.closest("[data-tp]");
+  const toggle = ev.target.closest("[data-sb]");
+  if (preset) setDraft("take_profit_pct", Number(preset.dataset.tp) * 100);
+  else if (toggle && sniperDraft) {
+    const name = toggle.dataset.sb;
+    sniperDraft[name] = !sniperDraft[name];
+    sniperDirty = true;
+    toggle.setAttribute("aria-checked", sniperDraft[name] ? "true" : "false");
+    renderPreview();
+  }
+});
+document.getElementById("panel-sniper").addEventListener("click", (ev) => {
+  const apply = ev.target.closest("#opt-apply");
+  if (!apply) return;
+  const tp = Number(apply.dataset.tp), sl = Number(apply.dataset.sl);
+  if (!confirm(`Sæt sniperens mål til ${spct(tp)} og stop til ${spct(-sl)}?`)) return;
+  act(async () => { const b = await post("/api/meme/sniper", { take_profit_pct: tp, stop_loss_pct: sl }); sniperDirty = false; sniperKey = ""; return b; }, "Nyt mål og stop er gemt");
+});
+document.getElementById("diag-run").addEventListener("click", async (ev) => {
+  const b = ev.currentTarget;
+  b.disabled = true;
+  b.innerHTML = icon("scan", "sm") + "Tester…";
+  try {
+    const result = await post("/api/meme/diagnostics");
+    if (state) { state.diagnostics = result; delete cache.diag; }
+    toast(result.required_ok ? "up" : "down", `${result.ok} af ${result.total} forbindelser virker`, result.required_ok ? "" : "Se forklaringen ved det, der fejler.");
+  } catch (err) {
+    toast("down", "Testen fejlede", err.message);
+  } finally {
+    b.disabled = false;
+    if (state) renderDiagnostics(state);
+  }
+});
+document.getElementById("report-now").addEventListener("click", async () => {
+  try {
+    const r = await post("/api/meme/report");
+    const el = document.getElementById("report-text");
+    el.textContent = r.text;
+    el.hidden = false;
+  } catch (err) {
+    toast("down", "Rapporten kunne ikke laves", err.message);
+  }
+});
+
+document.getElementById("sniper-switch").addEventListener("click", () => {
+  const on = !(state && state.sniper && state.sniper.enabled);
+  act(() => post("/api/meme/sniper", { enabled: on }), on ? "Sniperen er tændt" : "Sniperen er slukket");
+});
+document.getElementById("sniper-save").addEventListener("click", () => {
+  if (!sniperDraft) return;
+  const { enabled, ...rest } = sniperDraft;
+  act(async () => { const b = await post("/api/meme/sniper", rest); sniperDirty = false; sniperKey = ""; return b; }, "Sniper-indstillingerne er gemt");
+});
+document.getElementById("sniper-reset").addEventListener("click", () => {
+  if (!confirm("Sæt alle sniper-indstillinger tilbage til standard?")) return;
+  act(async () => { const b = await post("/api/meme/sniper", { reset: true }); sniperDirty = false; sniperKey = ""; return b; }, "Standardindstillingerne er tilbage");
+});
+document.getElementById("scan").addEventListener("click", async (ev) => {
+  const b = ev.currentTarget; b.disabled = true;
+  try { await post("/api/meme/scan"); toast("", "Scanning bestilt", "Resultatet dukker op om lidt."); setTimeout(refresh, 3500); }
+  catch (err) { toast("down", "Det gik ikke", err.message); }
+  finally { setTimeout(() => { b.disabled = false; }, 2500); }
+});
+document.getElementById("pause").addEventListener("click", () => act(() => post("/api/meme/pause", { paused: !(state && state.paused) }), state && state.paused ? "Botten køber igen" : "Nye køb er sat på pause"));
+document.getElementById("kill").addEventListener("click", (ev) => {
+  if (ev.currentTarget.dataset.mode === "resume") return act(() => post("/api/meme/resume"), "Genoptaget");
+  if (confirm("Nødstop: sælg alle positioner nu og stop nye køb?")) act(() => post("/api/meme/kill"), "Nødstop er aktivt");
+});
+document.getElementById("to-paper").addEventListener("click", () => { if (confirm("Sælg alle live-positioner og gå tilbage til papirpenge?")) act(() => post("/api/meme/paper"), "Tilbage på papirpenge"); });
+document.getElementById("panel-wallets").addEventListener("click", (ev) => {
+  const t = ev.target.closest("#ph-connect,#ph-disconnect,[data-dep],#dep-go,[data-wfill],#withdraw-go");
+  if (!t) return;
+  ev.preventDefault();
+  if (t.id === "ph-connect") connectPhantom(false);
+  else if (t.id === "ph-disconnect") disconnectPhantom();
+  else if (t.dataset.dep) { const i = document.getElementById("dep-sol"); if (i) i.value = t.dataset.dep; }
+  else if (t.id === "dep-go") { const v = Number((document.getElementById("dep-sol") || {}).value); if (v > 0) depositFromPhantom(v); else toast("down", "Skriv et beløb i SOL", ""); }
+  else if (t.dataset.wfill) { const i = document.getElementById("withdraw-sol"); if (i) i.value = t.dataset.wfill; }
+  else if (t.id === "withdraw-go") {
+    const v = Number((document.getElementById("withdraw-sol") || {}).value);
+    if (!(v > 0)) { toast("down", "Skriv et beløb i SOL", ""); return; }
+    const to = walletInfo && walletInfo.withdraw_address;
+    if (!confirm(`Send ${fmtNum.format(v)} SOL fra bot-wallet'en til ${short(to)}?`)) return;
+    act(async () => { const code = await askCode(); const b = await post("/api/meme/wallet/withdraw", { sol: v, code }); walletInfo = { ...b.wallet, phantom: walletInfo && walletInfo.phantom }; if (state) renderWalletCards(state); setTimeout(() => refreshWallet(true), 4000); toast("up", `${fmtNum.format(b.sol)} SOL er sendt til din Phantom`, "tx " + short(b.signature)); return null; });
+  }
+});
+document.getElementById("bulk-form").addEventListener("submit", (ev) => {
+  ev.preventDefault();
+  const input = document.getElementById("bulk-input");
+  const wallets = input.value.split(/[\s,;]+/).map((x) => x.trim()).filter(Boolean);
+  if (!wallets.length) return;
+  act(async () => {
+    const b = await post("/api/meme/wallets", { wallets, action: "add" });
+    input.value = "";
+    const r = b.import || { added: 0, errors: [] };
+    toast(r.added ? "up" : "down", `${r.added} wallets tilføjet`, r.errors.length ? `${r.errors.length} sprunget over: ${r.errors[0]}` : "");
+    return b;
+  });
+});
+document.getElementById("wallet-form").addEventListener("submit", (ev) => {
+  ev.preventDefault();
+  const input = document.getElementById("wallet-input");
+  const wallet = input.value.trim();
+  if (!wallet) return;
+  act(async () => { const b = await post("/api/meme/wallets", { wallet, action: "add" }); input.value = ""; return b; }, "Wallet tilføjet");
+});
+document.getElementById("unlock-form").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  try { const code = await askCode(); const b = await post("/api/meme/live/unlock", { phrase: document.getElementById("phrase").value, code }); render(b.status); document.getElementById("unlock-msg").textContent = b.message; }
+  catch (err) { document.getElementById("unlock-msg").textContent = err.message; }
+});
+document.getElementById("notify").addEventListener("click", async () => {
+  if (!("Notification" in window)) return;
+  if (notifyEnabled()) { try { localStorage.setItem("meme-notify", "0"); } catch (e) {} renderBell(); toast("", "Notifikationer er slået fra", ""); return; }
+  const perm = await Notification.requestPermission();
+  if (perm === "granted") { try { localStorage.setItem("meme-notify", "1"); } catch (e) {} toast("", "Notifikationer er slået til", "Du får besked ved køb og salg, når fanen ikke er åben."); }
+  else toast("down", "Browseren afviste notifikationer", "Tillad dem i browserens indstillinger.");
+  renderBell();
+});
+document.getElementById("theme").addEventListener("click", () => applyTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark"));
+document.getElementById("logout").addEventListener("click", async () => { try { await post("/logout"); } catch (e) {} location.assign("/login"); });
+document.addEventListener("keydown", (ev) => {
+  if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
+  const tag = (ev.target.tagName || "").toLowerCase();
+  if (tag === "input" || tag === "textarea") { if (ev.key === "Escape") ev.target.blur(); return; }
+  if (/^[1-8]$/.test(ev.key)) { setTab(TABS[Number(ev.key) - 1][0], true); return; }
+  const k = ev.key.toLowerCase();
+  if (k === "s") document.getElementById("scan").click();
+  else if (k === "p") document.getElementById("pause").click();
+  else if (k === "t") document.getElementById("theme").click();
+  else if (ev.key === "/") { ev.preventDefault(); setTab("radar", true); const i = document.getElementById("radar-search"); if (i) i.focus(); }
+});
+window.addEventListener("hashchange", () => setTab(location.hash.slice(1), false));
+let resizeTimer = null;
+window.addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { delete cache["equity-svg"]; if (state) renderHero(state); }, 150); });
+setInterval(() => { if (active === "wallets") refreshWallet(false); }, 5000);
+setInterval(() => {
+  if (!state) return;
+  const left = Math.max(0, Math.round((state.engine.next_scan_in || 0) - (Date.now() - countdownBase) / 1000));
+  if (left !== countdown) { countdown = left; renderHeader(state); }
+}, 1000);
+
+/* ---------- Start ---------- */
+document.getElementById("stocks-link").innerHTML = icon("stocks");
+document.getElementById("logout").innerHTML = icon("logout");
+if (csrfToken()) document.getElementById("logout").hidden = false;
+let storedTheme = null;
+try { storedTheme = localStorage.getItem("meme-theme"); } catch (e) {}
+const queryTheme = new URLSearchParams(location.search).get("theme");
+applyTheme(queryTheme === "dark" || queryTheme === "light" ? queryTheme : (storedTheme || "dark"));
+renderBell();
+renderTabs({ positions: [], kpis: { trades: 0 }, copy_wallets: [], sniper: null });
+setTab(location.hash.slice(1) || "oversigt", false);
+bindEquityHover();
+bindDailyHover();
+(() => {
+  const p = phantomProvider();
+  if (!p) return;
+  let wanted = false;
+  try { wanted = localStorage.getItem("meme-phantom") === "1"; } catch (e) {}
+  if (wanted) connectPhantom(true);
+  if (p.on) p.on("accountChanged", (pk) => { phantomAddr = pk ? pk.toString() : null; refreshWallet(true); if (state) renderWalletCards(state); });
+})();
+refresh();
+// Hurtig opdatering, når siden er åben. Kun hvert minut, når fanen ligger i baggrunden (sparer data på mobil).
+let lastPoll = 0;
+setInterval(() => {
+  const wait = document.hidden ? 60000 : 8000;
+  if (Date.now() - lastPoll >= wait - 50) { lastPoll = Date.now(); refresh(); }
+}, 1000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden && Date.now() - lastPoll > 3000) { lastPoll = Date.now(); refresh(); } });
+</script>
+</body>
+</html>
