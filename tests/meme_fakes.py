@@ -200,3 +200,11 @@ def make_engine(cfg: MemeSettings | None = None, *, rpc=None, researcher=None):
     clients = MemeClients(cfg, dex=dex, rug=rug, jup=jup, x=None, rpc=rpc)
     engine = MemeEngine(cfg, store=store, clients=clients, researcher=researcher, notifier=notes.append)
     return engine, dex, rug, jup, notes
+
+
+def quiet_engine(cfg: MemeSettings | None = None):
+    """En memebot med falske kilder og uden baggrundstråd. Til tests af HTTP-laget."""
+    engine, *_ = make_engine(cfg)
+    engine.start = lambda: None
+    engine.stop = lambda: None
+    return engine

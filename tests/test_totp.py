@@ -7,12 +7,10 @@ import re
 import pytest
 from fastapi.testclient import TestClient
 
-from meme_fakes import make_engine
+from meme_fakes import make_engine, quiet_engine
 from test_auth import _settings
 from trader.app import create_app
 from trader.auth import enforce_startup, new_totp_secret, totp_code, totp_ok, totp_uri
-from trader.db import Database
-from trader.engine import TradingEngine
 
 SECRET = "JBSWY3DPEHPK3PXP"  # kendt testhemmelighed
 
@@ -39,8 +37,7 @@ def test_bad_secret_stops_startup(tmp_path):
 
 def _client(tmp_path, meme=None):
     settings = _settings(tmp_path, app_totp_secret=SECRET)
-    engine = TradingEngine(settings=settings, db=Database(settings.db_path))
-    return TestClient(create_app(engine=engine, settings=settings, meme_engine=meme))
+    return TestClient(create_app(settings=settings, meme_engine=meme or quiet_engine()))
 
 
 def _login(client, code):

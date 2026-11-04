@@ -319,105 +319,104 @@ def render_login(csrf: str, error: str = "", username: str = "", totp: bool = Fa
     )
 
 
-_TOTP_FIELD = """<label>Kode fra din godkendelses-app
+_TOTP_FIELD = """<label class="field">
+      <span>Kode fra din godkendelses-app</span>
       <input name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9 ]{6,7}" maxlength="7" required placeholder="123 456">
     </label>"""
 
-
 _LOGIN_HTML = """<!DOCTYPE html>
-<html lang="da">
+<html lang="da" data-theme="dark">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="dark light">
-<title>Log ind · AI Daytrader</title>
+<title>Log ind · Memebot</title>
+<link rel="icon" type="image/png" href="/icons/icon-192.png">
 <link rel="manifest" href="/manifest.webmanifest">
-<meta name="theme-color" content="#07090e" media="(prefers-color-scheme: dark)">
-<meta name="theme-color" content="#f3f5fa" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#07080c">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="Memebot">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%239945ff'/%3E%3Cstop offset='1' stop-color='%2314f195'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='9' fill='url(%23g)'/%3E%3Ctext x='16' y='21.5' text-anchor='middle' font-size='13' font-weight='700' fill='white' font-family='Arial'%3EDT%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400..700&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #f3f5fa; --surface: #ffffff; --surface-2: #f7f8fc; --text: #0d1120; --muted: #636b82;
-    --border: rgba(16, 22, 45, 0.12); --accent: #7537ee; --bad: #d23350; --bad-soft: rgba(210, 51, 80, 0.1);
-    --glow-1: rgba(153, 69, 255, 0.14); --glow-2: rgba(20, 241, 149, 0.1);
-    color-scheme: light;
-  }
-  html[data-theme="dark"] {
-    --bg: #07090e; --surface: #0e121a; --surface-2: #121722; --text: #eef1f8; --muted: #8189a0;
-    --border: rgba(255, 255, 255, 0.1); --accent: #a77bff; --bad: #ff6680; --bad-soft: rgba(255, 102, 128, 0.12);
-    --glow-1: rgba(153, 69, 255, 0.22); --glow-2: rgba(20, 241, 149, 0.1);
     color-scheme: dark;
+    --bg: #07080c; --surface: #10131b; --surface-2: #151925; --raised: #1b2030;
+    --border: rgba(255,255,255,0.08); --border-strong: rgba(255,255,255,0.15);
+    --text: #f3f4fa; --muted: #7c8297; --accent: #a47cff; --accent-soft: rgba(164,124,255,0.16);
+    --bad: #ff5d7d; --bad-soft: rgba(255,93,125,0.13);
+    --grad: linear-gradient(135deg, #9945ff 0%, #6a5cf5 45%, #14f195 100%);
+    --font: "Geist", -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  }
+  :root[data-theme="light"] {
+    color-scheme: light;
+    --bg: #f3f4f8; --surface: #ffffff; --surface-2: #f7f8fb; --raised: #eef0f5;
+    --border: rgba(12,16,32,0.08); --border-strong: rgba(12,16,32,0.16);
+    --text: #0b0d14; --muted: #6a7085; --accent: #7a3ff0; --accent-soft: rgba(122,63,240,0.1);
+    --bad: #e0365a; --bad-soft: rgba(224,54,90,0.1);
   }
   * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
   body {
-    margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px 16px;
-    font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--text);
-    background:
-      radial-gradient(900px 480px at 10% -10%, var(--glow-1), transparent 60%),
-      radial-gradient(800px 420px at 100% 110%, var(--glow-2), transparent 55%),
-      var(--bg);
+    margin: 0; min-height: 100vh; min-height: 100dvh; display: grid; place-items: center;
+    padding: max(24px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+    background: var(--bg); color: var(--text); font: 15px/1.45 var(--font);
+    -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent;
   }
-  main { width: min(400px, 100%); }
-  .brand { display: flex; gap: 12px; align-items: center; margin-bottom: 22px; }
-  .mark {
-    width: 44px; height: 44px; border-radius: 13px; display: grid; place-items: center;
-    background: linear-gradient(135deg, #9945ff, #14f195); color: #fff; font-weight: 700;
-    box-shadow: 0 8px 24px rgba(153, 69, 255, 0.35);
+  body::before {
+    content: ""; position: fixed; inset: -30vh -20vw auto; height: 80vh; z-index: -1; pointer-events: none;
+    background: radial-gradient(55% 55% at 25% 10%, rgba(153,69,255,0.32), transparent 70%), radial-gradient(45% 45% at 85% 20%, rgba(20,241,149,0.16), transparent 70%);
   }
-  h1 { font-size: 1.3rem; margin: 0; }
-  .brand p { margin: 2px 0 0; color: var(--muted); font-size: 0.9rem; }
-  form {
-    background: var(--surface); border: 1px solid var(--border); border-radius: 18px;
-    padding: 22px; display: grid; gap: 14px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.18);
-  }
-  label { display: grid; gap: 6px; font-size: 0.86rem; color: var(--muted); font-weight: 500; }
+  :root[data-theme="light"] body::before { opacity: 0.55; }
+  main { width: 100%; max-width: 380px; }
+  .brand { text-align: center; margin-bottom: 26px; }
+  .brand img { width: 76px; height: 76px; border-radius: 22px; display: block; margin: 0 auto 16px; box-shadow: 0 18px 40px -16px rgba(124,77,255,0.8); }
+  h1 { margin: 0; font-size: 30px; font-weight: 700; letter-spacing: -0.035em; }
+  .brand p { margin: 6px 0 0; color: var(--muted); font-size: 15px; }
+  form { display: grid; gap: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 26px; padding: 22px 20px; box-shadow: 0 24px 60px -30px rgba(0,0,0,0.7); }
+  .field { display: grid; gap: 7px; font-size: 13px; font-weight: 600; color: var(--muted); }
   input {
-    font: inherit; color: var(--text); background: var(--surface-2);
-    border: 1px solid var(--border); border-radius: 11px; height: 44px; padding: 0 12px;
+    height: 52px; padding: 0 16px; border-radius: 14px; border: 1px solid var(--border-strong); background: var(--surface-2);
+    color: var(--text); font: 17px var(--font); outline: none; width: 100%;
   }
-  input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  input:focus { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+  input[name="code"] { letter-spacing: 0.25em; text-align: center; font-size: 20px; }
   button[type="submit"] {
-    font: inherit; font-weight: 600; cursor: pointer; border: 0; height: 44px; border-radius: 11px;
-    color: #fff; background: linear-gradient(135deg, #8a3ffc, #12c98a); box-shadow: 0 8px 24px rgba(117, 55, 238, 0.3);
+    height: 54px; margin-top: 4px; border: 0; border-radius: 15px; background: var(--grad); color: #fff;
+    font: 650 17px var(--font); cursor: pointer; box-shadow: 0 14px 30px -14px rgba(124,77,255,0.9); touch-action: manipulation;
   }
-  .hint { margin: -4px 0 0; color: var(--muted); font-size: 0.8rem; line-height: 1.4; }
-  .error { margin: 0; padding: 10px 12px; border-radius: 11px; background: var(--bad-soft); color: var(--bad); font-size: 0.9rem; }
-  .theme {
-    margin: 16px auto 0; display: block; background: transparent; color: var(--muted);
-    border: 1px solid var(--border); border-radius: 999px; padding: 5px 14px; cursor: pointer; font: inherit; font-size: 0.86rem;
-  }
-  [hidden] { display: none; }
+  button[type="submit"]:active { transform: scale(0.985); }
+  .error { margin: 0; padding: 12px 14px; border-radius: 14px; background: var(--bad-soft); color: var(--bad); font-size: 14px; font-weight: 550; }
+  .error[hidden] { display: none; }
+  .hint { margin: 2px 2px 0; color: var(--muted); font-size: 12.5px; line-height: 1.45; }
+  .theme { margin: 22px auto 0; display: block; height: 40px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--border); background: transparent; color: var(--muted); font: 600 13px var(--font); cursor: pointer; }
 </style>
 </head>
 <body>
 <main>
   <div class="brand">
-    <div class="mark">DT</div>
-    <div>
-      <h1>AI Daytrader</h1>
-      <p>Memebot og aktier · kun for dig</p>
-    </div>
+    <img src="/icons/icon-192.png" alt="">
+    <h1>Memebot</h1>
+    <p>Log ind for at følge din bot</p>
   </div>
   <form method="post" action="/login" autocomplete="on">
     <p class="error" __ERROR_HIDDEN__>__ERROR__</p>
     <input type="hidden" name="csrf" value="__CSRF__">
-    <label>Brugernavn
+    <label class="field">
+      <span>Brugernavn</span>
       <input name="username" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required value="__USERNAME__">
     </label>
-    <label>Adgangskode
+    <label class="field">
+      <span>Adgangskode</span>
       <input name="password" type="password" autocomplete="current-password" required>
     </label>
-    <p class="hint">Det er APP_USERNAME og APP_PASSWORD fra Variables i Railway. Store og små bogstaver tæller i adgangskoden.</p>
     __TOTP__
     <button type="submit">Log ind</button>
+    <p class="hint">Det er APP_USERNAME og APP_PASSWORD fra Variables i Railway. Store og små bogstaver tæller i adgangskoden.</p>
   </form>
   <button class="theme" id="theme" type="button">Lyst tema</button>
 </main>
@@ -426,6 +425,8 @@ function applyTheme(theme) {
   document.documentElement.dataset.theme = theme;
   try { localStorage.setItem("meme-theme", theme); } catch (e) {}
   document.getElementById("theme").textContent = theme === "dark" ? "Lyst tema" : "Mørkt tema";
+  var meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute("content", theme === "dark" ? "#07080c" : "#f3f4f8");
 }
 var stored = null;
 try { stored = localStorage.getItem("meme-theme"); } catch (e) {}

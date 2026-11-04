@@ -39,7 +39,7 @@ def test_icon_route_serves_only_known_files(tmp_path):
         assert sneaky.status_code in {401, 303, 404}  # aldrig selve filen
         assert "import" not in sneaky.text
         # Alt andet kræver stadig login.
-        assert client.get("/api/status").status_code == 401
+        assert client.get("/api/meme/status").status_code == 401
         assert client.get("/meme", follow_redirects=False).status_code == 303
 
 
@@ -52,3 +52,13 @@ def test_pages_link_the_manifest(tmp_path):
         assert 'rel="manifest"' in meme.text
         assert 'id="app-card"' in meme.text
         assert 'apple-mobile-web-app-title" content="Memebot"' in meme.text
+
+
+def test_dashboard_is_mobile_first_and_memebot_only(tmp_path):
+    with _client(tmp_path) as client:
+        assert _login(client).status_code == 303
+        page = client.get("/meme").text
+        assert "viewport-fit=cover" in page  # plads til notch og hjemmeindikator på iPhone
+        assert 'id="nav"' in page and 'id="sheet-root"' in page
+        assert "confirm(" not in page and "window.prompt" not in page  # egne pop-op-ark i stedet
+        assert "Daytrader" not in page and "/api/status" not in page
