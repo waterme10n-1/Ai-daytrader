@@ -112,3 +112,25 @@ Skaler ikke tjenesten til mere end ét replika. Et nyt replika ville åbne sin e
 ```bash
 pytest
 ```
+
+## Claude Code-connectors (MCP)
+
+`.mcp.json` i roden giver Claude Code fire connectors, når du arbejder i dette repo. Claude Code spørger første gang, om du vil godkende dem.
+
+| Connector | Hvad den gør | Kræver |
+|---|---|---|
+| perplexity | Søger på nettet med kilder | `PERPLEXITY_API_KEY` (console.perplexity.ai, betales pr. brug) |
+| firecrawl | Læser en webside som ren tekst | Intet til basisbrug |
+| playwright | Egen browser: klik, formularer, test | Intet. Node.js 18+ |
+| posthog | Svarer ud fra dine PostHog-tal | `POSTHOG_PERSONAL_API_KEY` (PostHog → Personal API keys) |
+
+Nøglerne sættes som miljøvariabler i din shell, ikke i filen, så de aldrig ender i git:
+
+```bash
+export PERPLEXITY_API_KEY="..."
+export POSTHOG_PERSONAL_API_KEY="..."
+```
+
+Composio er ikke med i filen, fordi den installeres med sit eget script og et browser-login. Kør på din egen maskine: `curl -fsSL https://composio.dev/install | sh`, genstart terminalen og kør `composio login`.
+
+Tjek i Claude Code med `/mcp`. Fjern en med `claude mcp remove <navn>`.
