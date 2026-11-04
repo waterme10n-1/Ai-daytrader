@@ -8,7 +8,9 @@ from __future__ import annotations
 
 import logging
 import math
+import threading
 import time
+from collections import deque
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -23,6 +25,111 @@ USER_AGENT = "ai-daytrader-meme/1.0"
 
 class SourceError(RuntimeError):
     pass
+
+
+class RateLimited(SourceError):
+    """API'et har sagt stop (429), eller botten sparer selv på kvoten. Prøv igen senere."""
+
+
+# Andel af minutkvoten hver slags kald må bruge. Salg og køb går altid forrest.
+PRIORITY_SHARE = {"high": 1.0, "normal": 0.8, "low": 0.6}
+HIGH_PRIORITY_MAX_WAIT = 8.0
+COOLDOWN_START_SECONDS = 15.0
+COOLDOWN_MAX_SECONDS = 120.0
+
+
+class CallBudget:
+    """Holder styr på kald pr. minut (glidende vindue), så vi ikke rammer API'ets grænse.
+
+    Jupiter tæller quote, pris og token-lister i samme spand. Lavprioritets-kald (lister over nye
+    tokens) springes over, når kvoten er ved at være brugt, så der altid er plads til salg.
+    """
+
+    def __init__(self, per_minute: int, *, clock=time.monotonic, sleep=time.sleep) -> None:
+        self.per_minute = max(1, int(per_minute))
+        self._clock = clock
+        self._sleep = sleep
+        self._lock = threading.Lock()
+        self._calls: deque[float] = deque()
+        self._cooldown_until = 0.0
+        self._strikes = 0
+        self.limited_total = 0
+        self.skipped_total = 0
+        self.last_limited_at = 0.0
+
+    def _prune(self, now: float) -> None:
+        while self._calls and now - self._calls[0] >= 60.0:
+            self._calls.popleft()
+
+    def _wait_needed(self, priority: str, now: float) -> float:
+        """Sekunder til der er plads. 0 betyder klar nu."""
+        if now < self._cooldown_until:
+            return self._cooldown_until - now
+        allowed = max(1, int(self.per_minute * PRIORITY_SHARE.get(priority, PRIORITY_SHARE["normal"])))
+        if len(self._calls) < allowed:
+            return 0.0
+        return max(0.05, self._calls[len(self._calls) - allowed] + 60.0 - now)
+
+    def take(self, priority: str = "normal") -> None:
+        """Reserver en plads. Lister og nye køb springes over, når kvoten er brugt.
+
+        Salg (high) springes aldrig over: de venter højst et par sekunder og prøver så alligevel,
+        for et stop-loss, der ikke bliver sendt, er værre end endnu et 429.
+        """
+        waited = 0.0
+        while True:
+            with self._lock:
+                now = self._clock()
+                self._prune(now)
+                wait = self._wait_needed(priority, now)
+                if wait <= 0 or (priority == "high" and waited >= HIGH_PRIORITY_MAX_WAIT):
+                    self._calls.append(now)
+                    return
+                if priority != "high":
+                    self.skipped_total += 1
+                    reason = "venter efter rate limit" if now < self._cooldown_until else "sparer på kvoten"
+                    raise RateLimited(f"{reason} ({len(self._calls)}/{self.per_minute} kald det seneste minut)")
+                pause = min(wait, HIGH_PRIORITY_MAX_WAIT - waited)
+            self._sleep(pause)
+            waited += pause
+
+    def limited(self, retry_after: float | None = None) -> float:
+        """API'et svarede 429. Hold pause, længere for hver gang i træk."""
+        with self._lock:
+            self._strikes += 1
+            self.limited_total += 1
+            pause = COOLDOWN_START_SECONDS * (2 ** (self._strikes - 1))
+            if retry_after and retry_after > 0:
+                pause = max(pause, retry_after)
+            pause = min(COOLDOWN_MAX_SECONDS, pause)
+            now = self._clock()
+            self.last_limited_at = now
+            self._cooldown_until = max(self._cooldown_until, now + pause)
+            return pause
+
+    def succeeded(self) -> None:
+        with self._lock:
+            self._strikes = 0
+
+    def snapshot(self) -> dict:
+        with self._lock:
+            now = self._clock()
+            self._prune(now)
+            return {
+                "used_last_minute": len(self._calls),
+                "per_minute": self.per_minute,
+                "cooldown_seconds": round(max(0.0, self._cooldown_until - now)),
+                "limited_total": self.limited_total,
+                "skipped_total": self.skipped_total,
+                "limited_seconds_ago": round(now - self.last_limited_at) if self.last_limited_at else None,
+            }
+
+
+def _retry_after(response: httpx.Response) -> float | None:
+    try:
+        return float(response.headers.get("retry-after", ""))
+    except ValueError:
+        return None
 
 
 def _num(value: Any, default: float = 0.0) -> float:
@@ -46,41 +153,58 @@ def _int(value: Any, default: int = 0) -> int:
 
 
 class _Http:
-    def __init__(self, base: str, *, headers: dict[str, str] | None = None, timeout: float = 12.0) -> None:
+    def __init__(
+        self,
+        base: str,
+        *,
+        headers: dict[str, str] | None = None,
+        timeout: float = 12.0,
+        budget: CallBudget | None = None,
+        transport: httpx.BaseTransport | None = None,
+    ) -> None:
         merged = {"User-Agent": USER_AGENT, "Accept": "application/json"}
         if headers:
             merged.update(headers)
         self.base = base.rstrip("/")
-        self._client = httpx.Client(base_url=self.base, headers=merged, timeout=timeout)
+        self.budget = budget
+        self._client = httpx.Client(base_url=self.base, headers=merged, timeout=timeout, transport=transport)
 
     def close(self) -> None:
         self._client.close()
 
-    def get(self, path: str, params: dict | None = None) -> Any:
+    def _send(self, method: str, path: str, priority: str, **kwargs) -> httpx.Response:
+        if self.budget is not None:
+            self.budget.take(priority)
         try:
-            response = self._client.get(path, params=params)
+            response = self._client.request(method, path, **kwargs)
         except httpx.HTTPError as exc:
             raise SourceError(f"{self.base}{path}: {exc.__class__.__name__}") from exc
         if response.status_code == 429:
-            raise SourceError(f"{self.base}{path}: rate limit (429)")
+            pause = self.budget.limited(_retry_after(response)) if self.budget is not None else 0
+            note = f", venter {pause:.0f} s" if pause else ""
+            raise RateLimited(f"{self.base}{path}: rate limit (429){note}")
+        if self.budget is not None and response.status_code < 400:
+            self.budget.succeeded()
+        return response
+
+    @staticmethod
+    def _json(response: httpx.Response, where: str) -> Any:
+        try:
+            return response.json()
+        except ValueError as exc:
+            raise SourceError(f"{where}: svaret var ikke JSON") from exc
+
+    def get(self, path: str, params: dict | None = None, *, priority: str = "normal") -> Any:
+        response = self._send("GET", path, priority, params=params)
         if response.status_code >= 400:
             raise SourceError(f"{self.base}{path}: HTTP {response.status_code} {response.text[:160]}")
-        try:
-            return response.json()
-        except ValueError as exc:
-            raise SourceError(f"{self.base}{path}: svaret var ikke JSON") from exc
+        return self._json(response, f"{self.base}{path}")
 
-    def post(self, path: str, payload: dict) -> Any:
-        try:
-            response = self._client.post(path, json=payload)
-        except httpx.HTTPError as exc:
-            raise SourceError(f"{self.base}{path}: {exc.__class__.__name__}") from exc
+    def post(self, path: str, payload: dict, *, priority: str = "normal") -> Any:
+        response = self._send("POST", path, priority, json=payload)
         if response.status_code >= 400:
             raise SourceError(f"{self.base}{path}: HTTP {response.status_code} {response.text[:200]}")
-        try:
-            return response.json()
-        except ValueError as exc:
-            raise SourceError(f"{self.base}{path}: svaret var ikke JSON") from exc
+        return self._json(response, f"{self.base}{path}")
 
 
 # --------------------------------------------------------------------------- DexScreener
@@ -422,17 +546,36 @@ class Quote:
     raw: dict
 
 
+# Lister over trending tokens ændrer sig langsomt (1-times vindue). Ingen grund til at hente dem hvert minut.
+TOP_TOKENS_TTL = 300.0
+# Hvor gammel en liste må være, når Jupiter siger stop. Bedre end ingenting.
+STALE_LIST_SECONDS = 1800.0
+TOKEN_INFO_TTL = 120.0
+
+
 class Jupiter:
-    def __init__(self, settings: MemeSettings) -> None:
+    """Swap, priser og token-lister. Alle kald deler én minutkvote hos Jupiter."""
+
+    def __init__(self, settings: MemeSettings, *, transport: httpx.BaseTransport | None = None, budget: CallBudget | None = None) -> None:
         headers = {"x-api-key": settings.jupiter_api_key} if settings.jupiter_api_key else None
-        self.http = _Http(settings.jupiter_url, headers=headers, timeout=15.0)
+        self.keyed = bool(settings.jupiter_api_key)
+        self.budget = budget or CallBudget(settings.jupiter_rpm)
+        self.http = _Http(settings.jupiter_url, headers=headers, timeout=15.0, budget=self.budget, transport=transport)
         self.slippage_bps = settings.slippage_bps
         self.priority_fee_lamports = settings.priority_fee_lamports
+        # Uden nøgle deles grænsen med andre på samme IP. Hent nye tokens lidt sjældnere.
+        self.recent_ttl = 6.0 if self.keyed else 15.0
+        self._lists: dict[str, tuple[float, list[TokenInfo]]] = {}
+        self._infos: dict[str, tuple[float, TokenInfo]] = {}
+        self._cache_lock = threading.Lock()
 
     def close(self) -> None:
         self.http.close()
 
-    def quote(self, input_mint: str, output_mint: str, amount: int, slippage_bps: int | None = None) -> Quote:
+    def usage(self) -> dict:
+        return {**self.budget.snapshot(), "keyed": self.keyed}
+
+    def quote(self, input_mint: str, output_mint: str, amount: int, slippage_bps: int | None = None, *, priority: str = "high") -> Quote:
         if amount <= 0:
             raise SourceError("Beløbet til en quote skal være positivt.")
         data = self.http.get(
@@ -444,6 +587,7 @@ class Jupiter:
                 "slippageBps": str(slippage_bps or self.slippage_bps),
                 "restrictIntermediateTokens": "true",
             },
+            priority=priority,
         )
         if not isinstance(data, dict) or "outAmount" not in data:
             message = (data or {}).get("error") if isinstance(data, dict) else None
@@ -474,18 +618,18 @@ class Jupiter:
             "dynamicComputeUnitLimit": True,
             "prioritizationFeeLamports": fee,
         }
-        data = self.http.post("/swap/v1/swap", payload)
+        data = self.http.post("/swap/v1/swap", payload, priority="high")
         tx = (data or {}).get("swapTransaction") if isinstance(data, dict) else None
         if not tx:
             raise SourceError(f"Jupiter byggede ingen transaktion: {str(data)[:200]}")
         return str(tx)
 
-    def prices(self, mints: list[str]) -> dict[str, float]:
+    def prices(self, mints: list[str], *, priority: str = "normal") -> dict[str, float]:
         result: dict[str, float] = {}
         unique = [mint for mint in dict.fromkeys(mints) if mint]
         for start in range(0, len(unique), 50):
             chunk = unique[start : start + 50]
-            data = self.http.get("/price/v3", params={"ids": ",".join(chunk)})
+            data = self.http.get("/price/v3", params={"ids": ",".join(chunk)}, priority=priority)
             if isinstance(data, dict):
                 payload = data.get("data") if isinstance(data.get("data"), dict) else data
                 for mint, row in payload.items():
@@ -495,14 +639,14 @@ class Jupiter:
                             result[mint] = price
         return result
 
-    def sol_usd(self) -> float:
-        price = self.prices([SOL_MINT]).get(SOL_MINT, 0.0)
+    def sol_usd(self, *, priority: str = "normal") -> float:
+        price = self.prices([SOL_MINT], priority=priority).get(SOL_MINT, 0.0)
         if price <= 0:
             raise SourceError("Kunne ikke hente SOL-kursen fra Jupiter.")
         return price
 
-    def _token_list(self, path: str, params: dict | None = None) -> list[TokenInfo]:
-        data = self.http.get(path, params=params)
+    def _token_list(self, path: str, params: dict | None = None, *, priority: str = "low") -> list[TokenInfo]:
+        data = self.http.get(path, params=params, priority=priority)
         rows = data if isinstance(data, list) else (data or {}).get("tokens") or []
         tokens = []
         for row in rows:
@@ -512,20 +656,62 @@ class Jupiter:
                     tokens.append(parsed)
         return tokens
 
-    def top_tokens(self, category: str, interval: str = "1h", limit: int = 50) -> list[TokenInfo]:
-        return self._token_list(f"/tokens/v2/{category}/{interval}", {"limit": str(limit)})
+    def _cached_list(self, key: str, ttl: float, fetch, limit: int) -> list[TokenInfo]:
+        now = time.monotonic()
+        with self._cache_lock:
+            cached = self._lists.get(key)
+        if cached and now - cached[0] < ttl:
+            return cached[1][:limit]
+        try:
+            tokens = fetch()
+        except RateLimited:
+            # Jupiter siger stop: brug den seneste liste, hvis den ikke er for gammel.
+            if cached and now - cached[0] < STALE_LIST_SECONDS:
+                return cached[1][:limit]
+            raise
+        with self._cache_lock:
+            self._lists[key] = (time.monotonic(), tokens)
+        return tokens[:limit]
 
-    def recent_tokens(self, limit: int = 60) -> list[TokenInfo]:
+    def top_tokens(self, category: str, interval: str = "1h", limit: int = 50, *, priority: str = "low") -> list[TokenInfo]:
+        fetch_limit = max(limit, 50)
+        return self._cached_list(
+            f"top:{category}:{interval}",
+            TOP_TOKENS_TTL,
+            lambda: self._token_list(f"/tokens/v2/{category}/{interval}", {"limit": str(fetch_limit)}, priority=priority),
+            limit,
+        )
+
+    def recent_tokens(self, limit: int = 60, *, priority: str = "low") -> list[TokenInfo]:
         """Tokens hvis første pool lige er oprettet. Sniperens hovedkilde."""
-        return self._token_list("/tokens/v2/recent", {"limit": str(limit)})
+        fetch_limit = max(limit, 60)
+        return self._cached_list(
+            "recent",
+            self.recent_ttl,
+            lambda: self._token_list("/tokens/v2/recent", {"limit": str(fetch_limit)}, priority=priority),
+            limit,
+        )
 
-    def token_infos(self, mints: list[str]) -> dict[str, TokenInfo]:
+    def token_infos(self, mints: list[str], *, priority: str = "low") -> dict[str, TokenInfo]:
         result: dict[str, TokenInfo] = {}
+        now = time.monotonic()
         unique = [mint for mint in dict.fromkeys(mints) if mint]
-        for start in range(0, len(unique), 100):
-            chunk = unique[start : start + 100]
-            for token in self._token_list("/tokens/v2/search", {"query": ",".join(chunk)}):
-                result[token.mint] = token
+        with self._cache_lock:
+            for mint in unique:
+                cached = self._infos.get(mint)
+                if cached and now - cached[0] < TOKEN_INFO_TTL:
+                    result[mint] = cached[1]
+        missing = [mint for mint in unique if mint not in result]
+        for start in range(0, len(missing), 100):
+            chunk = missing[start : start + 100]
+            fetched = self._token_list("/tokens/v2/search", {"query": ",".join(chunk)}, priority=priority)
+            with self._cache_lock:
+                for token in fetched:
+                    result[token.mint] = token
+                    self._infos[token.mint] = (time.monotonic(), token)
+                if len(self._infos) > 2000:
+                    for mint in sorted(self._infos, key=lambda key: self._infos[key][0])[:1000]:
+                        self._infos.pop(mint, None)
         return result
 
 

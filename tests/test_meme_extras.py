@@ -245,7 +245,7 @@ def test_swap_request_uses_jito_tip_or_urgent_priority():
     cfg = meme_fakes.settings()
     jup = Jupiter(cfg)
     sent = []
-    jup.http.post = lambda path, payload: sent.append(payload) or {"swapTransaction": "dHg="}
+    jup.http.post = lambda path, payload, **_kw: sent.append(payload) or {"swapTransaction": "dHg="}
     quote = Quote(SOL_MINT, MINT, 1, 1, 0.1, {"outAmount": "1"})
     jup.swap_transaction(quote, "Pub", urgent=True)
     assert sent[-1]["prioritizationFeeLamports"]["priorityLevelWithMaxLamports"]["priorityLevel"] == "veryHigh"

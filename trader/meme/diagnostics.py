@@ -15,8 +15,9 @@ from trader.meme.store import now_iso
 KNOWN_TOKEN = "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263"
 
 HINT_JUPITER = (
-    "Tjek at JUPITER_API_URL er rigtig. Hvis lite-api er lukket: opret en gratis nøgle på portal.jup.ag "
-    "og sæt JUPITER_API_URL=https://api.jup.ag og JUPITER_API_KEY."
+    "Står der rate limit (429), har Jupiter fået for mange kald. Uden nøgle deles grænsen med andre servere på "
+    "samme IP. Opret en gratis nøgle på portal.jup.ag og sæt JUPITER_API_KEY i Railway; så bruges api.jup.ag "
+    "automatisk. Ellers: tjek at JUPITER_API_URL er rigtig."
 )
 HINT_DEX = "DexScreener svarer ikke. Prøv igen om lidt; deres API er gratis og uden nøgle."
 HINT_RUG = "RugCheck svarer ikke. Uden RugCheck køber botten intet, så det skal virke."

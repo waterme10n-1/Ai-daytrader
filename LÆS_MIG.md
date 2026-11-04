@@ -266,4 +266,6 @@ Lokalt: `python run.py` og åbn [http://127.0.0.1:8741/meme](http://127.0.0.1:87
 
 På Railway: følg afsnittet *Udgiv på Railway* ovenfor. Memebotten gemmer sin database i `/data/meme.db` på samme volume. Tilføj de `MEME_*`-variabler, du vil ændre. Alle har fornuftige standarder, så botten kører på papir uden ekstra opsætning.
 
-Datakilder: DexScreener, RugCheck og Jupiter (`lite-api.jup.ag`) kræver ingen nøgle. Hvis Jupiter lukker lite-api, så opret en gratis nøgle på portal.jup.ag og sæt `JUPITER_API_URL=https://api.jup.ag` og `JUPITER_API_KEY`.
+Datakilder: DexScreener, RugCheck og Jupiter (`lite-api.jup.ag`) virker uden nøgle. Jupiter tillader dog kun ca. 30 kald i minuttet uden nøgle, og hos Railway deles grænsen med andre servere på samme IP. Ser du "rate limit (429)", så opret en **gratis** nøgle på portal.jup.ag og sæt `JUPITER_API_KEY` i Railway. Så bruges `api.jup.ag` automatisk med 60 kald i minuttet for din egen konto.
+
+Botten holder selv regnskab med kaldene (25 i minuttet uden nøgle, 55 med) og prioriterer: salg og køb går altid forrest, quotes til nye kandidater må bruge 80 % af kvoten, og lister over nye eller trending tokens 60 %. Trending-lister gemmes i 5 minutter. Svarer Jupiter alligevel 429, holder botten pause (15 s, så 30 s og op til 2 minutter) og bruger imens den senest hentede liste. Et token, der kun blev stoppet af kvoten, afvises ikke, men tjekkes igen i næste runde. Under Indstillinger kan du se, hvor mange kald der er brugt det seneste minut.
