@@ -280,13 +280,18 @@ def _delete_cookie(response: Response, name: str, *, secure: bool, path: str) ->
     response.delete_cookie(name, path=path, secure=secure, samesite="strict")
 
 
+# Åbne uden login: sundhedstjek, login-siden og app-ikonerne. Intet af det afslører data.
+PUBLIC_PATHS = frozenset({"/healthz", "/login", "/manifest.webmanifest", "/apple-touch-icon.png", "/apple-touch-icon-precomposed.png"})
+
+
 class AuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         settings: Settings = request.app.state.settings
         if not auth_is_active(settings):
             return await call_next(request)
         path = request.url.path
-        if path == "/healthz" or path == "/login":
+        if path in PUBLIC_PATHS or path.startswith("/icons/"):
+            # Ikoner og manifest hentes af telefonen uden cookies, når appen lægges på hjemmeskærmen.
             return await call_next(request)
         session = read_session(settings, request)
         if session is None:
@@ -326,6 +331,14 @@ _LOGIN_HTML = """<!DOCTYPE html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="dark light">
 <title>Log ind · AI Daytrader</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#07090e" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f3f5fa" media="(prefers-color-scheme: light)">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Memebot">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%239945ff'/%3E%3Cstop offset='1' stop-color='%2314f195'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='9' fill='url(%23g)'/%3E%3Ctext x='16' y='21.5' text-anchor='middle' font-size='13' font-weight='700' fill='white' font-family='Arial'%3EDT%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

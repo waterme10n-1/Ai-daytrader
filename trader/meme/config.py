@@ -73,6 +73,8 @@ class MemeSettings:
     jupiter_url: str
     jupiter_api_key: str
     jupiter_rpm: int
+    rugcheck_api_key: str
+    rugcheck_rpm: int
     x_bearer_token: str
     x_daily_requests: int
     bankroll_usd: float
@@ -145,6 +147,8 @@ class MemeSettings:
             jupiter_url=(os.getenv("JUPITER_API_URL", "").strip() or (KEYED_JUPITER if jupiter_key else DEFAULT_JUPITER)).rstrip("/"),
             jupiter_api_key=jupiter_key,
             jupiter_rpm=min(6000, max(5, _int(os.getenv("JUPITER_RPM"), jupiter_default_rpm))),
+            rugcheck_api_key=os.getenv("RUGCHECK_API_KEY", "").strip(),
+            rugcheck_rpm=min(600, max(5, _int(os.getenv("RUGCHECK_RPM"), 30))),
             x_bearer_token=os.getenv("X_BEARER_TOKEN", "").strip(),
             x_daily_requests=max(0, _int(os.getenv("X_DAILY_REQUESTS"), 40)),
             bankroll_usd=bankroll,
@@ -403,6 +407,7 @@ def public_meme_settings(settings: MemeSettings) -> dict:
         "jupiter_url": settings.jupiter_url,
         "jupiter_keyed": bool(settings.jupiter_api_key),
         "jupiter_rpm": settings.jupiter_rpm,
+        "rugcheck_rpm": settings.rugcheck_rpm,
         "goal_usd_per_month": settings.goal_usd_per_month,
         "confirmation_phrase": MEME_LIVE_PHRASE,
         "unlock_min_trades": UNLOCK_MIN_TRADES,

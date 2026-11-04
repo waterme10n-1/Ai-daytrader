@@ -125,6 +125,10 @@ class CallBudget:
             }
 
 
+# Hvor gammel en liste over tokens må være, når et API siger stop. Bedre end ingenting.
+STALE_LIST_SECONDS_DEFAULT = 1800.0
+
+
 def _retry_after(response: httpx.Response) -> float | None:
     try:
         return float(response.headers.get("retry-after", ""))
@@ -304,33 +308,93 @@ def best_pairs(raw_pairs: list[dict]) -> dict[str, PairInfo]:
     return chosen
 
 
-class DexScreener:
+# DexScreener: 60 kald/min på profiler og boosts, 300 på kurser og par (pr. IP). Vi holder os under.
+DEX_LISTS_RPM = 50
+DEX_PAIRS_RPM = 240
+# Lister over nye profiler og boosts. Sniperen og scanningen spørger begge; ét kald pr. vindue er nok.
+DEX_PROFILES_TTL = 10.0
+DEX_BOOSTS_TTL = 30.0
+
+
+class _ListCache:
+    """Gem en liste et øjeblik, og brug den seneste, hvis API'et siger stop."""
+
     def __init__(self) -> None:
-        self.http = _Http(DEXSCREENER_URL)
+        self._items: dict[str, tuple[float, Any]] = {}
+        self._lock = threading.Lock()
+
+    def get(self, key: str, ttl: float, fetch, *, stale_seconds: float = STALE_LIST_SECONDS_DEFAULT):
+        now = time.monotonic()
+        with self._lock:
+            cached = self._items.get(key)
+        if cached and now - cached[0] < ttl:
+            return cached[1]
+        try:
+            value = fetch()
+        except RateLimited:
+            if cached and now - cached[0] < stale_seconds:
+                return cached[1]
+            raise
+        with self._lock:
+            self._items[key] = (time.monotonic(), value)
+        return value
+
+
+class DexScreener:
+    def __init__(
+        self,
+        *,
+        transport: httpx.BaseTransport | None = None,
+        lists_budget: CallBudget | None = None,
+        pairs_budget: CallBudget | None = None,
+    ) -> None:
+        self.lists_budget = lists_budget or CallBudget(DEX_LISTS_RPM)
+        self.pairs_budget = pairs_budget or CallBudget(DEX_PAIRS_RPM)
+        # To forbindelser, fordi DexScreener tæller lister og kurser hver for sig.
+        self.http = _Http(DEXSCREENER_URL, budget=self.pairs_budget, transport=transport)
+        self.lists_http = _Http(DEXSCREENER_URL, budget=self.lists_budget, transport=transport)
+        self._lists = _ListCache()
 
     def close(self) -> None:
         self.http.close()
+        self.lists_http.close()
 
-    def _solana_list(self, path: str) -> list[dict]:
-        data = self.http.get(path)
-        rows = data if isinstance(data, list) else [data] if isinstance(data, dict) else []
-        return [row for row in rows if isinstance(row, dict) and row.get("chainId") == "solana" and row.get("tokenAddress")]
+    def usage(self) -> dict:
+        pairs = self.pairs_budget.snapshot()
+        lists = self.lists_budget.snapshot()
+        ago = [value for value in (pairs["limited_seconds_ago"], lists["limited_seconds_ago"]) if value is not None]
+        return {
+            "pairs": pairs,
+            "lists": lists,
+            "limited_total": pairs["limited_total"] + lists["limited_total"],
+            "limited_seconds_ago": min(ago) if ago else None,
+            "cooldown_seconds": max(pairs["cooldown_seconds"], lists["cooldown_seconds"]),
+        }
+
+    def _solana_list(self, path: str, ttl: float) -> list[dict]:
+        def fetch() -> list[dict]:
+            data = self.lists_http.get(path, priority="low")
+            rows = data if isinstance(data, list) else [data] if isinstance(data, dict) else []
+            return [row for row in rows if isinstance(row, dict) and row.get("chainId") == "solana" and row.get("tokenAddress")]
+
+        return list(self._lists.get(path, ttl, fetch))
 
     def latest_boosts(self) -> list[dict]:
-        return self._solana_list("/token-boosts/latest/v1")
+        return self._solana_list("/token-boosts/latest/v1", DEX_BOOSTS_TTL)
 
     def top_boosts(self) -> list[dict]:
-        return self._solana_list("/token-boosts/top/v1")
+        return self._solana_list("/token-boosts/top/v1", DEX_BOOSTS_TTL)
 
     def latest_profiles(self) -> list[dict]:
-        return self._solana_list("/token-profiles/latest/v1")
+        return self._solana_list("/token-profiles/latest/v1", DEX_PROFILES_TTL)
 
-    def pairs_for(self, mints: list[str]) -> dict[str, PairInfo]:
+    def pairs_for(self, mints: list[str], *, priority: str = "normal") -> dict[str, PairInfo]:
+        """Kurser og likviditet. Overvågning af åbne positioner kalder med priority="high"."""
         result: dict[str, PairInfo] = {}
         unique = [mint for mint in dict.fromkeys(mints) if mint]
         for start in range(0, len(unique), 30):
             chunk = unique[start : start + 30]
-            data = self.http.get(f"/tokens/v1/solana/{','.join(chunk)}")
+            data = self.http.get(f"/tokens/v1/solana/{','.join(chunk)}", priority=priority)
             rows = data if isinstance(data, list) else (data or {}).get("pairs") or []
             result.update(best_pairs(rows))
         return result
@@ -430,22 +494,42 @@ def parse_rug_report(mint: str, data: dict) -> RugReport:
     )
 
 
+# RugCheck oplyser ingen fast grænse. Vi er forsigtige og holder pause ved 429.
+RUGCHECK_RPM_DEFAULT = 30
+
+
 class RugCheck:
-    def __init__(self) -> None:
-        self.http = _Http(RUGCHECK_URL, timeout=15.0)
+    def __init__(
+        self,
+        settings: MemeSettings | None = None,
+        *,
+        transport: httpx.BaseTransport | None = None,
+        budget: CallBudget | None = None,
+    ) -> None:
+        api_key = settings.rugcheck_api_key if settings is not None else ""
+        per_minute = settings.rugcheck_rpm if settings is not None else RUGCHECK_RPM_DEFAULT
+        self.budget = budget or CallBudget(per_minute)
+        headers = {"X-API-KEY": api_key} if api_key else None
+        self.http = _Http(RUGCHECK_URL, headers=headers, timeout=15.0, budget=self.budget, transport=transport)
         self._cache: dict[str, tuple[float, RugReport]] = {}
 
     def close(self) -> None:
         self.http.close()
 
-    def report(self, mint: str, max_age: float = 600.0) -> RugReport:
+    def usage(self) -> dict:
+        return self.budget.snapshot()
+
+    def report(self, mint: str, max_age: float = 600.0, *, priority: str = "normal") -> RugReport:
+        """Et rug-tjek. Ved rate limit kastes RateLimited: kandidaten skal tjekkes igen, ikke afvises."""
         cached = self._cache.get(mint)
         if cached and time.time() - cached[0] < max_age:
             return cached[1]
         try:
-            data = self.http.get(f"/v1/tokens/{mint}/report")
+            data = self.http.get(f"/v1/tokens/{mint}/report", priority=priority)
+        except RateLimited:
+            raise  # opsummeringen tæller i samme kvote; prøv ikke igen med det samme
         except SourceError:
-            data = self.http.get(f"/v1/tokens/{mint}/report/summary")
+            data = self.http.get(f"/v1/tokens/{mint}/report/summary", priority=priority)
         if not isinstance(data, dict):
             raise SourceError("RugCheck returnerede ikke et objekt.")
         report = parse_rug_report(mint, data)

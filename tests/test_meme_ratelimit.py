@@ -201,3 +201,139 @@ def test_rate_limit_alert_explains_the_free_key():
     assert engine.status()["engine"]["jupiter"]["limited_total"] == 1
     # Uden Claude-nøgle kommer der kun én besked om X, ikke to.
     assert not any("X_BEARER_TOKEN" in text for text in texts)
+
+
+# --------------------------------------------------------------------------- DexScreener og RugCheck
+
+from trader.meme.clients import DexScreener, RugCheck  # noqa: E402
+
+
+def _profile(mint: str) -> dict:
+    return {"chainId": "solana", "tokenAddress": mint}
+
+
+def test_dexscreener_lists_are_cached_and_counted_apart_from_prices():
+    calls = []
+    state = {"lists": 200}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request.url.path)
+        if request.url.path.startswith("/token-profiles"):
+            if state["lists"] == 429:
+                return httpx.Response(429)
+            return httpx.Response(200, json=[_profile("Prof1111"), {"chainId": "base", "tokenAddress": "x"}])
+        return httpx.Response(200, json=[])
+
+    dex = DexScreener(transport=httpx.MockTransport(handler))
+    assert [row["tokenAddress"] for row in dex.latest_profiles()] == ["Prof1111"]
+    dex.latest_profiles()
+    assert calls.count("/token-profiles/latest/v1") == 1  # sniperen og scanningen deler ét kald
+
+    stamp, rows = dex._lists._items["/token-profiles/latest/v1"]
+    dex._lists._items["/token-profiles/latest/v1"] = (stamp - 60, rows)
+    state["lists"] = 429
+    assert [row["tokenAddress"] for row in dex.latest_profiles()] == ["Prof1111"]  # seneste liste imens
+    assert dex.usage()["lists"]["cooldown_seconds"] > 0
+    # Kurserne har deres egen kvote hos DexScreener og virker stadig, også til overvågning.
+    assert dex.pairs_for(["Mint1111"], priority="high") == {}
+    assert dex.usage()["pairs"]["cooldown_seconds"] == 0
+    dex.close()
+
+
+def test_rugcheck_429_pauses_without_hammering_the_summary():
+    calls = []
+    state = {"status": 429}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append((request.url.path, request.headers.get("x-api-key")))
+        if request.url.path.endswith("/report"):
+            if state["status"] == 429:
+                return httpx.Response(429, headers={"Retry-After": "20"})
+            return httpx.Response(500)
+        return httpx.Response(200, json={"score_normalised": 10, "risks": []})
+
+    rug = RugCheck(meme_fakes.settings(rugcheck_api_key="rk-test"), transport=httpx.MockTransport(handler))
+    with pytest.raises(RateLimited):
+        rug.report("Mint1111")
+    assert [path for path, _key in calls] == ["/v1/tokens/Mint1111/report"]  # ingen ekstra kald til opsummeringen
+    assert calls[0][1] == "rk-test"
+    assert rug.usage()["cooldown_seconds"] >= 19
+    with pytest.raises(RateLimited):
+        rug.report("Mint2222")  # under pausen sendes intet
+    assert len(calls) == 1
+
+    rug.budget._cooldown_until = 0  # pausen er ovre
+    state["status"] = 500
+    report = rug.report("Mint3333")  # almindelig fejl: fald tilbage til opsummeringen som før
+    assert report.mint == "Mint3333"
+    assert [path for path, _key in calls][-2:] == ["/v1/tokens/Mint3333/report", "/v1/tokens/Mint3333/report/summary"]
+    rug.close()
+
+
+class ThrottledRug(meme_fakes.FakeRug):
+    def __init__(self) -> None:
+        super().__init__()
+        self.throttle = True
+
+    def report(self, mint, max_age=600.0, **kw):
+        if self.throttle:
+            raise RateLimited("venter efter rate limit (0/30 kald det seneste minut)")
+        return super().report(mint, max_age)
+
+
+def test_scan_keeps_candidates_when_rugcheck_says_stop():
+    engine, dex, _rug, _jup, _notes = make_engine()
+    rug = ThrottledRug()
+    engine.clients.rug = rug
+    engine.update_sniper({"enabled": False})
+    mint = "Boost1111"
+    dex.pairs[mint] = meme_fakes.raw_pair(mint)
+    dex.boosts.append(mint)
+    rug.reports[mint] = meme_fakes.safe_report()
+    engine.tick(force_scan=True)
+    assert engine.store.open_positions("paper") == []
+    assert not [row for row in engine.store.recent_candidates("paper") if row["mint"] == mint]  # intet afvist
+    assert "RugCheck" in (engine.last_scan.get("note") or "")
+    assert not engine.last_scan.get("errors")
+
+    rug.throttle = False
+    engine.tick(force_scan=True)
+    assert [row["mint"] for row in engine.store.open_positions("paper")] == [mint]
+
+
+def test_sniper_rechecks_tokens_after_rugcheck_pause():
+    engine, dex, _rug, jup, _notes = make_engine()
+    rug = ThrottledRug()
+    engine.clients.rug = rug
+    _arm(dex, rug, jup)
+    engine.tick(force_scan=True)
+    assert engine.store.open_positions("paper") == []
+    assert NEW not in (engine.store.get_json("sniper_seen", {}) or {})
+    assert "RugCheck" in (engine.last_snipe.get("note") or "")
+
+    rug.throttle = False
+    engine.tick(force_scan=True)
+    assert [row["mint"] for row in engine.store.open_positions("paper")] == [NEW]
+
+
+def test_rugcheck_and_dexscreener_alerts():
+    engine, *_ = make_engine()
+    clock = Clock()
+    budget = CallBudget(30, clock=clock, sleep=clock.sleep)
+    budget.limited()
+
+    class Rug(meme_fakes.FakeRug):
+        def usage(self):
+            return budget.snapshot()
+
+    class Dex(meme_fakes.FakeDex):
+        def usage(self):
+            return {"limited_seconds_ago": 5, "limited_total": 1, "cooldown_seconds": 10}
+
+    engine.clients.rug = Rug()
+    engine.clients.dex = Dex()
+    status = engine.status()
+    texts = [alert["text"] for alert in status["alerts"]]
+    assert any(text.startswith("RugCheck har sagt stop") for text in texts)
+    assert any(text.startswith("DexScreener har sagt stop") for text in texts)
+    assert status["engine"]["rugcheck"]["limited_total"] == 1
