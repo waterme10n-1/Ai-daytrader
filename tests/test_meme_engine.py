@@ -355,3 +355,34 @@ def test_status_is_gzip_compressed(tmp_path, monkeypatch):
         assert response.status_code == 200
         assert response.headers.get("content-encoding") == "gzip"
         assert response.json()["mode"] == "paper"
+
+
+def test_daily_loss_limit_is_off_by_default_and_can_be_switched_on(tmp_path):
+    import dataclasses
+
+    from trader.meme.config import MemeSettings
+
+    defaults = MemeSettings.from_env()
+    assert defaults.daily_loss_limit is False and defaults.drawdown_limit is True
+
+    engine, dex, rug, _jup, _notes = make_engine(meme_fakes.settings(daily_loss_pct=0.1, position_usd=3.0, daily_loss_limit=False, drawdown_limit=False))
+    for index, name in enumerate(("First1111111", "Second11111")):
+        _arm(dex, rug, mint=name, symbol=f"L{index}")
+        engine.tick(force_scan=True)
+        dex.set_price(name, 0.0007)
+        engine.tick()  # to stop-loss-tab: over dagens grænse på 1,5 USD
+    status = engine.status()
+    assert status["halted_day"] is False and status["loss_limits"]["daily"] is False
+    assert any("Tabsgrænserne er slået fra" in a["text"] for a in status["alerts"])
+    _arm(dex, rug, mint="Third111111", symbol="THREE")
+    engine.tick(force_scan=True)
+    assert len(engine.store.open_positions("paper")) == 1  # botten køber stadig
+
+    engine.update_loss_limits({"daily": True})
+    _arm(dex, rug, mint="Fourth11111", symbol="FOUR")
+    engine.tick(force_scan=True)
+    assert engine.status()["halted_day"] is True
+    assert [row["mint"] for row in engine.store.open_positions("paper")] == ["Third111111"]
+    engine.update_loss_limits({"daily": False})
+    assert engine.status()["halted_day"] is False
+    assert engine.store.get_json("loss_limits") == {"daily": False, "drawdown": False}

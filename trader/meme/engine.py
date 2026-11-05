@@ -249,6 +249,11 @@ class MemeEngine:
         self.last_snipe: dict[str, Any] = {}
         self.copy = CopyTracker(self.clients.rpc, self.store, self._all_wallets())
         self.top_cfg: TopTraderSettings = top_from(self.store.get_json("toptraders"), self.settings)
+        stored_limits = self.store.get_json("loss_limits", None) or {}
+        self.loss_limits = {
+            "daily": bool(stored_limits.get("daily", self.settings.daily_loss_limit)),
+            "drawdown": bool(stored_limits.get("drawdown", self.settings.drawdown_limit)),
+        }
         self.top_copy = CopyTracker(self.clients.rpc, self.store, (), prefix="top_last")
         self._last_top_poll = 0.0
         self.top_signals: deque = deque(self.store.get_json("top_signals", []) or [], maxlen=TOP_SIGNALS_KEPT)
@@ -628,7 +633,7 @@ class MemeEngine:
             positions = self.store.open_positions(self.mode)
             if not positions:
                 return
-        if self.kill_switch or self.store.get_state(f"halt_dd:{self.mode}", "0") == "1":
+        if self.kill_switch or (self.loss_limits["drawdown"] and self.store.get_state(f"halt_dd:{self.mode}", "0") == "1"):
             # Et salg kan fejle under nødstop. Bliv ved med at prøve, indtil alt er solgt eller skrevet af.
             for pos in positions:
                 self._sell(pos, 1.0, "kill", "Nødstop: prøver at sælge igen.", wallet, sol_usd)
@@ -896,9 +901,9 @@ class MemeEngine:
         mode = self.mode
         day_key = f"halt_day:{mode}:{day}"
         dd_key = f"halt_dd:{mode}"
-        halted_day = self.store.get_state(day_key, "0") == "1"
-        halted_dd = self.store.get_state(dd_key, "0") == "1"
-        if not halted_day and daily_loss_hit(totals["today_pnl"], self.settings):
+        halted_day = self.loss_limits["daily"] and self.store.get_state(day_key, "0") == "1"
+        halted_dd = self.loss_limits["drawdown"] and self.store.get_state(dd_key, "0") == "1"
+        if self.loss_limits["daily"] and not halted_day and daily_loss_hit(totals["today_pnl"], self.settings):
             self.store.set_state(day_key, "1")
             halted_day = True
             message = (
@@ -908,7 +913,7 @@ class MemeEngine:
             self.store.add_event("warning", message)
             self._notify(message)
         reset = float(self.store.get_state(f"dd_reset:{mode}", "0") or 0)
-        if not halted_dd and drawdown_hit(totals["total_pnl"] - reset, self.settings):
+        if self.loss_limits["drawdown"] and not halted_dd and drawdown_hit(totals["total_pnl"] - reset, self.settings):
             self.store.set_state(dd_key, "1")
             halted_dd = True
             message = (
@@ -1775,7 +1780,7 @@ class MemeEngine:
             if name == "position_usd":
                 high = min(high, self.settings.position_usd)
             fields.append({"name": name, "label": TOP_LABELS[name], "value": getattr(cfg, name), "default": getattr(defaults, name), "bounds": [low, high], "kind": kinds[name]})
-        for name in ("follow_sells", "daily_loss_stop"):
+        for name in ("follow_sells", "stop_loss_on", "daily_loss_stop"):
             fields.append({"name": name, "label": TOP_LABELS[name], "value": getattr(cfg, name), "default": getattr(defaults, name), "kind": "bool"})
         api = self.clients.top is not None
         cached = (self.store.get_json("top_traders", None) or {}) if api else {}
@@ -1987,7 +1992,7 @@ class MemeEngine:
             exit_plan = "Sælger, når traderen sælger" if self.top_cfg.follow_sells else "Følger ikke traderens salg"
             reasoning = (
                 f"Top-trader {source_label(cand['source'])[6:]} ({who}{earned}) købte for {_dk(lead.get('sol', 0))} SOL for {lead.get('age', 0):.0f} s siden. "
-                f"Bestod rug-tjek og exit-rute. {exit_plan}, stop ved -{self.top_cfg.stop_loss_pct * 100:.0f} %."
+                f"Bestod rug-tjek og exit-rute. {exit_plan}" + (f", stop ved -{self.top_cfg.stop_loss_pct * 100:.0f} %." if self.top_cfg.stop_loss_on else " (ingen stop-loss).")
             )
         else:
             reasoning = f"Score {cand['score']:.2f}. Kilde: {source_label(cand['source'])}. Stærkeste signaler: {', '.join(drivers) or 'ingen enkeltstående'}."
@@ -2122,6 +2127,26 @@ class MemeEngine:
         self.kill_switch = False
         self.store.set_state("kill_switch", "0")
         self.store.add_event("info", "Genoptaget. Drawdown måles fra nu. Dagens tabsgrænse gælder stadig.")
+
+    def update_loss_limits(self, changes: dict) -> None:
+        if not isinstance(changes, dict):
+            raise ValueError("Ugyldige indstillinger.")
+        limits = dict(self.loss_limits)
+        for key in ("daily", "drawdown"):
+            if key in changes:
+                limits[key] = bool(changes[key])
+        if not limits["daily"]:
+            self.store.set_state(f"halt_day:{self.mode}:{utc_day()}", "0")
+        if not limits["drawdown"]:
+            self.store.set_state(f"halt_dd:{self.mode}", "0")
+        elif not self.loss_limits["drawdown"]:
+            # Slås den samlede grænse til igen, måles tabet fra nu, så den ikke udløses med det samme.
+            self.store.set_state(f"dd_reset:{self.mode}", repr(self._totals()["total_pnl"]))
+        if limits != self.loss_limits:
+            words = {True: "til", False: "fra"}
+            self.store.add_event("info", f"Tabsgrænser: dagligt {words[limits['daily']]}, samlet {words[limits['drawdown']]}.")
+        self.loss_limits = limits
+        self.store.set_json("loss_limits", limits)
 
     def pause(self, paused: bool) -> None:
         # Ingen lås: pausen skal virke med det samme, også midt i en runde.
@@ -2331,8 +2356,14 @@ class MemeEngine:
             "mode": mode,
             "kill_switch": self.kill_switch,
             "paused": self.paused,
-            "halted_day": self.store.get_state(f"halt_day:{mode}:{today}", "0") == "1",
-            "halted_drawdown": self.store.get_state(f"halt_dd:{mode}", "0") == "1",
+            "halted_day": self.loss_limits["daily"] and self.store.get_state(f"halt_day:{mode}:{today}", "0") == "1",
+            "halted_drawdown": self.loss_limits["drawdown"] and self.store.get_state(f"halt_dd:{mode}", "0") == "1",
+            "loss_limits": {
+                **self.loss_limits,
+                "daily_usd": round(self.settings.daily_loss_pct * self.settings.bankroll_usd, 2),
+                "drawdown_usd": round(self.settings.max_drawdown_pct * self.settings.bankroll_usd, 2),
+                "bankroll_usd": self.settings.bankroll_usd,
+            },
             "alerts": self._alerts(),
             "kpis": {
                 **{key: round(value, 4) for key, value in totals.items()},
@@ -2486,14 +2517,16 @@ class MemeEngine:
         if self.paused:
             alerts.append({"level": "warning", "text": "Nye køb er sat på pause. Åbne positioner passes stadig."})
         today = utc_day()
-        if self.store.get_state(f"halt_day:{self.mode}:{today}", "0") == "1":
+        if not self.loss_limits["daily"] and not self.loss_limits["drawdown"]:
+            alerts.append({"level": "info", "text": f"Tabsgrænserne er slået fra. Botten stopper ikke ved tab, men bruger aldrig mere end din bankroll på {self.settings.bankroll_usd:.2f} USD."})
+        if self.loss_limits["daily"] and self.store.get_state(f"halt_day:{self.mode}:{today}", "0") == "1":
             top_runs = self.top_cfg.enabled and not self.top_cfg.daily_loss_stop
             alerts.append({
                 "level": "warning",
                 "text": "Dagens tabsgrænse er ramt. Ingen nye køb før i morgen (UTC)."
                 + (" Top 10 kopierer stadig, fordi den ikke har en daglig tabsgrænse." if top_runs else ""),
             })
-        if self.store.get_state(f"halt_dd:{self.mode}", "0") == "1":
+        if self.loss_limits["drawdown"] and self.store.get_state(f"halt_dd:{self.mode}", "0") == "1":
             alerts.append({"level": "warning", "text": "Drawdown-grænsen er ramt. Tryk Genoptag, når du har set på det."})
         if not self.settings.anthropic_api_key:
             alerts.append({"level": "info", "text": "Ingen ANTHROPIC_API_KEY: ingen Claude-research af X og nyheder. Botten kører på regler og RugCheck."})
@@ -2547,7 +2580,7 @@ class MemeEngine:
         elif row.get("strategy") == "toptrader":
             if peak >= 1.0 + TOP_TRAIL_ACTIVATION:
                 trail = peak * (1.0 - TOP_TRAIL) - 1.0
-            stop_pct, tp_pct = -self.top_cfg.stop_loss_pct, None
+            stop_pct, tp_pct = (-self.top_cfg.stop_loss_pct if self.top_cfg.stop_loss_on else None), None
             max_hold = self.top_cfg.max_hold_minutes
         else:
             if peak >= 1.0 + self.params.trail_activation_pct:

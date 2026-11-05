@@ -87,6 +87,8 @@ class MemeSettings:
     max_trades_per_day: int
     daily_loss_pct: float
     max_drawdown_pct: float
+    daily_loss_limit: bool
+    drawdown_limit: bool
     sol_reserve: float
     slippage_bps: int
     priority_fee_lamports: int
@@ -164,6 +166,9 @@ class MemeSettings:
             max_trades_per_day=max(1, min(50, _int(os.getenv("MEME_MAX_TRADES_PER_DAY"), 8))),
             daily_loss_pct=min(0.9, max(0.05, _float(os.getenv("MEME_DAILY_LOSS_PCT"), 0.25))),
             max_drawdown_pct=min(0.95, max(0.1, _float(os.getenv("MEME_MAX_DRAWDOWN_PCT"), 0.5))),
+            # Ingen daglig tabsgrænse som standard. Den samlede tabsgrænse er slået til.
+            daily_loss_limit=_flag(os.getenv("MEME_DAILY_LOSS_LIMIT"), False),
+            drawdown_limit=_flag(os.getenv("MEME_DRAWDOWN_LIMIT"), True),
             sol_reserve=max(0.005, _float(os.getenv("MEME_SOL_RESERVE"), 0.02)),
             slippage_bps=max(50, min(1500, _int(os.getenv("MEME_SLIPPAGE_BPS"), 300))),
             priority_fee_lamports=max(0, min(5_000_000, _int(os.getenv("MEME_PRIORITY_FEE_LAMPORTS"), 100_000))),
@@ -406,6 +411,8 @@ class TopTraderSettings:
     max_signal_age_seconds: float = 120.0
     min_leader_sol: float = 0.1
     follow_sells: bool = True
+    # Stop-loss som sikkerhedsnet, hvis traderen aldrig sælger. Kan slås fra under Top 10.
+    stop_loss_on: bool = True
     # Fra som standard: Top 10 bliver ved med at kopiere, selv om resten af botten har ramt dagens tabsgrænse.
     daily_loss_stop: bool = False
 
@@ -426,7 +433,7 @@ TOP_BOUNDS: dict[str, tuple[float, float]] = {
     "min_leader_sol": (0.0, 50.0),
 }
 TOP_INTS = ("count", "days", "max_open", "max_per_day")
-TOP_BOOLS = ("enabled", "follow_sells", "daily_loss_stop")
+TOP_BOOLS = ("enabled", "follow_sells", "stop_loss_on", "daily_loss_stop")
 TOP_LABELS: dict[str, str] = {
     "enabled": "Følg top-traders",
     "count": "Antal traders",
@@ -441,6 +448,7 @@ TOP_LABELS: dict[str, str] = {
     "min_leader_sol": "Ignorer køb under",
     "follow_sells": "Sælg når de sælger",
     "daily_loss_stop": "Stop ved dagens tabsgrænse",
+    "stop_loss_on": "Brug stop-loss",
 }
 # Når en kopieret position er steget meget, sikres gevinsten, hvis traderen aldrig sælger.
 TOP_TRAIL_ACTIVATION = 1.0
