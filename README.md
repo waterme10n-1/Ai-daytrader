@@ -13,3 +13,5 @@ python run.py
 ```bash
 pytest
 ```
+
+**Handelsbordet** (`/desk`): seks bots i én gruppechat til amerikanske aktier på Alpacas papirkonto. SCOUT finder bevægelsen, NEWS grunden, CHART indgang, mål og stop, SKEPTIC argumenterer imod, SIZER sætter beløbet, og EXECUTOR køber selv (autopilot) eller spørger dig. Se afsnittet *Handelsbordet* i [LÆS_MIG.md](LÆS_MIG.md).

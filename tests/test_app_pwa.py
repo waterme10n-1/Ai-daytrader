@@ -62,3 +62,14 @@ def test_dashboard_is_mobile_first_and_memebot_only(tmp_path):
         assert 'id="nav"' in page and 'id="sheet-root"' in page
         assert "confirm(" not in page and "window.prompt" not in page  # egne pop-op-ark i stedet
         assert "Daytrader" not in page and "/api/status" not in page
+
+
+def test_memebot_and_desk_link_to_each_other(tmp_path):
+    with _client(tmp_path) as client:
+        assert _login(client).status_code == 303
+        for path in ("/meme", "/desk"):
+            page = client.get(path).text
+            nav = page[page.index('<nav class="appnav"'):]
+            nav = nav[: nav.index("</nav>")]
+            assert 'href="/meme"' in nav and 'href="/desk"' in nav, path
+            assert nav.count('aria-current="page"') == 1, path

@@ -38,12 +38,15 @@ from trader.auth import (
     _set_cookie,
 )
 from trader.config import Settings
+from trader.desk.alpaca import BrokerError as DeskBrokerError
+from trader.desk.config import DeskSettings
 from trader.meme.clients import SourceError
 from trader.meme.config import MemeSettings
 
 logger = logging.getLogger("trader.app")
 
 MEME_STATIC = Path(__file__).resolve().parent / "static" / "meme.html"
+DESK_STATIC = Path(__file__).resolve().parent / "static" / "desk.html"
 ICONS = Path(__file__).resolve().parent / "static" / "icons"
 ICON_FILES = frozenset({"icon-192.png", "icon-512.png", "icon-maskable-512.png", "apple-touch-icon.png"})
 # Gør dashboardet til en app på hjemmeskærmen (PWA). Åbner direkte på memebotten.
@@ -69,6 +72,10 @@ MANIFEST = {
 class PhraseBody(BaseModel):
     phrase: str = ""
     code: str = ""
+
+
+class MessageBody(BaseModel):
+    text: str
 
 
 class IdBody(BaseModel):
@@ -105,6 +112,8 @@ def create_app(
     settings: Settings | None = None,
     meme_engine=None,
     meme_settings: MemeSettings | None = None,
+    desk_engine=None,
+    desk_settings: DeskSettings | None = None,
 ) -> FastAPI:
     """Byg appen. I produktion startes memebotten selv; tests sprøjter en motor med falske kilder ind."""
     chosen = settings or Settings.from_env()
@@ -124,6 +133,17 @@ def create_app(
                 meme = MemeEngine(meme_cfg, main_settings=holder["settings"])
         holder["meme"] = meme
         app.state.meme = meme
+        # Handelsbordet startes selv i produktion. I tests kun, når en motor eller indstillinger gives med.
+        desk = desk_engine
+        if desk is None and (not injected or desk_settings is not None):
+            desk_cfg = desk_settings or DeskSettings.from_env()
+            if desk_cfg.enabled:
+                from trader.desk.engine import DeskEngine
+
+                desk = DeskEngine(desk_cfg, holder["settings"])
+        app.state.desk = desk
+        if desk is not None:
+            desk.start()
         bot = None
         if meme is not None:
             meme.start()
@@ -140,6 +160,8 @@ def create_app(
                 bot.stop()
             if meme is not None:
                 meme.stop()
+            if desk is not None:
+                desk.stop()
 
     app = FastAPI(title="Memebot", lifespan=lifespan)
     app.state.settings = chosen
@@ -431,6 +453,100 @@ def create_app(
         if not ok:
             raise HTTPException(status_code=400, detail=message)
         return {"ok": True, "message": message, "status": meme().status()}
+
+    def desk():
+        engine_ = getattr(app.state, "desk", None)
+        if engine_ is None:
+            raise HTTPException(status_code=404, detail="Handelsbordet er slået fra (DESK_ENABLED=false).")
+        return engine_
+
+    @app.get("/desk")
+    def desk_page() -> FileResponse:
+        return FileResponse(
+            DESK_STATIC,
+            media_type="text/html; charset=utf-8",
+            headers={"Cache-Control": "no-cache"},
+        )
+
+    @app.get("/api/desk/status")
+    def desk_status(after: int = 0) -> dict:
+        return desk().status(after=max(0, after))
+
+    @app.post("/api/desk/message")
+    def desk_message(body: MessageBody) -> dict:
+        try:
+            result = desk().post_message(body.text)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return {"ok": True, **result}
+
+    @app.post("/api/desk/approve")
+    def desk_approve(body: IdBody) -> dict:
+        try:
+            desk().approve(body.id)
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        return {"ok": True}
+
+    @app.post("/api/desk/reject")
+    def desk_reject(body: IdBody) -> dict:
+        try:
+            desk().reject(body.id)
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        return {"ok": True}
+
+    @app.post("/api/desk/pause")
+    def desk_pause(body: PauseBody) -> dict:
+        desk().pause(body.paused)
+        return {"ok": True}
+
+    @app.post("/api/desk/params")
+    async def desk_params(request: Request) -> dict:
+        try:
+            body = await request.json()
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Ugyldig JSON.") from exc
+        try:
+            desk().update_params(body if isinstance(body, dict) else {})
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return {"ok": True}
+
+    @app.post("/api/desk/scan")
+    def desk_scan() -> dict:
+        engine_ = desk()
+        if not engine_.keys_present:
+            raise HTTPException(status_code=409, detail="Mangler Alpaca-papirnøgler.")
+        market = engine_._market()
+        if not market.get("is_open"):
+            raise HTTPException(status_code=409, detail="Markedet er lukket. SCOUT arbejder kun i åbningstiden.")
+        if engine_.paused:
+            raise HTTPException(status_code=409, detail="Bordet er på pause.")
+        import threading
+
+        threading.Thread(target=engine_.scan, name="desk-scan", daemon=True).start()
+        return {"ok": True}
+
+    @app.post("/api/desk/close-all")
+    def desk_close_all() -> dict:
+        try:
+            closed = desk().close_all()
+        except DeskBrokerError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        return {"ok": True, "closed": closed}
+
+    @app.post("/api/desk/log")
+    def desk_log() -> dict:
+        try:
+            text = desk().day_log()
+        except DeskBrokerError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        return {"ok": True, "text": text}
+
+    @app.get("/api/desk/compare")
+    def desk_compare() -> dict:
+        return desk().compare()
 
     @app.post("/api/meme/paper")
     def meme_paper() -> dict:

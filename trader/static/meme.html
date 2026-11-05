@@ -477,8 +477,18 @@
   }
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 </style>
+<style>
+  .appnav { display: flex; justify-content: center; padding: 8px 12px 0; padding-top: max(8px, env(safe-area-inset-top)); }
+  .appnav-in { display: inline-flex; gap: 2px; padding: 3px; border-radius: 999px; background: rgba(127, 127, 127, 0.14); max-width: 100%; }
+  .appnav a { padding: 6px 14px; border-radius: 999px; font: 600 13px/1.2 Inter, system-ui, sans-serif; color: inherit; opacity: 0.72; text-decoration: none; white-space: nowrap; }
+  .appnav a:hover { opacity: 1; }
+  .appnav a[aria-current="page"] { opacity: 1; background: rgba(127, 127, 127, 0.28); }
+  @media (max-width: 360px) { .appnav a { padding: 6px 10px; } }
+</style>
 </head>
 <body>
+<nav class="appnav" aria-label="Skift side"><div class="appnav-in"><a href="/meme" aria-current="page">Memebot</a><a href="/desk">Handelsbordet</a></div></nav>
+
 <header class="appbar" id="appbar">
   <div class="appbar-in">
     <div class="brand">

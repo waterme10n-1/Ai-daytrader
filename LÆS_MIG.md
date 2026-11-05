@@ -242,3 +242,48 @@ RugCheck og DexScreener har samme beskyttelse:
 
 - **RugCheck** oplyser ingen fast grænse, så botten bruger højst 30 kald i minuttet (`RUGCHECK_RPM`). Svarer RugCheck 429, holder botten pause og prøver ikke den lille opsummering med det samme, da den tæller i samme kvote. Der købes aldrig uden et frisk rug-tjek. Kandidater, der ikke nåede at blive tjekket, afvises ikke, men tjekkes igen i næste runde, også i sniperen.
 - **DexScreener** tæller lister (nye profiler og boosts, 60 i minuttet) og kurser (300 i minuttet) hver for sig. Botten holder sig til 50 og 240. Listerne gemmes i 10–30 sekunder, så sniperen og scanningen deler ét kald. Kurser til dine åbne positioner går altid forrest. Siger DexScreener stop, bruger overvågningen Jupiters kurser imens.
+
+---
+
+# Handelsbordet (seks bots, én gruppechat)
+
+Bygget efter guiden "How to build a trading desk in one group chat", men på Claude og Alpaca i stedet for Grok Bot og TradingView. Bordet kører i samme proces som memebotten, har sin egen side på `/desk` (skifteren øverst på siden) og handler **kun på papirpenge**. Der findes ingen kodevej til rigtige penge for bordet.
+
+## De seks bots
+
+| Bot | Job | Kører på |
+|---|---|---|
+| **SCOUT** | Markerer en ticker på watchlisten, der flytter sig mindst 3 % på en time eller handler mindst 2 gange normal volumen. Højst 5 markeringer om dagen. | fast kode |
+| **NEWS** | Finder grunden med websøgning og Alpaca-nyheder og skriver den på to linjer med link. Uden kilde: "Ingen klar grund". | Claude |
+| **CHART** | Sætter indgang, mål og stop. Stoppet er højst 2 % under indgangen, og målet er mindst 2 gange så langt væk. Ellers "Ingen setup". Kun køb, ingen short. | fast kode |
+| **SKEPTIC** | Giver de tre stærkeste grunde til, at handlen fejler, og afgør BUY, WAIT eller SKIP. Uden klar grund fra NEWS er svaret altid SKIP. Det håndhæves i koden, også hvis Claude siger BUY. | Claude |
+| **SIZER** | Højst 5 % af papirkontoen pr. handel og højst 3 åbne eller ventende. Er en grænse ramt, er svaret 0. | fast kode |
+| **EXECUTOR** | Beder om din godkendelse, lægger en bracket-ordre med stop og mål hos Alpaca, lukker alt kl. 15:50 ET og skriver dagsloggen kl. 16:15 ET med handler og saldo. | fast kode |
+
+SCOUT, CHART og SIZER er bevidst almindelig kode. Tal fra en sprogmodel kan være opdigtede, så kurser, stop og beløb bliver regnet ud fra rigtige kursdata. Claude bruges til det, Claude er god til: at finde og vurdere nyheder og argumentere imod en handel.
+
+## Autopilot eller godkendelser
+
+**Autopilot er slået til som standard** (`DESK_AUTO_APPROVE=true`, eller fluebenet under **Bots**): når SKEPTIC siger BUY og SIZER har sat et beløb, køber EXECUTOR selv på papirkontoen uden at spørge. Samme tjek som ved en manuel godkendelse gælder stadig (kursen må ikke være løbet, lofterne skal holde), og **Stop nu** sætter alt på pause. SCOUT kigger hvert minut (`DESK_SCAN_MINUTES=1`).
+
+Slår du autopiloten fra, ender hver BUY som et kort under **Godkend** (og i chatten) med hele kæden: markering, nyhed med link, de tre modargumenter og beløbet. Du har 10 minutter. Når du trykker **Godkend køb**, tjekker EXECUTOR igen, at kursen ikke er løbet mere end 0,5 % over indgangen og stadig ligger mellem stop og mål, og at SIZER's grænser holder. Ellers lægges ordren ikke. Er Telegram sat op, får du også en besked på telefonen.
+
+## Tal med bordet
+
+Skriv `@SKEPTIC hvorfor WAIT til NVDA?` (eller tryk på en af knapperne over skrivefeltet). Den nævnte bot svarer i sin rolle med bordets tal. Bots kan ikke lægge ordrer eller ændre grænser fra chatten. Skriv **Stop nu** for at sætte alt på pause (ventende godkendelser annulleres, åbne positioner beholder stop og mål), og **Start igen** for at fortsætte.
+
+## Papirmåneden og SKEPTIC's regnskab
+
+- **Uge 1:** godkend intet. Læs med, og tjek, at SKEPTIC siger nej.
+- **Uge 2–4:** godkend de handler, du er enig i.
+- **Slutningen:** fanen **Måneden** sammenligner bordets resultat med at holde SPY siden første dag.
+
+For hver handel, der ikke blev til noget (WAIT, SKIP, afvist eller udløbet), regner bordet efter lukketid ud, om den ville have ramt stop eller mål først (skyggeregnskab). Så kan du se, om SKEPTIC sagde nej med rette. Godkender den mere end halvdelen af mindst 5 afgørelser, får du en advarsel om, at den er for blød. Regler og grænser kan ændres under **Bots**, men aldrig ud over de hårde lofter (10 % pr. handel, 5 åbne, stop 5 %, mål mindst 1,5 gange stoppet).
+
+## Opsætning
+
+1. Opret en papirkonto på [app.alpaca.markets](https://app.alpaca.markets) (kontonavnet øverst til venstre → **Open New Paper Account** → **API Keys → Generate New Keys**) og sæt `DESK_ALPACA_API_KEY` og `DESK_ALPACA_SECRET_KEY` i Railway. Står `ALPACA_API_KEY` og `ALPACA_SECRET_KEY` der allerede, bruges de.
+2. `ANTHROPIC_API_KEY` slår Claude til for NEWS og SKEPTIC. `DESK_AI_DAILY_BUDGET_USD` (standard 1 USD) er et hårdt dagligt loft. Uden nøgle eller budget tager faste regler over, og de er strengere: kun en Alpaca-overskrift fra de sidste 6 timer tæller som grund, og SKEPTIC siger WAIT, hvis kursen ligger mere end 2 % over VWAP.
+3. Alle `DESK_*`-variabler står i `.env.example`. På Railway ligger databasen som `/data/desk.db`.
+
+SCOUT kigger hvert minut fra 9:45 til 15:30 ET (15:45–21:30 dansk tid). Intet her er finansiel rådgivning: bottene foreslår, du beslutter.

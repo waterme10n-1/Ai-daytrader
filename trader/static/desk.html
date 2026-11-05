@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark light">
+<title>Handelsbordet</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#0a0c11" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f4f5f8" media="(prefers-color-scheme: light)">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%23161b26'/%3E%3Ctext x='16' y='21.5' text-anchor='middle' font-size='12' font-weight='700' fill='%23f2c14e' font-family='Arial'%3E6%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f4f5f8; --surface: #ffffff; --surface-2: #f8f9fb; --raised: #eceef3;
+    --border: rgba(14, 20, 38, 0.09); --border-strong: rgba(14, 20, 38, 0.18);
+    --text: #0d1120; --text-2: #3f475c; --muted: #646c82;
+    --accent: #b07a00; --accent-soft: rgba(176, 122, 0, 0.12);
+    --up: #0a8a5a; --up-soft: rgba(10, 138, 90, 0.11);
+    --down: #cc2f4b; --down-soft: rgba(204, 47, 75, 0.1);
+    --warn: #9a6208; --warn-soft: rgba(196, 128, 18, 0.13);
+    --info: #2458c2; --info-soft: rgba(36, 88, 194, 0.1);
+    --me: #1d2433; --me-text: #ffffff;
+    --scout: #c27c06; --news: #2563d6; --chart: #0d8f88; --skeptic: #cf3550; --sizer: #7a45e0; --executor: #13845a;
+    --shadow: 0 1px 2px rgba(14, 20, 38, 0.04), 0 8px 26px rgba(14, 20, 38, 0.06);
+    --radius: 16px;
+    color-scheme: light;
+  }
+  html[data-theme="dark"] {
+    --bg: #0a0c11; --surface: #11151d; --surface-2: #151a24; --raised: #1c2230;
+    --border: rgba(255, 255, 255, 0.07); --border-strong: rgba(255, 255, 255, 0.15);
+    --text: #eef1f7; --text-2: #b6bdcc; --muted: #858da2;
+    --accent: #f2c14e; --accent-soft: rgba(242, 193, 78, 0.13);
+    --up: #35d39a; --up-soft: rgba(53, 211, 154, 0.12);
+    --down: #ff6b84; --down-soft: rgba(255, 107, 132, 0.12);
+    --warn: #f3b648; --warn-soft: rgba(243, 182, 72, 0.13);
+    --info: #79a6ff; --info-soft: rgba(121, 166, 255, 0.12);
+    --me: #2a3346; --me-text: #f4f6fb;
+    --scout: #f2b13b; --news: #6fa0ff; --chart: #3fd0c6; --skeptic: #ff6b84; --sizer: #b08cff; --executor: #3fd39a;
+    --shadow: none;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    font-family: "Inter", system-ui, sans-serif; font-size: 15px; line-height: 1.45;
+    color: var(--text); background: var(--bg); min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+  button, input, textarea { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); }
+  .wrap { width: min(1040px, 100%); margin: 0 auto; padding: 0 16px; }
+  header.top {
+    position: sticky; top: 0; z-index: 20; background: color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter: blur(12px); border-bottom: 1px solid var(--border);
+    padding-top: env(safe-area-inset-top);
+  }
+  .bar { display: flex; align-items: center; gap: 12px; padding: 12px 0 10px; }
+  .brand { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; }
+  .logo {
+    width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; flex: none;
+    background: var(--raised); color: var(--accent); font-family: "Space Grotesk", sans-serif; font-weight: 700;
+  }
+  h1 { font-family: "Space Grotesk", sans-serif; font-size: 18px; margin: 0; letter-spacing: -0.01em; }
+  .sub { color: var(--muted); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 600; letter-spacing: 0.04em;
+    padding: 4px 9px; border-radius: 999px; background: var(--info-soft); color: var(--info); white-space: nowrap;
+  }
+  .pill.open { background: var(--up-soft); color: var(--up); }
+  .pill.closed { background: var(--raised); color: var(--muted); }
+  .btn {
+    border: 1px solid var(--border-strong); background: var(--surface); border-radius: 10px; padding: 8px 12px;
+    font-weight: 600; font-size: 13.5px; white-space: nowrap;
+  }
+  .btn:hover { background: var(--surface-2); }
+  .btn.stop { background: var(--down); border-color: var(--down); color: #fff; }
+  .btn.go { background: var(--up); border-color: var(--up); color: #fff; }
+  .btn.ghost { border-color: transparent; background: transparent; }
+  .btn:disabled { opacity: 0.5; cursor: default; }
+  .icon-btn { width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); display: grid; place-items: center; text-decoration: none; color: var(--text-2); flex: none; }
+  nav.tabs { display: flex; gap: 4px; overflow-x: auto; padding-bottom: 8px; scrollbar-width: none; }
+  nav.tabs::-webkit-scrollbar { display: none; }
+  nav.tabs button {
+    border: 0; background: transparent; padding: 7px 12px; border-radius: 9px; color: var(--muted); font-weight: 600; font-size: 14px; white-space: nowrap;
+  }
+  nav.tabs button[aria-selected="true"] { background: var(--raised); color: var(--text); }
+  .badge { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; margin-left: 4px; border-radius: 9px; background: var(--down); color: #fff; font-size: 11px; }
+  .badge[hidden] { display: none; }
+  main { padding: 14px 0 60px; }
+  body.chatting main { padding-bottom: calc(170px + env(safe-area-inset-bottom)); }
+  .alerts { display: grid; gap: 8px; margin-bottom: 12px; }
+  .alert { padding: 10px 12px; border-radius: 12px; font-size: 13.5px; background: var(--info-soft); color: var(--text); border: 1px solid var(--border); }
+  .alert.warning { background: var(--warn-soft); }
+  .alert.error { background: var(--down-soft); }
+  .week { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: var(--radius); background: var(--accent-soft); margin-bottom: 12px; font-size: 13.5px; }
+  .week b { white-space: nowrap; font-family: "Space Grotesk", sans-serif; }
+  .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-bottom: 14px; }
+  .stat { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 10px 12px; box-shadow: var(--shadow); min-width: 0; }
+  .stat .k { color: var(--muted); font-size: 12px; }
+  .stat .v { font-family: "Space Grotesk", sans-serif; font-size: 19px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .up { color: var(--up); } .down { color: var(--down); }
+  section[hidden] { display: none; }
+
+  /* chat */
+  .chat { display: flex; flex-direction: column; gap: 10px; }
+  .msg { display: flex; gap: 10px; align-items: flex-start; max-width: 760px; }
+  .avatar {
+    width: 34px; height: 34px; border-radius: 50%; flex: none; display: grid; place-items: center;
+    font-family: "Space Grotesk", sans-serif; font-weight: 700; font-size: 13px; color: #fff; background: var(--c, var(--muted));
+  }
+  .bubble { background: var(--surface); border: 1px solid var(--border); border-radius: 4px 14px 14px 14px; padding: 9px 12px; box-shadow: var(--shadow); min-width: 0; overflow-wrap: anywhere; }
+  .who { display: flex; gap: 8px; align-items: baseline; font-size: 12px; color: var(--muted); margin-bottom: 2px; }
+  .who b { color: var(--c, var(--text)); font-weight: 700; letter-spacing: 0.03em; font-size: 12.5px; }
+  .msg.me { margin-left: auto; flex-direction: row-reverse; }
+  .msg.me .bubble { background: var(--me); color: var(--me-text); border-color: transparent; border-radius: 14px 4px 14px 14px; }
+  .msg.me .who, .msg.me .who b { color: color-mix(in srgb, var(--me-text) 70%, transparent); }
+  .msg.system { margin: 2px auto; max-width: 640px; }
+  .msg.system .bubble { background: transparent; border: 1px dashed var(--border-strong); box-shadow: none; color: var(--text-2); font-size: 13.5px; border-radius: 12px; text-align: center; }
+  .msg.system.error .bubble { color: var(--down); }
+  .msg.kind-approval .bubble { border-color: var(--accent); }
+  .msg.kind-log .bubble { background: var(--surface-2); }
+  .source { display: inline-block; margin-top: 4px; font-size: 13px; }
+  .actions { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+  .composer {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 15; background: color-mix(in srgb, var(--bg) 92%, transparent);
+    backdrop-filter: blur(12px); border-top: 1px solid var(--border); padding: 8px 0 calc(8px + env(safe-area-inset-bottom));
+  }
+  .chips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 6px; scrollbar-width: none; }
+  .chips::-webkit-scrollbar { display: none; }
+  .chip { border: 1px solid var(--border); background: var(--surface); border-radius: 999px; padding: 4px 10px; font-size: 12.5px; font-weight: 600; color: var(--c, var(--text)); white-space: nowrap; }
+  .chip.stopchip { color: var(--down); }
+  form.send { display: flex; gap: 8px; }
+  form.send input { flex: 1; min-width: 0; border: 1px solid var(--border-strong); background: var(--surface); border-radius: 12px; padding: 10px 12px; }
+  .empty { color: var(--muted); text-align: center; padding: 30px 10px; }
+
+  /* cards */
+  .grid { display: grid; gap: 12px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; box-shadow: var(--shadow); min-width: 0; }
+  .card h3 { margin: 0 0 6px; font-family: "Space Grotesk", sans-serif; font-size: 16px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .chain { display: grid; gap: 8px; margin-top: 8px; }
+  .step { display: grid; grid-template-columns: 86px 1fr; gap: 8px; font-size: 13.5px; }
+  .step .n { font-weight: 700; font-size: 12px; letter-spacing: 0.04em; color: var(--c); padding-top: 1px; }
+  .levels { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 10px 0 4px; }
+  .level { background: var(--surface-2); border-radius: 10px; padding: 8px 10px; }
+  .level .k { font-size: 11.5px; color: var(--muted); }
+  .level .v { font-family: "Space Grotesk", sans-serif; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .countdown { font-size: 12.5px; color: var(--warn); font-weight: 600; }
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+  th, td { text-align: left; padding: 8px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; }
+  .tag { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; padding: 2px 7px; border-radius: 6px; background: var(--raised); color: var(--text-2); }
+  .tag.BUY { background: var(--up-soft); color: var(--up); }
+  .tag.WAIT { background: var(--warn-soft); color: var(--warn); }
+  .tag.SKIP { background: var(--down-soft); color: var(--down); }
+  .bots { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .bot-head { display: flex; gap: 10px; align-items: center; margin-bottom: 8px; }
+  .bot-head .name { font-family: "Space Grotesk", sans-serif; font-weight: 700; letter-spacing: 0.03em; color: var(--c); }
+  .bot-head .job { font-size: 12.5px; color: var(--muted); }
+  .rules { font-size: 13.5px; color: var(--text-2); background: var(--surface-2); border-radius: 10px; padding: 10px 12px; }
+  .engine { margin-left: auto; }
+  .form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .form label { display: grid; gap: 4px; font-size: 12.5px; color: var(--muted); }
+  .form input, .form textarea { border: 1px solid var(--border-strong); background: var(--surface); border-radius: 10px; padding: 8px 10px; width: 100%; }
+  .form .wide { grid-column: 1 / -1; }
+  .form label.check { display: flex; gap: 10px; align-items: flex-start; color: var(--text); font-size: 14px; background: var(--accent-soft); padding: 10px 12px; border-radius: 10px; }
+  .form label.check input { width: 20px; height: 20px; flex: none; margin-top: 1px; accent-color: var(--up); }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .muted { color: var(--muted); }
+  .small { font-size: 12.5px; }
+  .big { font-family: "Space Grotesk", sans-serif; font-size: 28px; font-weight: 600; }
+  .plan { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .toast { position: fixed; left: 50%; bottom: 120px; transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 10px 14px; border-radius: 12px; font-size: 13.5px; z-index: 50; max-width: calc(100% - 32px); }
+  .toast[hidden] { display: none; }
+  @media (max-width: 720px) {
+    .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .bots, .form, .plan { grid-template-columns: 1fr; }
+    .levels { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .hide-sm { display: none; }
+    .step { grid-template-columns: 74px 1fr; }
+  }
+</style>
+<style>
+  .appnav { display: flex; justify-content: center; padding: 8px 12px 0; padding-top: max(8px, env(safe-area-inset-top)); }
+  .appnav-in { display: inline-flex; gap: 2px; padding: 3px; border-radius: 999px; background: rgba(127, 127, 127, 0.14); max-width: 100%; }
+  .appnav a { padding: 6px 14px; border-radius: 999px; font: 600 13px/1.2 Inter, system-ui, sans-serif; color: inherit; opacity: 0.72; text-decoration: none; white-space: nowrap; }
+  .appnav a:hover { opacity: 1; }
+  .appnav a[aria-current="page"] { opacity: 1; background: rgba(127, 127, 127, 0.28); }
+  @media (max-width: 360px) { .appnav a { padding: 6px 10px; } }
+</style>
+</head>
+<body class="chatting">
+<nav class="appnav" aria-label="Skift side"><div class="appnav-in"><a href="/meme">Memebot</a><a href="/desk" aria-current="page">Handelsbordet</a></div></nav>
+
+<header class="top">
+  <div class="wrap">
+    <div class="bar">
+      <div class="brand">
+        <div class="logo" aria-hidden="true">6</div>
+        <div style="min-width:0">
+          <h1>Handelsbordet</h1>
+          <div class="sub" id="sub">Seks bots, én gruppechat</div>
+        </div>
+      </div>
+      <span class="pill hide-sm">PAPIRPENGE</span>
+      <span class="pill closed hide-sm" id="market">Marked …</span>
+      <button class="btn stop" id="pause-btn" type="button">Stop nu</button>
+      <button class="icon-btn" id="theme" type="button" title="Skift tema" aria-label="Skift tema"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.5a6.5 6.5 0 0 1 0 13z" fill="currentColor"/></svg></button>
+    </div>
+    <nav class="tabs" role="tablist">
+      <button role="tab" data-tab="chat" aria-selected="true">Gruppen</button>
+      <button role="tab" data-tab="approve" aria-selected="false">Godkend<span class="badge" id="badge" hidden>0</span></button>
+      <button role="tab" data-tab="trades" aria-selected="false">Handler</button>
+      <button role="tab" data-tab="bots" aria-selected="false">Bots</button>
+      <button role="tab" data-tab="month" aria-selected="false">Måneden</button>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="alerts" id="alerts"></div>
+  <div class="week" id="week" hidden></div>
+  <div class="stats">
+    <div class="stat"><div class="k">Papirkonto</div><div class="v" id="s-equity">–</div></div>
+    <div class="stat"><div class="k">Markeringer i dag</div><div class="v" id="s-flags">–</div></div>
+    <div class="stat"><div class="k">Åbne handler</div><div class="v" id="s-open">–</div></div>
+    <div class="stat"><div class="k">Bordets resultat</div><div class="v" id="s-pnl">–</div></div>
+  </div>
+
+  <section id="tab-chat">
+    <div class="chat" id="chat" aria-live="polite"></div>
+  </section>
+
+  <section id="tab-approve" hidden>
+    <p class="muted small">Ordrer venter her på dit tryk. Intet lægges uden din godkendelse, og en godkendelse udløber, hvis kursen når at løbe.</p>
+    <div class="grid" id="approvals"></div>
+  </section>
+
+  <section id="tab-trades" hidden>
+    <div class="card" style="margin-bottom:12px">
+      <h3>Åbne positioner</h3>
+      <div id="open-list"></div>
+      <div class="actions">
+        <button class="btn" id="scan-btn" type="button">Lad SCOUT kigge nu</button>
+        <button class="btn" id="log-btn" type="button">Dagslog nu</button>
+        <button class="btn" id="close-btn" type="button">Luk bordets positioner</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Alle forslag</h3>
+      <p class="muted small" style="margin:0 0 8px">Skygge viser, hvad der ville være sket med handler, der ikke blev til noget. Sådan ser du, om SKEPTIC sagde nej med rette.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Dag</th><th>Ticker</th><th>SKEPTIC</th><th>Status</th><th>Indgang</th><th>Stop</th><th>Mål</th><th>Antal</th><th>Resultat</th><th>Skygge</th></tr></thead>
+        <tbody id="proposals"></tbody>
+      </table></div>
+    </div>
+  </section>
+
+  <section id="tab-bots" hidden>
+    <div class="card" style="margin-bottom:12px">
+      <h3>SKEPTIC's regnskab</h3>
+      <div id="skeptic-card" class="small"></div>
+    </div>
+    <div class="bots" id="bots"></div>
+    <div class="card" style="margin-top:12px">
+      <h3>Indstillinger</h3>
+      <p class="muted small" style="margin:0 0 10px">Tallene er bordets stående regler. Hårde lofter kan ikke overskrides, uanset hvad der står her.</p>
+      <form class="form" id="params">
+        <label class="wide check"><input name="auto_approve" type="checkbox"> <span><b>Autopilot</b>: bordet køber selv på papir, når SKEPTIC siger BUY. Slå fra, hvis du vil godkende hver ordre.</span></label>
+        <label class="wide">Watchlist (10–20 tickers du kender)<textarea name="watchlist" rows="2"></textarea></label>
+        <label>SCOUT: bevægelse på en time (%)<input name="move_pct" type="number" step="0.1" min="0.5" max="20"></label>
+        <label>SCOUT: volumen (gange normal)<input name="volume_x" type="number" step="0.1" min="1.2" max="20"></label>
+        <label>SCOUT: højst markeringer pr. dag<input name="max_flags_per_day" type="number" step="1" min="1"></label>
+        <label>SCOUT: kigger hvert (minutter)<input name="scan_minutes" type="number" step="1" min="1" max="30"></label>
+        <label>CHART: stop højst (% under indgang)<input name="stop_max_pct" type="number" step="0.1" min="0.3"></label>
+        <label>CHART: målet mindst (gange stoppet)<input name="reward_risk" type="number" step="0.1" min="1.5" max="5"></label>
+        <label>SIZER: højst (% af kontoen pr. handel)<input name="position_pct" type="number" step="0.5" min="0.5"></label>
+        <label>SIZER: højst åbne handler<input name="max_open" type="number" step="1" min="1"></label>
+        <div class="row wide"><button class="btn go" type="submit">Gem regler</button><button class="btn" type="button" id="reset-params">Tilbage til standard</button><span class="muted small" id="hard"></span></div>
+      </form>
+    </div>
+  </section>
+
+  <section id="tab-month" hidden>
+    <div class="card" style="margin-bottom:12px">
+      <h3>Bordet mod S&amp;P 500</h3>
+      <div id="compare" class="small muted">Henter …</div>
+    </div>
+    <div class="plan">
+      <div class="card"><h3>Uge 1</h3><p class="small">Godkend intet. Læs, hvad hver bot skriver, og tjek, at SKEPTIC faktisk siger nej. Vinker den de fleste handler igennem, så stram dens regler før uge 2.</p></div>
+      <div class="card"><h3>Uge 2–4</h3><p class="small">Godkend de papirhandler, du er enig i. Skriv ned, hvilke du ville springe over og hvorfor. Så finder du ud af, om bordet eller din mavefornemmelse handler bedst.</p></div>
+      <div class="card"><h3>Månedens slutning</h3><p class="small">Sammenlign bordets resultat med bare at holde S&amp;P 500. Slår bordet det ikke på papir, hjælper rigtige penge ikke.</p></div>
+    </div>
+    <div class="card" style="margin-top:12px">
+      <h3>Fem ting, der bider</h3>
+      <ul class="small" style="margin:0;padding-left:18px">
+        <li>Store tal fra andre er skærmbilleder, ikke bevis. Ingen viser de tabende uger.</li>
+        <li>En SKEPTIC, der siger ja til alt, er i stykker. Den skal afvise langt mere, end den godkender.</li>
+        <li>Rammer Alpaca en fejl, bliver bordet stille. Tjek nøglerne, hvis der ikke sker noget i åbningstiden.</li>
+        <li>Claude koster penge pr. kald. Bordet har et hårdt dagsbudget, og kun NEWS og SKEPTIC bruger Claude af sig selv.</li>
+        <li>Det er dit valg hver gang. Bottene foreslår, du godkender. Intet her er finansiel rådgivning.</li>
+      </ul>
+    </div>
+  </section>
+</main>
+
+<div class="composer" id="composer">
+  <div class="wrap">
+    <div class="chips" id="chips"></div>
+    <form class="send" id="send">
+      <input id="text" autocomplete="off" maxlength="1000" placeholder="Skriv til gruppen. @SKEPTIC hvorfor WAIT?" aria-label="Besked til gruppen">
+      <button class="btn go" type="submit">Send</button>
+    </form>
+  </div>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+const BOT = {
+  scout: { name: "SCOUT", c: "var(--scout)", i: "SC" },
+  news: { name: "NEWS", c: "var(--news)", i: "NW" },
+  chart: { name: "CHART", c: "var(--chart)", i: "CH" },
+  skeptic: { name: "SKEPTIC", c: "var(--skeptic)", i: "SK" },
+  sizer: { name: "SIZER", c: "var(--sizer)", i: "SZ" },
+  executor: { name: "EXECUTOR", c: "var(--executor)", i: "EX" },
+  me: { name: "DIG", c: "var(--me)", i: "DU" },
+  system: { name: "BORDET", c: "var(--muted)", i: "·" },
+};
+let state = null;
+let lastId = 0;
+const messages = [];
+let busy = false;
+
+const $ = (id) => document.getElementById(id);
+function esc(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+}
+function safeUrl(url) { return /^https?:\/\//i.test(url || "") ? url : ""; }
+function money(v, sign = false) {
+  if (v === null || v === undefined || isNaN(v)) return "–";
+  const s = Number(v).toLocaleString("da-DK", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return (sign && v > 0 ? "+" : "") + s;
+}
+function price(v) { return v === null || v === undefined ? "–" : Number(v).toFixed(2); }
+function hhmm(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return isNaN(d) ? "" : d.toLocaleTimeString("da-DK", { hour: "2-digit", minute: "2-digit" });
+}
+function toast(text) {
+  const el = $("toast"); el.textContent = text; el.hidden = false;
+  clearTimeout(toast.t); toast.t = setTimeout(() => { el.hidden = true; }, 4200);
+}
+function csrfToken() {
+  const match = document.cookie.match(/(?:^|; )dt_csrf=([^;]*)/);
+  return match ? decodeURIComponent(match[1]) : "";
+}
+async function post(url, body = {}) {
+  const response = await fetch(url, {
+    method: "POST", credentials: "same-origin",
+    headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken() },
+    body: JSON.stringify(body),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (response.status === 401) { location.href = "/login"; throw new Error("Log ind igen."); }
+  if (!response.ok) throw new Error(data.detail || `Fejl ${response.status}`);
+  return data;
+}
+
+// tema
+(function () {
+  let saved = null;
+  try { saved = localStorage.getItem("desk-theme"); } catch (e) {}
+  const dark = saved ? saved === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  document.documentElement.dataset.theme = dark ? "dark" : "light";
+  $("theme").onclick = () => {
+    const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+    document.documentElement.dataset.theme = next;
+    try { localStorage.setItem("desk-theme", next); } catch (e) {}
+  };
+})();
+
+// faner
+let tab = "chat";
+function showTab(name) {
+  tab = name;
+  document.querySelectorAll("nav.tabs button").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === name)));
+  ["chat", "approve", "trades", "bots", "month"].forEach((t) => { $("tab-" + t).hidden = t !== name; });
+  $("composer").hidden = name !== "chat";
+  document.body.classList.toggle("chatting", name === "chat");
+  if (name === "month") loadCompare();
+  if (name === "chat") scrollDown(true);
+  try { localStorage.setItem("desk-tab", name); } catch (e) {}
+}
+document.querySelectorAll("nav.tabs button").forEach((b) => (b.onclick = () => showTab(b.dataset.tab)));
+
+// chips
+$("chips").innerHTML =
+  `<button class="chip stopchip" type="button" data-say="Stop nu">Stop nu</button>` +
+  ["scout", "news", "chart", "skeptic", "sizer", "executor"].map((k) => `<button class="chip" type="button" style="--c:${BOT[k].c}" data-at="${BOT[k].name}">@${BOT[k].name}</button>`).join("");
+$("chips").onclick = (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  const input = $("text");
+  if (b.dataset.say) { input.value = b.dataset.say; $("send").requestSubmit(); return; }
+  input.value = `@${b.dataset.at} ` + input.value.replace(/^@\w+\s*/, "");
+  input.focus();
+};
+
+function nearBottom() { return window.innerHeight + window.scrollY >= document.body.scrollHeight - 160; }
+function scrollDown(force) { if (force || nearBottom()) requestAnimationFrame(() => window.scrollTo(0, document.body.scrollHeight)); }
+
+function approvalButtons(pid) {
+  if (!state) return "";
+  const pending = (state.approvals || []).find((p) => p.id === pid);
+  if (!pending) return "";
+  return `<div class="actions"><button class="btn go" data-approve="${pid}">Godkend køb</button><button class="btn" data-reject="${pid}">Afvis</button></div>`;
+}
+function renderMessage(m) {
+  const who = BOT[m.author] || BOT.system;
+  const cls = m.author === "me" ? "me" : m.author === "system" ? "system" : "";
+  let body = esc(m.text);
+  const url = m.data && safeUrl(m.data.source_url);
+  if (m.kind === "news" && url) body += `<br><a class="source" href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(m.data.source_title || "Kilde")} ↗</a>`;
+  if (m.kind === "approval") body += `<div data-slot="${m.proposal_id}">${approvalButtons(m.proposal_id)}</div>`;
+  if (cls === "system") {
+    return `<div class="msg system ${m.kind === "error" ? "error" : ""}"><div class="bubble">${body}</div></div>`;
+  }
+  return `<div class="msg ${cls} kind-${esc(m.kind)}" style="--c:${who.c}">
+    <div class="avatar">${who.i}</div>
+    <div class="bubble"><div class="who"><b>${who.name}</b><span>${hhmm(m.ts)}</span></div>${body}</div></div>`;
+}
+function renderChat(fresh) {
+  const box = $("chat");
+  if (!messages.length) { box.innerHTML = `<div class="empty">Gruppen er stille. SCOUT kigger hvert par minutter i amerikansk åbningstid (15:45–21:30 dansk tid).</div>`; return; }
+  const follow = nearBottom();
+  if (fresh === null || box.querySelector(".empty")) box.innerHTML = messages.map(renderMessage).join("");
+  else if (fresh.length) box.insertAdjacentHTML("beforeend", fresh.map(renderMessage).join(""));
+  box.querySelectorAll("[data-slot]").forEach((slot) => { slot.innerHTML = approvalButtons(Number(slot.dataset.slot)); });
+  if (follow && tab === "chat") scrollDown(true);
+}
+
+function chainCard(p, withButtons) {
+  const f = p.flag || {}, n = p.news || {}, s = p.skeptic || {}, z = p.size || {};
+  const url = safeUrl(n.source_url);
+  const left = p.expires_at ? Math.max(0, Math.round((new Date(p.expires_at) - Date.now()) / 60000)) : null;
+  return `<div class="card">
+    <h3>${esc(p.symbol)} <span class="tag ${esc(p.ruling || "")}">${esc(p.ruling || p.status_label)}</span>${left !== null && p.status === "awaiting" ? `<span class="countdown">udløber om ${left} min</span>` : ""}</h3>
+    <div class="levels">
+      <div class="level"><div class="k">Indgang</div><div class="v">${price(p.entry)}</div></div>
+      <div class="level"><div class="k">Stop</div><div class="v down">${price(p.stop)}</div></div>
+      <div class="level"><div class="k">Mål</div><div class="v up">${price(p.target)}</div></div>
+    </div>
+    <div class="chain">
+      <div class="step" style="--c:var(--scout)"><div class="n">SCOUT</div><div>${f.move_pct !== undefined ? `${f.move_pct > 0 ? "+" : ""}${f.move_pct}% på ${f.window_minutes} min, ${f.volume_x}x volumen` : "–"}</div></div>
+      <div class="step" style="--c:var(--news)"><div class="n">NEWS</div><div>${esc(n.reason || "–")}${url ? ` <a href="${esc(url)}" target="_blank" rel="noopener noreferrer">kilde ↗</a>` : ""}</div></div>
+      <div class="step" style="--c:var(--skeptic)"><div class="n">SKEPTIC</div><div>${(s.reasons || []).map((r, i) => `${i + 1}) ${esc(r)}`).join("<br>") || "–"}</div></div>
+      <div class="step" style="--c:var(--sizer)"><div class="n">SIZER</div><div>${z.qty ? `${z.qty} aktier · ${money(z.notional)} USD (${z.pct}%) · største tab ${money(z.max_loss)} USD` : esc(z.reason || "–")}</div></div>
+    </div>
+    ${withButtons ? `<div class="actions"><button class="btn go" data-approve="${p.id}">Godkend køb</button><button class="btn" data-reject="${p.id}">Afvis</button></div>` : ""}
+  </div>`;
+}
+
+function render(data, fresh) {
+  state = data;
+  const m = data.market || {};
+  const mk = $("market");
+  mk.textContent = m.is_open === true ? "Marked åbent" : m.is_open === false ? "Marked lukket" : "Marked ukendt";
+  mk.className = "pill hide-sm " + (m.is_open ? "open" : "closed");
+  const pb = $("pause-btn");
+  pb.textContent = data.paused ? "Start igen" : "Stop nu";
+  pb.className = "btn " + (data.paused ? "go" : "stop");
+  const ai = data.ai || {};
+  $("sub").textContent = `Papirpenge · ${data.params.auto_approve ? "Autopilot" : "Du godkender"} · ${ai.configured ? "NEWS og SKEPTIC på Claude" : "Kun regler (ingen Claude-nøgle)"} · AI i dag ${money(ai.spent_today_usd)} af ${money(ai.budget_usd)} USD`;
+  $("alerts").innerHTML = (data.alerts || []).map((a) => `<div class="alert ${esc(a.level)}">${esc(a.text)}</div>`).join("");
+  const pm = data.paper_month || {};
+  const week = $("week");
+  if (pm.week) {
+    const tip = data.params.auto_approve ? "Autopilot køber selv på papir. Læs med, og tjek at SKEPTIC siger nej langt oftere end ja."
+      : pm.week === 1 ? "Godkend intet i denne uge. Læs med, og tjek at SKEPTIC siger nej."
+      : pm.week <= 4 ? "Godkend de papirhandler, du er enig i, og skriv ned, hvilke du ville springe over."
+      : "Måneden er gået. Sammenlign med S&P 500 under Måneden, før du overvejer noget som helst andet.";
+    week.innerHTML = `<b>Uge ${pm.week}</b><span>${esc(tip)}</span>`; week.hidden = false;
+  } else week.hidden = true;
+  $("s-equity").textContent = data.account ? money(data.account.equity) : "–";
+  $("s-flags").textContent = `${data.today.flags} / ${data.today.max_flags}`;
+  $("s-open").textContent = `${data.today.open} / ${data.today.max_open}`;
+  const pnl = $("s-pnl"); pnl.textContent = money(data.kpis.pnl, true); pnl.className = "v " + (data.kpis.pnl > 0 ? "up" : data.kpis.pnl < 0 ? "down" : "");
+  const count = (data.approvals || []).length;
+  $("badge").hidden = !count; $("badge").textContent = count;
+  notifyApprovals(data.approvals || []);
+
+  renderChat(fresh);
+  $("approvals").innerHTML = count ? data.approvals.map((p) => chainCard(p, true)).join("")
+    : `<div class="empty">${data.params.auto_approve ? "Autopilot er slået til, så bordet køber selv på papir. Slå den fra under Bots, hvis du vil godkende hver ordre." : "Ingen ordrer venter på dig."}</div>`;
+  $("open-list").innerHTML = (data.open || []).length
+    ? data.open.map((p) => `<div class="row small" style="padding:6px 0;border-bottom:1px solid var(--border)"><b>${esc(p.symbol)}</b> ${p.qty} stk · købt ${price(p.fill_price || p.entry)} · stop ${price(p.stop)} · mål ${price(p.target)}</div>`).join("")
+    : `<p class="muted small">Ingen åbne positioner. Alt lukkes senest 15:50 ET (21:50 dansk tid).</p>`;
+  $("proposals").innerHTML = (data.proposals || []).map((p) => {
+    const sh = p.shadow;
+    const shadow = sh ? `<span class="${sh.result === "loss" ? "up" : "down"}">${sh.result === "loss" ? "ville tabe" : "ville vinde"} (${sh.pct > 0 ? "+" : ""}${sh.pct}%)</span>` : "";
+    const res = p.pnl !== null && p.pnl !== undefined ? `<span class="${p.pnl >= 0 ? "up" : "down"}">${money(p.pnl, true)}</span>` : "";
+    return `<tr><td>${esc(p.trading_day.slice(5))}</td><td><b>${esc(p.symbol)}</b></td><td>${p.ruling ? `<span class="tag ${esc(p.ruling)}">${esc(p.ruling)}</span>` : ""}</td><td>${esc(p.status_label)}</td><td>${price(p.entry)}</td><td>${price(p.stop)}</td><td>${price(p.target)}</td><td>${p.qty || ""}</td><td>${res}</td><td>${shadow}</td></tr>`;
+  }).join("") || `<tr><td colspan="10" class="muted">Ingen forslag endnu.</td></tr>`;
+
+  const sk = data.skeptic;
+  $("skeptic-card").innerHTML = `
+    <div class="row" style="gap:18px">
+      <div><div class="muted">Afgørelser</div><div class="big">${sk.rulings}</div></div>
+      <div><div class="muted">BUY</div><div class="big">${sk.buy}</div></div>
+      <div><div class="muted">Nej (WAIT/SKIP)</div><div class="big">${sk.refused}</div></div>
+      <div><div class="muted">Nej med rette</div><div class="big">${sk.refusals_checked ? `${sk.refusals_right}/${sk.refusals_checked}` : "–"}</div></div>
+    </div>
+    <p class="${sk.too_soft ? "down" : "muted"}" style="margin:8px 0 0">${esc(sk.verdict)}</p>`;
+  $("bots").innerHTML = data.bots.map((b) => `<div class="card" style="--c:${BOT[b.key].c}">
+      <div class="bot-head"><div class="avatar">${BOT[b.key].i}</div><div><div class="name">${esc(b.name)}</div><div class="job">${esc(b.job)}</div></div><span class="tag engine">${b.engine === "Claude" ? "Claude" : "fast kode"}</span></div>
+      <div class="rules">${esc(b.rules)}</div></div>`).join("");
+  fillParams(data.params);
+}
+
+let paramsFilled = false;
+function fillParams(p) {
+  const form = $("params");
+  $("hard").textContent = `Hårde lofter: ${p.hard.position_pct}% pr. handel, ${p.hard.max_open} åbne, stop ${p.hard.stop_max_pct}%, mål mindst ${p.hard.reward_risk_min}x.`;
+  if (paramsFilled && form.contains(document.activeElement)) return;
+  form.watchlist.value = p.watchlist.join(", ");
+  ["move_pct", "volume_x", "max_flags_per_day", "scan_minutes", "stop_max_pct", "reward_risk", "position_pct", "max_open"].forEach((k) => { form[k].value = p[k]; });
+  form.auto_approve.checked = !!p.auto_approve;
+  form.max_flags_per_day.max = p.hard.max_flags_per_day; form.position_pct.max = p.hard.position_pct;
+  form.max_open.max = p.hard.max_open; form.stop_max_pct.max = p.hard.stop_max_pct;
+  paramsFilled = true;
+}
+$("params").onsubmit = async (e) => {
+  e.preventDefault();
+  const form = e.target;
+  const body = { watchlist: form.watchlist.value, auto_approve: form.auto_approve.checked };
+  ["move_pct", "volume_x", "max_flags_per_day", "scan_minutes", "stop_max_pct", "reward_risk", "position_pct", "max_open"].forEach((k) => { body[k] = form[k].value; });
+  try { await post("/api/desk/params", body); paramsFilled = false; toast("Reglerne er gemt."); refresh(); } catch (err) { toast(err.message); }
+};
+$("reset-params").onclick = async () => {
+  try { await post("/api/desk/params", { reset: true }); paramsFilled = false; toast("Tilbage til standard."); refresh(); } catch (err) { toast(err.message); }
+};
+
+document.addEventListener("click", async (e) => {
+  const a = e.target.closest("[data-approve]"), r = e.target.closest("[data-reject]");
+  if (!a && !r) return;
+  const id = Number((a || r).dataset.approve || (a || r).dataset.reject);
+  (a || r).disabled = true;
+  try {
+    if (a) { await post("/api/desk/approve", { id }); toast("Godkendt. EXECUTOR lægger ordren på papirkontoen."); }
+    else { await post("/api/desk/reject", { id }); toast("Afvist. Ingen ordre."); }
+  } catch (err) { toast(err.message); }
+  refresh();
+});
+
+$("send").onsubmit = async (e) => {
+  e.preventDefault();
+  const input = $("text"); const text = input.value.trim();
+  if (!text) return;
+  input.value = "";
+  try { await post("/api/desk/message", { text }); } catch (err) { toast(err.message); input.value = text; }
+  refresh(); scrollDown(true);
+};
+$("pause-btn").onclick = async () => {
+  if (!state) return;
+  try { await post("/api/desk/pause", { paused: !state.paused }); } catch (err) { toast(err.message); }
+  refresh();
+};
+async function action(url, done) {
+  try { const r = await post(url); toast(done(r)); } catch (err) { toast(err.message); }
+  refresh();
+}
+$("scan-btn").onclick = () => action("/api/desk/scan", () => "SCOUT kigger nu. Svarene kommer i gruppen.");
+$("log-btn").onclick = () => action("/api/desk/log", () => "Dagsloggen er skrevet i gruppen.");
+$("close-btn").onclick = () => { if (confirm("Luk alle bordets positioner nu?")) action("/api/desk/close-all", (r) => `${r.closed} position(er) lukket.`); };
+
+async function loadCompare() {
+  try {
+    const response = await fetch("/api/desk/compare", { cache: "no-store", credentials: "same-origin" });
+    const c = await response.json();
+    if (!c.started) { $("compare").textContent = c.text; return; }
+    const row = (k, v, cls = "") => `<div><div class="muted">${k}</div><div class="big ${cls}">${v}</div></div>`;
+    $("compare").innerHTML = `<div class="row" style="gap:22px">
+      ${row("Bordet", `${c.desk_pct > 0 ? "+" : ""}${c.desk_pct}%`, c.desk_pct >= 0 ? "up" : "down")}
+      ${row("S&P 500 (SPY)", c.spy_pct === null ? "–" : `${c.spy_pct > 0 ? "+" : ""}${c.spy_pct}%`)}
+      ${row("Handler", c.trades)}
+      ${row("Vindere", c.win_rate === null ? "–" : Math.round(c.win_rate * 100) + "%")}
+      ${row("Dag", c.days + 1)}
+    </div><p style="margin:10px 0 0;color:var(--text)">${esc(c.text)}</p>`;
+  } catch (err) { $("compare").textContent = "Kunne ikke hente sammenligningen."; }
+}
+
+const seenApprovals = new Set();
+function notifyApprovals(list) {
+  for (const p of list) {
+    if (seenApprovals.has(p.id)) continue;
+    seenApprovals.add(p.id);
+    if (state && lastId && "Notification" in window && Notification.permission === "granted") {
+      try { new Notification("Godkendelse nødvendig", { body: `KØB ${p.qty} ${p.symbol} til ca. ${price(p.entry)}` }); } catch (e) {}
+    }
+  }
+}
+document.addEventListener("click", () => {
+  if ("Notification" in window && Notification.permission === "default") Notification.requestPermission().catch(() => {});
+}, { once: true });
+
+async function refresh() {
+  if (busy) return;
+  busy = true;
+  try {
+    const response = await fetch(`/api/desk/status?after=${lastId}`, { cache: "no-store", credentials: "same-origin" });
+    if (response.status === 401) { location.href = "/login"; return; }
+    if (!response.ok) { const d = await response.json().catch(() => ({})); $("alerts").innerHTML = `<div class="alert error">${esc(d.detail || "Handelsbordet svarer ikke.")}</div>`; return; }
+    const data = await response.json();
+    const first = lastId === 0;
+    const fresh = data.messages.filter((m) => m.id > lastId);
+    messages.push(...fresh);
+    if (messages.length > 400) messages.splice(0, messages.length - 400);
+    lastId = data.last_message_id || lastId;
+    render(data, first ? null : fresh);
+    if (first) scrollDown(true);
+  } catch (err) {
+    $("alerts").innerHTML = `<div class="alert error">Ingen forbindelse til serveren.</div>`;
+  } finally { busy = false; }
+}
+try { const t = localStorage.getItem("desk-tab"); if (t) showTab(t); } catch (e) {}
+refresh();
+setInterval(() => { if (!document.hidden) refresh(); }, 4000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
+</script>
+</body>
+</html>
