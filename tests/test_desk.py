@@ -136,7 +136,7 @@ def fresh_news(symbol: str, minutes_ago: int = 30) -> list[NewsItem]:
 
 def make_desk(tmp_path, broker: FakeBroker, **overrides) -> tuple[DeskEngine, dict]:
     clock = {"now": at(11, 30)}
-    values = {"watchlist": ("NVDA", "AAPL"), "db_path": str(tmp_path / "desk.db"), **overrides}
+    values = {"watchlist": ("NVDA", "AAPL"), "db_path": str(tmp_path / "desk.db"), "auto_approve": False, "scan_minutes": 5, **overrides}
     cfg = replace(DeskSettings(), **values)
     main = _settings(tmp_path)
 
@@ -418,3 +418,32 @@ def test_claude_news_needs_a_real_source_and_spend_is_counted(tmp_path):
 
     tiny = DeskBrain(DeskSettings(ai_daily_budget_usd=0.0), store, api_key="test")
     assert tiny.skeptic(flag, news, {}, {}) is None  # intet budget: reglerne afgør
+
+
+def test_autopilot_buys_on_its_own_but_only_after_skeptic_says_buy(tmp_path):
+    broker = FakeBroker(
+        {"NVDA": ramp_bars(), "AAPL": ramp_bars(), "SPY": ramp_bars(end=100.3, ramp_volume=1000)},
+        news={"NVDA": fresh_news("NVDA")},
+    )
+    desk, clock = make_desk(tmp_path, broker, auto_approve=True, scan_minutes=1)
+    clock["now"] = at(11, 31)
+    desk.tick()
+    rows = {row["symbol"]: row for row in desk.store.proposals_on(DAY.isoformat())}
+    assert rows["NVDA"]["status"] == "placed"
+    assert rows["AAPL"]["status"] == "skip"  # ingen grund fra NEWS, så intet køb
+    assert [order[0] for order in broker.submitted] == ["NVDA"]
+    assert desk.store.proposals_with_status("awaiting") == []
+    desk.post_message("Stop nu")
+    broker.intraday["AMD"] = ramp_bars()
+    clock["now"] = at(11, 32)
+    desk.tick()
+    assert len(broker.submitted) == 1
+
+
+def test_autopilot_and_scan_interval_can_be_changed(tmp_path):
+    desk, _ = make_desk(tmp_path, FakeBroker({}), auto_approve=True)
+    desk.update_params({"auto_approve": False, "scan_minutes": 2})
+    assert desk.cfg.auto_approve is False and desk.cfg.scan_minutes == 2
+    with pytest.raises(ValueError):
+        desk.update_params({"scan_minutes": 0})
+    assert DeskSettings().auto_approve is True and DeskSettings().scan_minutes == 1

@@ -124,9 +124,11 @@ class DeskEngine:
         for name in ("move_pct", "volume_x", "position_pct", "stop_max_pct", "reward_risk"):
             if isinstance(params.get(name), (int, float)):
                 values[name] = float(params[name])
-        for name in ("max_open", "max_flags_per_day"):
+        for name in ("max_open", "max_flags_per_day", "scan_minutes"):
             if isinstance(params.get(name), int):
                 values[name] = int(params[name])
+        if isinstance(params.get("auto_approve"), bool):
+            values["auto_approve"] = params["auto_approve"]
         return dataclasses.replace(self.base, **values) if values else self.base
 
     def update_params(self, body: dict) -> None:
@@ -140,8 +142,13 @@ class DeskEngine:
             "reward_risk": (HARD_MIN_REWARD_RISK, 5.0, float),
             "max_open": (1, HARD_MAX_OPEN, int),
             "max_flags_per_day": (1, HARD_MAX_FLAGS, int),
+            "scan_minutes": (1, 30, int),
         }
         changes: list[str] = []
+        if "auto_approve" in body and body["auto_approve"] is not None:
+            auto = body["auto_approve"] in (True, "true", "1", 1, "on")
+            params["auto_approve"] = auto
+            changes.append("autopilot " + ("til: bordet køber selv på papir" if auto else "fra: du godkender hver ordre"))
         if "watchlist" in body:
             watch = parse_watchlist(body.get("watchlist"))
             if not watch:
@@ -311,7 +318,7 @@ class DeskEngine:
                 return 0
             broker = self.broker()
             intraday = broker.get_intraday(symbols, now)
-            daily = broker.get_daily(symbols, 20, now)
+            daily = self._daily(broker, symbols, now)
             found = []
             for symbol in symbols:
                 flag = rules.scout(
@@ -333,6 +340,19 @@ class DeskEngine:
         finally:
             self.scanning = False
             self._scan_lock.release()
+
+    def _daily(self, broker, symbols: list[str], now: datetime) -> dict:
+        """Dagsbarer ændrer sig ikke i løbet af dagen. De hentes én gang pr. dag, så SCOUT kan kigge hvert minut."""
+        day = now.date().isoformat()
+        cache = self._cache.get("daily")
+        stored: dict = cache[1] if cache and cache[1].get("day") == day else {"day": day, "bars": {}}
+        missing = [symbol for symbol in symbols if symbol not in stored["bars"]]
+        if missing:
+            stored["bars"].update(broker.get_daily(missing, 20, now))
+            for symbol in missing:
+                stored["bars"].setdefault(symbol, [])
+            self._cache["daily"] = (float("inf"), stored)
+        return {symbol: stored["bars"].get(symbol, []) for symbol in symbols}
 
     def _pipeline(self, flag: rules.Flag, bars: list, now: datetime, cfg: DeskSettings) -> None:
         day = now.date().isoformat()
@@ -410,6 +430,20 @@ class DeskEngine:
             # EXECUTOR: venter på dig
             expires = now + timedelta(minutes=cfg.approval_minutes)
             self.store.update_proposal(pid, status="awaiting", expires_at=expires.isoformat(timespec="seconds"))
+        if cfg.auto_approve:
+            # Autopilot: samme tjek som når du trykker Godkend (kurs, stop, mål, lofter), bare uden at vente på dig.
+            self.store.post(
+                "executor",
+                "info",
+                f"Autopilot: SKEPTIC sagde BUY, så jeg køber {sized.qty} {symbol} uden at spørge (papirpenge).",
+                symbol=symbol,
+                proposal_id=pid,
+            )
+            try:
+                self.approve(pid)
+            except ValueError as exc:
+                logger.info("Autopilot købte ikke %s: %s", symbol, exc)
+            return
         text = (
             f"Godkendelse nødvendig: KØB {sized.qty} {symbol} til ca. {plan.entry:.2f}, stop {plan.stop:.2f}, "
             f"mål {plan.target:.2f}. Udløber kl. {expires.strftime('%H:%M')} ET."
@@ -906,6 +940,8 @@ class DeskEngine:
             alerts.append({"level": "info", "text": "Dagens AI-budget er brugt. Reglerne tager over til i morgen."})
         if record["too_soft"]:
             alerts.append({"level": "warning", "text": "SKEPTIC godkender mere end halvdelen. Den skal sige nej langt oftere end ja."})
+        if cfg.auto_approve:
+            alerts.append({"level": "info", "text": "Autopilot er slået til: bordet køber selv på papir, når SKEPTIC siger BUY. \"Stop nu\" sætter alt på pause."})
         if self.paused:
             alerts.append({"level": "warning", "text": "Bordet er på pause. Skriv \"Start igen\" i chatten for at fortsætte."})
         if self.last_error:
@@ -937,6 +973,7 @@ class DeskEngine:
                 "max_open": cfg.max_open,
                 "approval_minutes": cfg.approval_minutes,
                 "scan_minutes": cfg.scan_minutes,
+                "auto_approve": cfg.auto_approve,
                 "daily_loss_pct": cfg.daily_loss_pct,
                 "max_chase_pct": cfg.max_chase_pct,
                 "log_time_et": cfg.log_time_et,

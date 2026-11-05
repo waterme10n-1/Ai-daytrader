@@ -62,7 +62,8 @@ class DeskSettings:
     max_open: int = 3
     daily_loss_pct: float = 2.0
     approval_minutes: int = 10
-    scan_minutes: int = 5
+    scan_minutes: int = 1
+    auto_approve: bool = True
     max_chase_pct: float = 0.5
     alpaca_api_key: str = ""
     alpaca_secret_key: str = ""
@@ -98,7 +99,8 @@ class DeskSettings:
             max_open=max(1, min(HARD_MAX_OPEN, _int(os.getenv("DESK_MAX_OPEN"), 3))),
             daily_loss_pct=min(5.0, max(0.5, _float(os.getenv("DESK_DAILY_LOSS_PCT"), 2.0))),
             approval_minutes=max(2, min(60, _int(os.getenv("DESK_APPROVAL_MINUTES"), 10))),
-            scan_minutes=max(1, min(30, _int(os.getenv("DESK_SCAN_MINUTES"), 5))),
+            scan_minutes=max(1, min(30, _int(os.getenv("DESK_SCAN_MINUTES"), 1))),
+            auto_approve=_flag(os.getenv("DESK_AUTO_APPROVE"), True),
             max_chase_pct=min(2.0, max(0.1, _float(os.getenv("DESK_MAX_CHASE_PCT"), 0.5))),
             alpaca_api_key=os.getenv("DESK_ALPACA_API_KEY", "").strip(),
             alpaca_secret_key=os.getenv("DESK_ALPACA_SECRET_KEY", "").strip(),
