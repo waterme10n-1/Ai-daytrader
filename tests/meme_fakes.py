@@ -178,6 +178,8 @@ def settings(**overrides) -> MemeSettings:
         max_trades_per_day=8,
         daily_loss_pct=0.25,
         max_drawdown_pct=0.5,
+        daily_loss_limit=True,
+        drawdown_limit=True,
         db_path=":memory:",
         paper_fail_rate=0.0,
         paper_slippage_pct=0.0,
@@ -200,3 +202,11 @@ def make_engine(cfg: MemeSettings | None = None, *, rpc=None, researcher=None):
     clients = MemeClients(cfg, dex=dex, rug=rug, jup=jup, x=None, rpc=rpc)
     engine = MemeEngine(cfg, store=store, clients=clients, researcher=researcher, notifier=notes.append)
     return engine, dex, rug, jup, notes
+
+
+def quiet_engine(cfg: MemeSettings | None = None):
+    """En memebot med falske kilder og uden baggrundstråd. Til tests af HTTP-laget."""
+    engine, *_ = make_engine(cfg)
+    engine.start = lambda: None
+    engine.stop = lambda: None
+    return engine

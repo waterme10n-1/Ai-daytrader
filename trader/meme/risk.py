@@ -162,3 +162,36 @@ def sniper_exit_decision(
     if minutes_held >= cfg.max_hold_minutes:
         return ExitDecision(True, 1.0, "time", f"Holdt i {minutes_held:.0f} min. Tidsgrænsen er nået.")
     return HOLD
+
+
+def top_exit_decision(
+    *,
+    ratio: float,
+    peak_ratio: float,
+    minutes_held: float,
+    partial_taken: bool,
+    liquidity_entry: float | None,
+    liquidity_now: float | None,
+    cfg,
+) -> ExitDecision:
+    """Kopierede top-trader-positioner: hovedreglen er at sælge, når traderen sælger (det sker i motoren).
+
+    Her er kun sikkerhedsnettet: rug-alarm, dit stop-loss, en gevinstsikring hvis kursen er
+    fordoblet og falder igen, og en tidsgrænse, hvis traderen aldrig sælger.
+    """
+    from trader.meme.config import TOP_TRAIL, TOP_TRAIL_ACTIVATION
+
+    if liquidity_entry and liquidity_now is not None and liquidity_now < liquidity_entry * 0.4:
+        return ExitDecision(
+            True,
+            1.0,
+            "rug_liquidity",
+            f"Likviditeten faldt fra ${liquidity_entry:,.0f} til ${liquidity_now:,.0f}. Sælger alt (rug-alarm).",
+        )
+    if getattr(cfg, "stop_loss_on", True) and ratio <= 1.0 - cfg.stop_loss_pct:
+        return ExitDecision(True, 1.0, "stop_loss", f"Stop-loss: {(ratio - 1) * 100:.0f} %.")
+    if peak_ratio >= 1.0 + TOP_TRAIL_ACTIVATION and ratio <= peak_ratio * (1.0 - TOP_TRAIL):
+        return ExitDecision(True, 1.0, "trailing", f"Gevinstsikring: {(ratio / peak_ratio - 1) * 100:.0f} % fra toppen på {(peak_ratio - 1) * 100:+.0f} %.")
+    if minutes_held >= cfg.max_hold_minutes:
+        return ExitDecision(True, 1.0, "time", f"Holdt i {minutes_held:.0f} min. uden at traderen solgte. Tidsgrænsen er nået.")
+    return HOLD

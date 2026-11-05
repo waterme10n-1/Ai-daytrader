@@ -1,4 +1,4 @@
-"""HTTP-lag. Dashboard, login og API. /healthz er åben, resten kræver session når login er slået til."""
+"""HTTP-lag for memebotten: dashboard, login og API. /healthz er åben, resten kræver session når login er slået til."""
 
 from __future__ import annotations
 
@@ -37,25 +37,23 @@ from trader.auth import (
     _delete_cookie,
     _set_cookie,
 )
-from trader.broker import BrokerError
 from trader.config import Settings
+from trader.desk.alpaca import BrokerError as DeskBrokerError
 from trader.desk.config import DeskSettings
-from trader.engine import TradingEngine
 from trader.meme.clients import SourceError
 from trader.meme.config import MemeSettings
 
 logger = logging.getLogger("trader.app")
 
-STATIC = Path(__file__).resolve().parent / "static" / "index.html"
 MEME_STATIC = Path(__file__).resolve().parent / "static" / "meme.html"
 DESK_STATIC = Path(__file__).resolve().parent / "static" / "desk.html"
 ICONS = Path(__file__).resolve().parent / "static" / "icons"
 ICON_FILES = frozenset({"icon-192.png", "icon-512.png", "icon-maskable-512.png", "apple-touch-icon.png"})
 # Gør dashboardet til en app på hjemmeskærmen (PWA). Åbner direkte på memebotten.
 MANIFEST = {
-    "name": "Memebot · AI Daytrader",
+    "name": "Memebot",
     "short_name": "Memebot",
-    "description": "Følg memebotten: egenkapital, positioner, sniper og læring.",
+    "description": "Din memecoin-bot på Solana: egenkapital, positioner, sniper og læring.",
     "lang": "da",
     "id": "/meme",
     "start_url": "/meme",
@@ -74,6 +72,10 @@ MANIFEST = {
 class PhraseBody(BaseModel):
     phrase: str = ""
     code: str = ""
+
+
+class MessageBody(BaseModel):
+    text: str
 
 
 class IdBody(BaseModel):
@@ -106,41 +108,24 @@ class TokenBody(BaseModel):
     action: str = "block"
 
 
-class MessageBody(BaseModel):
-    text: str
-
-
 def create_app(
-    engine: TradingEngine | None = None,
     settings: Settings | None = None,
     meme_engine=None,
     meme_settings: MemeSettings | None = None,
     desk_engine=None,
     desk_settings: DeskSettings | None = None,
 ) -> FastAPI:
+    """Byg appen. I produktion startes memebotten selv; tests sprøjter en motor med falske kilder ind."""
     chosen = settings or Settings.from_env()
-    holder = {
-        "engine": engine,
-        "settings": chosen,
-        "meme": meme_engine,
-        "meme_settings": meme_settings,
-        "desk": desk_engine,
-        "desk_settings": desk_settings,
-    }
-    # Memebotten startes automatisk i produktion. Når en aktiemotor sprøjtes ind (tests), kun hvis
-    # en memebot eller dens indstillinger også gives med.
-    auto_meme = engine is None or meme_settings is not None
-    auto_desk = engine is None or desk_settings is not None
+    holder = {"settings": chosen, "meme": meme_engine, "meme_settings": meme_settings}
+    injected = meme_engine is not None
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         enforce_startup(holder["settings"])
-        eng = holder["engine"] or TradingEngine(settings=holder["settings"])
-        holder["engine"] = eng
-        app.state.engine = eng
         app.state.settings = holder["settings"]
         meme = holder["meme"]
-        if meme is None and auto_meme:
+        if meme is None:
             meme_cfg = holder["meme_settings"] or MemeSettings.from_env()
             if meme_cfg.enabled:
                 from trader.meme.engine import MemeEngine
@@ -148,23 +133,22 @@ def create_app(
                 meme = MemeEngine(meme_cfg, main_settings=holder["settings"])
         holder["meme"] = meme
         app.state.meme = meme
-        desk = holder["desk"]
-        if desk is None and auto_desk:
-            desk_cfg = holder["desk_settings"] or DeskSettings.from_env()
+        # Handelsbordet startes selv i produktion. I tests kun, når en motor eller indstillinger gives med.
+        desk = desk_engine
+        if desk is None and (not injected or desk_settings is not None):
+            desk_cfg = desk_settings or DeskSettings.from_env()
             if desk_cfg.enabled:
                 from trader.desk.engine import DeskEngine
 
                 desk = DeskEngine(desk_cfg, holder["settings"])
-        holder["desk"] = desk
         app.state.desk = desk
-        eng.start()
         if desk is not None:
             desk.start()
         bot = None
         if meme is not None:
             meme.start()
             cfg = holder["settings"]
-            if auto_meme and meme.settings.telegram_commands and cfg.telegram_bot_token and cfg.telegram_chat_id:
+            if not injected and meme.settings.telegram_commands and cfg.telegram_bot_token and cfg.telegram_chat_id:
                 from trader.meme.telegram import TelegramBot
 
                 bot = TelegramBot(meme, cfg.telegram_bot_token, cfg.telegram_chat_id)
@@ -172,23 +156,19 @@ def create_app(
         try:
             yield
         finally:
-            eng.stop()
             if bot is not None:
                 bot.stop()
-            if desk is not None:
-                desk.stop()
             if meme is not None:
                 meme.stop()
+            if desk is not None:
+                desk.stop()
 
-    app = FastAPI(title="AI Daytrader", lifespan=lifespan)
+    app = FastAPI(title="Memebot", lifespan=lifespan)
     app.state.settings = chosen
     app.state.login_guard = LoginGuard()
     app.add_middleware(AuthMiddleware)
     # Dashboardet henter status ofte. Komprimering gør svaret ca. 9 gange mindre (vigtigt på mobil).
     app.add_middleware(GZipMiddleware, minimum_size=2000)
-
-    def current() -> TradingEngine:
-        return app.state.engine
 
     def require_code(request: Request, code: str) -> None:
         """Ekstra kode fra godkendelses-appen før rigtige penge og udbetalinger, når to-trins-login er slået til."""
@@ -231,16 +211,16 @@ def create_app(
     def login_form(request: Request):
         settings = active_settings()
         if not auth_is_active(settings):
-            return RedirectResponse("/", status_code=303)
+            return RedirectResponse("/meme", status_code=303)
         if read_session(settings, request):
-            return RedirectResponse("/", status_code=303)
+            return RedirectResponse("/meme", status_code=303)
         return _login_response(request, settings)
 
     @app.post("/login")
     async def login_submit(request: Request):
         settings = active_settings()
         if not auth_is_active(settings):
-            return RedirectResponse("/", status_code=303)
+            return RedirectResponse("/meme", status_code=303)
         guard: LoginGuard = request.app.state.login_guard
         key = client_key(request)
         if guard.locked(key):
@@ -288,9 +268,7 @@ def create_app(
             settings.session_secret,
             {"u": settings.app_username, "csrf": csrf_token, "exp": now + SESSION_SECONDS},
         )
-        # Memebotten er forsiden efter login, når den kører. Aktierne ligger stadig på /.
-        landing = "/meme" if getattr(app.state, "meme", None) is not None else "/"
-        response = RedirectResponse(landing, status_code=303)
+        response = RedirectResponse("/meme", status_code=303)
         secure = cookie_is_secure(request)
         _set_cookie(response, SESSION_COOKIE, token, secure=secure, httponly=True, max_age=SESSION_SECONDS, path="/")
         _set_cookie(response, CSRF_COOKIE, csrf_token, secure=secure, httponly=False, max_age=SESSION_SECONDS, path="/")
@@ -306,16 +284,8 @@ def create_app(
         return response
 
     @app.get("/")
-    def index() -> FileResponse:
-        return FileResponse(
-            STATIC,
-            media_type="text/html; charset=utf-8",
-            headers={"Cache-Control": "no-cache"},
-        )
-
-    @app.get("/api/status")
-    def status() -> dict:
-        return current().status()
+    def index() -> RedirectResponse:
+        return RedirectResponse("/meme", status_code=307)
 
     def meme():
         engine_ = getattr(app.state, "meme", None)
@@ -431,6 +401,42 @@ def create_app(
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         return meme().status()
 
+    @app.post("/api/meme/strategies")
+    async def meme_strategies(request: Request) -> dict:
+        try:
+            body = await request.json()
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Ugyldig JSON.") from exc
+        try:
+            meme().set_strategy(body if isinstance(body, dict) else {})
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return meme().status()
+
+    @app.post("/api/meme/limits")
+    async def meme_limits(request: Request) -> dict:
+        try:
+            body = await request.json()
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Ugyldig JSON.") from exc
+        try:
+            meme().update_loss_limits(body if isinstance(body, dict) else {})
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return meme().status()
+
+    @app.post("/api/meme/toptraders")
+    async def meme_toptraders(request: Request) -> dict:
+        try:
+            body = await request.json()
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Ugyldig JSON.") from exc
+        try:
+            meme().update_toptraders(body if isinstance(body, dict) else {})
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return meme().status()
+
     @app.post("/api/meme/diagnostics")
     def meme_diagnostics() -> dict:
         return meme().run_diagnostics()
@@ -447,11 +453,6 @@ def create_app(
         if not ok:
             raise HTTPException(status_code=400, detail=message)
         return {"ok": True, "message": message, "status": meme().status()}
-
-    @app.post("/api/meme/paper")
-    def meme_paper() -> dict:
-        meme().return_to_paper()
-        return {"ok": True, "status": meme().status()}
 
     def desk():
         engine_ = getattr(app.state, "desk", None)
@@ -531,7 +532,7 @@ def create_app(
     def desk_close_all() -> dict:
         try:
             closed = desk().close_all()
-        except BrokerError as exc:
+        except DeskBrokerError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
         return {"ok": True, "closed": closed}
 
@@ -539,7 +540,7 @@ def create_app(
     def desk_log() -> dict:
         try:
             text = desk().day_log()
-        except BrokerError as exc:
+        except DeskBrokerError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
         return {"ok": True, "text": text}
 
@@ -547,39 +548,10 @@ def create_app(
     def desk_compare() -> dict:
         return desk().compare()
 
-    @app.post("/api/kill")
-    def kill() -> dict:
-        current().kill()
-        return current().status()
-
-    @app.post("/api/resume")
-    def resume() -> dict:
-        current().resume()
-        return current().status()
-
-    @app.post("/api/simulate")
-    def simulate() -> dict:
-        try:
-            result = current().simulate_one_day()
-        except Exception as exc:
-            raise HTTPException(status_code=500, detail=str(exc)) from exc
-        return {"ok": True, "result": result, "status": current().status()}
-
-    @app.post("/api/live/unlock")
-    def unlock(body: PhraseBody, request: Request) -> dict:
-        require_code(request, body.code)
-        ok, message = current().request_live(body.phrase)
-        if not ok:
-            raise HTTPException(status_code=400, detail=message)
-        return {"ok": True, "message": message, "status": current().status()}
-
-    @app.post("/api/paper")
-    def to_paper() -> dict:
-        try:
-            current().return_to_paper()
-        except BrokerError as exc:
-            raise HTTPException(status_code=409, detail=str(exc)) from exc
-        return {"ok": True, "status": current().status()}
+    @app.post("/api/meme/paper")
+    def meme_paper() -> dict:
+        meme().return_to_paper()
+        return {"ok": True, "status": meme().status()}
 
     return app
 

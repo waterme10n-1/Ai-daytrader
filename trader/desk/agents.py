@@ -13,7 +13,7 @@ from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, Field
 
-from trader.config import ET_NAME
+from trader.desk.alpaca import ET_NAME
 from trader.desk.config import DeskSettings
 from trader.desk.store import DeskStore
 from trader.meme.research import _container_id, _content_param, _refused, cost_of

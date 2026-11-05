@@ -9,8 +9,7 @@ import math
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
 
-from trader.broker import resolve_intrabar
-from trader.signals import Bar, _bracket, _round_price, vwap
+from trader.desk.alpaca import Bar, _bracket, _round_price, resolve_intrabar, vwap
 
 MIN_BARS = 15
 SWING_BARS = 15

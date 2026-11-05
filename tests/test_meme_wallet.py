@@ -168,8 +168,6 @@ def test_wallet_info_shows_bot_and_phantom_balances():
 def test_wallet_routes_and_bulk_import(tmp_path, monkeypatch):
     from trader.app import create_app
     from trader.config import Settings
-    from trader.db import Database
-    from trader.engine import TradingEngine
 
     phantom = str(Keypair().pubkey())
     engine, chain, bot, _ = _setup(withdraw_address=phantom)
@@ -177,8 +175,7 @@ def test_wallet_routes_and_bulk_import(tmp_path, monkeypatch):
     monkeypatch.setattr(engine, "start", lambda: None)
     monkeypatch.setattr(engine, "stop", lambda: None)
     settings = dataclasses.replace(Settings.from_env(), db_path=str(tmp_path / "t.db"), host="127.0.0.1", app_username="", app_password="", app_password_hash="", session_secret="")
-    stock = TradingEngine(settings=settings, db=Database(settings.db_path))
-    with TestClient(create_app(engine=stock, settings=settings, meme_engine=engine)) as client:
+    with TestClient(create_app(settings=settings, meme_engine=engine)) as client:
         info = client.get("/api/meme/wallet", params={"phantom": phantom}).json()
         assert info["address"] == bot and info["withdraw_address"] == phantom
         deposit = client.post("/api/meme/wallet/deposit", json={"from_address": phantom, "sol": 0.05}).json()

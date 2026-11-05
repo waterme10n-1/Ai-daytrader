@@ -1,8 +1,6 @@
-# AI Daytrader
+# Memebot
 
-Daytrader til likvide amerikanske aktier og ETF'er. Motoren handler kun i to vinduer omkring åbning og lukning, flader alt ud kl. 15:50 amerikansk østkysttid og starter på papirpenge. Rigtige penge kan først slås til, når en række krav er opfyldt i koden — ikke kun i brugerfladen.
-
-Univers: SPY, QQQ, IWM, AAPL, MSFT, NVDA, AMZN, META, GOOGL, TSLA og AMD. SPY er markedspejlet.
+En 24/7-bot til memecoins på Solana. Den finder nye og trendende tokens, tjekker dem for rug (RugCheck og Jupiter), sikrer at de kan sælges igen, kan følge udvalgte wallets, og lærer af hver lukket handel. Den starter **altid på papirpenge**: rigtige kurser fra DexScreener og rigtige quotes fra Jupiter, men ingen transaktioner. Rigtige penge kan først slås til, når en række krav er opfyldt i koden, ikke kun i brugerfladen.
 
 ## Kør lokalt
 
@@ -18,54 +16,9 @@ python run.py
 
 Åbn [http://127.0.0.1:8741](http://127.0.0.1:8741). Uden login-variabler binder serveren til `127.0.0.1` og kræver ikke login. Sæt `HOST` til noget andet end loopback, og processen nægter at starte, før `APP_USERNAME`, `APP_PASSWORD` eller `APP_PASSWORD_HASH`, og `SESSION_SECRET` er udfyldt.
 
-Uden nøgler kan du stadig bruge **Simulér én dag**. Knappen kører en hel børsdag gennem den rigtige motor med syntetiske kurser og regelbaseret analyse. Syntetiske resultater siger intet om rigtig performance, og de tæller ikke med i kravene for at låse rigtige penge op.
+## Claude-nøgle (valgfri)
 
-## Alpaca-papirnøgler
-
-1. Opret en konto på [alpaca.markets](https://alpaca.markets) og åbn paper trading.
-2. Under API Keys: opret et nøglesæt til paper.
-3. Sæt dem i `.env`:
-
-```
-ALPACA_API_KEY=...
-ALPACA_SECRET_KEY=...
-```
-
-Papirordrer sendes til `https://paper-api.alpaca.markets`. Markedsdata hentes fra `https://data.alpaca.markets` med `feed=iex` (gratisniveauet). Samme kodevej bruges til live, bare mod `https://api.alpaca.markets` og med live-nøglerne.
-
-## Anthropic-nøgle
-
-1. Opret en nøgle i [Claude Console](https://console.anthropic.com/).
-2. Sæt den i `.env`:
-
-```
-ANTHROPIC_API_KEY=...
-```
-
-Standardmodellen er `claude-opus-5-5`. Websøgning bruger værktøjet `web_search_20260209` (højst 5 opslag), indsats `high` og server-side fallback. Model, værktøjsversion, indsats og fallback kan ændres i `.env` uden at røre koden.
-
-Hvis `ANTHROPIC_API_KEY` er tom, eller Claude svarer med en fejl, kører analysen videre på de faste regler med sikkerhed 70 og en tydelig mærkning om, at det ikke er en modelvurdering. Et afvisningssvar fra Claude springer kandidaterne over i stedet for at handle alligevel.
-
-## Telegram (valgfrit)
-
-Sæt både `TELEGRAM_BOT_TOKEN` og `TELEGRAM_CHAT_ID`, hvis du vil have besked ved handler, lukninger, dagligt tab og fejl. Uden begge sker der ingenting.
-
-## Fra papir til rigtige penge
-
-Alle punkter skal være sande på samme tid, og de tjekkes i koden:
-
-- mindst 60 papirhandelsdage
-- mindst 50 lukkede papirhandler
-- nettoresultat over 0
-- profitfaktor mindst 1,2
-- maksimalt drawdown under 10 %
-- `ALLOW_LIVE=true`
-- `ALPACA_LIVE_API_KEY` og `ALPACA_LIVE_SECRET_KEY` er udfyldt
-- du skriver præcis `JEG FORSTÅR AT JEG KAN TABE RIGTIGE PENGE`
-
-Simulerede handler tæller ikke. Live-størrelse bruger aldrig mere end `LIVE_MAX_CAPITAL` (standard 1.000 USD), også hvis kontoen er større. Ved genstart falder systemet tilbage til papir, hvis kravene ikke længere holder. Knappen **Tilbage til papirpenge** lukker live-positioner.
-
-Med egenkapital under 25.000 USD i live blokeres nye handler, når Alpaca melder 3 eller flere daytrades.
+Med `ANTHROPIC_API_KEY` researcher Claude hver kandidat på X og nyheder, før botten køber, og gennemgår dagens fejl. Opret nøglen i [Claude Console](https://console.anthropic.com/). Forbruget betales separat fra et Claude Max-abonnement, og `MEME_AI_DAILY_BUDGET_USD` er et hårdt dagligt loft. Uden nøgle kører botten på regler og RugCheck.
 
 ## Udgiv på Railway
 
@@ -73,20 +26,18 @@ Tjenesten skal køre som ét eksemplar. SQLite og motortråden kan ikke deles me
 
 1. Opret en tjeneste ud fra dette repo. Railway opdager `Dockerfile`.
 2. Tilføj et volume og montér det på `/data`.
-3. Sæt miljøvariablerne nedenfor. `PORT` sætter Railway selv.
-4. Generér et domæne under Settings → Networking. Åbn det og log ind.
+3. Sæt miljøvariablerne nedenfor.
+4. Generér et domæne under Settings → Networking med port `8741`. Åbn det og log ind.
 
 Påkrævede variabler:
 
 ```
 HOST=0.0.0.0
+PORT=8741
 DB_PATH=/data/trader.db
 APP_USERNAME=dit-brugernavn
 APP_PASSWORD=en-lang-adgangskode
 SESSION_SECRET=...
-ALPACA_API_KEY=...
-ALPACA_SECRET_KEY=...
-ANTHROPIC_API_KEY=...
 ```
 
 `SESSION_SECRET` skal være mindst 32 tegn:
@@ -103,7 +54,7 @@ python -c "from trader.auth import hash_password; print(hash_password('en-lang-a
 
 Cookie sættes med `HttpOnly` og `SameSite=Strict`. Bag Railway (HTTPS) sættes også `Secure`, fordi proxyen sender `X-Forwarded-Proto: https`. Fem forkerte login-forsøg låser i et kvarter. Tilstandsskiftende POST kræver headeren `X-CSRF-Token`.
 
-Valgfrit, samme navne som lokalt: `ALPACA_LIVE_API_KEY`, `ALPACA_LIVE_SECRET_KEY`, `ALLOW_LIVE`, `LIVE_MAX_CAPITAL`, `ANTHROPIC_MODEL`, `ANTHROPIC_WEB_SEARCH_TOOL`, `ANTHROPIC_EFFORT`, `ANTHROPIC_FALLBACKS`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
+Anbefalet: `JUPITER_API_KEY` (gratis fra portal.jup.ag) og `SOLANA_RPC_URL` (gratis Helius-nøgle). Valgfrit: `ANTHROPIC_API_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `APP_TOTP_SECRET` og alle `MEME_*`-variabler i `.env.example`.
 
 Skaler ikke tjenesten til mere end ét replika. Et nyt replika ville åbne sin egen motor mod samme databasefil.
 
@@ -119,73 +70,19 @@ Testene kører med falske datakilder og en falsk Solana-kæde, så de kræver hv
 python tests/meme_soak.py 50 250 hard
 ```
 
----
-
-# Handelsbordet (seks bots, én gruppechat)
-
-Bygget efter guiden "How to build a trading desk in one group chat", men på Claude og Alpaca i stedet for Grok Bot og TradingView. Bordet kører i samme proces som resten, har sin egen side på `/desk` og handler **kun på papirpenge**. Der findes ingen kodevej til rigtige penge for bordet.
-
-## De seks bots
-
-| Bot | Job | Kører på |
-|---|---|---|
-| **SCOUT** | Markerer en ticker på watchlisten, der flytter sig mindst 3 % på en time eller handler mindst 2 gange normal volumen. Højst 5 markeringer om dagen. | fast kode |
-| **NEWS** | Finder grunden med websøgning og Alpaca-nyheder og skriver den på to linjer med link. Uden kilde: "Ingen klar grund". | Claude |
-| **CHART** | Sætter indgang, mål og stop. Stoppet er højst 2 % under indgangen, og målet er mindst 2 gange så langt væk. Ellers "Ingen setup". Kun køb, ingen short. | fast kode |
-| **SKEPTIC** | Giver de tre stærkeste grunde til, at handlen fejler, og afgør BUY, WAIT eller SKIP. Uden klar grund fra NEWS er svaret altid SKIP. Det håndhæves i koden, også hvis Claude siger BUY. | Claude |
-| **SIZER** | Højst 5 % af papirkontoen pr. handel og højst 3 åbne eller ventende. Er en grænse ramt, er svaret 0. | fast kode |
-| **EXECUTOR** | Beder om din godkendelse, lægger en bracket-ordre med stop og mål hos Alpaca, lukker alt kl. 15:50 ET og skriver dagsloggen kl. 16:15 ET med handler og saldo. | fast kode |
-
-SCOUT, CHART og SIZER er bevidst almindelig kode. Tal fra en sprogmodel kan være opdigtede, så kurser, stop og beløb bliver regnet ud fra rigtige kursdata. Claude bruges til det, Claude er god til: at finde og vurdere nyheder og argumentere imod en handel.
-
-## Autopilot eller godkendelser
-
-**Autopilot er slået til som standard** (`DESK_AUTO_APPROVE=true`, eller fluebenet under **Bots**): når SKEPTIC siger BUY og SIZER har sat et beløb, køber EXECUTOR selv på papirkontoen uden at spørge. Samme tjek som ved en manuel godkendelse gælder stadig (kursen må ikke være løbet, lofterne skal holde), og **Stop nu** sætter alt på pause. SCOUT kigger hvert minut (`DESK_SCAN_MINUTES=1`).
-
-Slår du autopiloten fra, ender hver BUY som et kort under **Godkend** (og i chatten) med hele kæden: markering, nyhed med link, de tre modargumenter og beløbet. Du har 10 minutter. Når du trykker **Godkend køb**, tjekker EXECUTOR igen, at kursen ikke er løbet mere end 0,5 % over indgangen og stadig ligger mellem stop og mål, og at SIZER's grænser holder. Ellers lægges ordren ikke. Er Telegram sat op, får du også en besked på telefonen.
-
-## Tal med bordet
-
-Skriv `@SKEPTIC hvorfor WAIT til NVDA?` (eller tryk på en af knapperne over skrivefeltet). Den nævnte bot svarer i sin rolle med bordets tal. Bots kan ikke lægge ordrer eller ændre grænser fra chatten. Skriv **Stop nu** for at sætte alt på pause (ventende godkendelser annulleres, åbne positioner beholder stop og mål), og **Start igen** for at fortsætte.
-
-## Papirmåneden og SKEPTIC's regnskab
-
-- **Uge 1:** godkend intet. Læs med, og tjek, at SKEPTIC siger nej.
-- **Uge 2–4:** godkend de handler, du er enig i.
-- **Slutningen:** fanen **Måneden** sammenligner bordets resultat med at holde SPY siden første dag.
-
-For hver handel, der ikke blev til noget (WAIT, SKIP, afvist eller udløbet), regner bordet efter lukketid ud, om den ville have ramt stop eller mål først (skyggeregnskab). Så kan du se, om SKEPTIC sagde nej med rette. Godkender den mere end halvdelen af mindst 5 afgørelser, får du en advarsel om, at den er for blød. Regler og grænser kan ændres under **Bots**, men aldrig ud over de hårde lofter (10 % pr. handel, 5 åbne, stop 5 %, mål mindst 1,5 gange stoppet).
-
-## Opsætning
-
-1. Bordet bruger `ALPACA_API_KEY` og `ALPACA_SECRET_KEY` ovenfor. Bedre: opret en **ekstra papirkonto** hos Alpaca og sæt `DESK_ALPACA_API_KEY` og `DESK_ALPACA_SECRET_KEY`. Deler bordet konto med aktiemotoren, kan aktiemotorens fladning kl. 15:50 og ved dagligt tab også lukke bordets positioner (bordet opdager det og bogfører dem som "lukket udefra").
-2. `ANTHROPIC_API_KEY` slår Claude til for NEWS og SKEPTIC. `DESK_AI_DAILY_BUDGET_USD` (standard 1 USD) er et hårdt dagligt loft. Uden nøgle eller budget tager faste regler over, og de er strengere: kun en Alpaca-overskrift fra de sidste 6 timer tæller som grund, og SKEPTIC siger WAIT, hvis kursen ligger mere end 2 % over VWAP.
-3. Alle `DESK_*`-variabler står i `.env.example`. På Railway ligger databasen som `/data/desk.db`.
-
-SCOUT kigger hvert minut fra 9:45 til 15:30 ET (15:45–21:30 dansk tid). Intet her er finansiel rådgivning: bottene foreslår, du beslutter.
-
----
-
-# Memebot (Solana-memecoins)
-
-Memebotten kører i samme proces som aktiemotoren, 24/7, og har sit eget dashboard på `/meme` (link øverst på forsiden). Den starter **altid på papirpenge**: rigtige kurser fra DexScreener og rigtige quotes fra Jupiter, men ingen transaktioner.
-
 ## Dashboardet
 
-Efter login lander du på `/meme`. Siden opdaterer sig selv hvert 8. sekund.
+Efter login lander du på `/meme`. Siden er bygget til mobilen først, opdaterer sig selv hvert 8. sekund og har lyst og mørkt tema (menuen øverst til højre). På telefonen ligger menuen i bunden. På en computer ligger den i venstre side.
 
-- **Oversigt**: egenkapital med graf (24 t, 7 d eller alt), målet om Claude Max, seneste scanning som tragt (fundet → marked → rug-tjek → score → købt), aktivitet, dagligt resultat og hvorfor botten solgte.
-- **Sniper**: tænd og sluk, sæt dit gevinstmål og stop-loss, og se de nye tokens botten har set på.
-- **Positioner**: et kort pr. position med en skala, der viser kursen i forhold til stop-loss, købskurs, delsalg og trailing stop, samt links til DexScreener, RugCheck, Solscan og X. Knappen **Sælg nu** sælger med det samme.
-- **Radar**: hvert token botten har set på, hvilket trin det faldt ved og hvorfor. Filtrér og søg, og bloker tokens, botten aldrig må købe.
-- **Journal**: alle lukkede handler. Klik på en række for begrundelse og transaktioner.
-- **Læring**: lektioner, signalvægte, kilder og strategiparametre.
-- **Wallet**: bot-wallet'ens saldo, forbind din Phantom, indbetal og hæv, Axiom-genveje, samt wallets botten følger (tilføj og fjern uden genstart).
-- **Indstillinger**: kravene før rigtige penge og alle indstillinger.
+- **Hjem**: egenkapital med graf (24 t, 7 d eller alt), knapperne **Scan nu**, **Pause køb** (åbne positioner passes stadig) og **Nødstop** (sælger alt), nøgletal (stryg til siden på telefonen), åbne positioner, seneste scanning som tragt, dagligt resultat, hvorfor botten solgte, målet om Claude Max, seneste lektion og aktivitet.
+- **Handler**: **Åbne** viser et kort pr. position med en skala for kursen i forhold til stop-loss, købskurs, delsalg og trailing stop, links til DexScreener, RugCheck, Solscan, X og Axiom, og knappen **Sælg nu**. **Historik** viser alle lukkede handler. Tryk på en handel for begrundelse og transaktioner.
+- **Sniper**: tænd og sluk, sæt gevinstmål og stop-loss, filtre for nye tokens, hvilket mål der ville have virket, og de nye tokens botten har set. **Radar** viser hvert token botten har set på, hvilket trin det faldt ved og hvorfor. Filtrér, søg og bloker tokens.
+- **Wallet**: bot-wallet'ens saldo, forbind din Phantom, indbetal og hæv, wallets botten følger, Axiom-genveje og blokerede tokens.
+- **Mere**: **Læring** (lektioner, signalvægte, kilder, skyggehandler og strategiparametre) og **Indstillinger** (app på hjemmeskærmen, kravene før rigtige penge, forbindelsestest, sikkerhed, alle indstillinger og Telegram).
 
-**Som app på telefonen.** Åbn dit link på telefonen og log ind. På iPhone (Safari): tryk på Del-knappen (firkanten med pilen op) og vælg **Føj til hjemmeskærm**. På Android (Chrome): tryk på **⋮** og vælg **Installer app**, eller brug knappen **Installer app** under Indstillinger. Så får du et Memebot-ikon, og dashboardet åbner uden adresselinje. Du logger ind én gang i appen, og så husker den dig i 7 dage.
+Alt, der flytter penge eller ændrer botten (sælg, nødstop, bloker, hæv, nulstil), spørger først i et vindue nederst på skærmen. Info-beskeder vises kun på Hjem, og en besked, du har lukket, forbliver lukket. Klokken i menuen slår notifikationer til ved køb og salg. På en computer: `1`–`8` skifter side, `S` scanner, `P` sætter køb på pause, `/` søger i radaren og `T` skifter tema.
 
-Knapper: **Scan nu**, **Pause køb** (åbne positioner passes stadig) og **Nødstop** (sælger alt). Klokken øverst slår browser-notifikationer til ved køb og salg. Genveje: `1`–`8` skifter fane, `S` scanner, `P` sætter køb på pause, `/` søger i radaren og `T` skifter tema.
+**Som app på telefonen.** Åbn dit link på telefonen og log ind. På iPhone (Safari): tryk på Del-knappen (firkanten med pilen op) og vælg **Føj til hjemmeskærm**. På Android (Chrome): tryk på **⋮** og vælg **Installer app**, eller brug knappen **Installer app** under Mere → Indstillinger. Så får du et Memebot-ikon, og dashboardet åbner uden adresselinje. I appen kan du trække ned for at opdatere. Du logger ind én gang i appen, og så husker den dig i 7 dage.
 
 ## Forbindelser, sikkerhed og opfølgning
 
@@ -249,6 +146,25 @@ Vær klar over:
 - Professionelle snipere køber i samme blok, som poolen oprettes, med private noder. Denne bot er bevidst langsommere, fordi den tjekker tokenet først. Den køber derfor sjældent i bunden.
 - Claude bruges ikke til snipes som standard, fordi research tager op til et par minutter. Du kan slå det til, men så kommer botten senere ind.
 
+## Top 10: følg dagens bedste traders
+
+Under **Strategi → Top 10** kan du slå en funktion til, der køber lige efter de traders, der har tjent mest i dag, og sælger, når de sælger. Den er slået fra, til du tænder den.
+
+1. **Listen**: med `SOLANATRACKER_API_KEY` (fra solanatracker.io) henter botten hver halve time de 10 mest profitable Solana-traders i dag eller den seneste uge. Uden nøgle bruger den de wallets, du selv følger under Wallet.
+2. **Køb**: hvert 8. sekund kigger botten efter nye handler fra dem. Køber en af dem et token for mindst 0,1 SOL, og er købet højst 2 minutter gammelt, tjekker botten tokenet (likviditet, RugCheck og at det kan sælges igen) og køber for dit beløb pr. handel. Claude springes over her, fordi det skal gå hurtigt.
+3. **Salg**: sælger traderen tokenet, sælger botten hele positionen med det samme. Det gælder også, hvis traderen er røget af listen, eller funktionen er slået fra. Som sikkerhedsnet er der stop-loss (standard 30 %, kan slås fra med **Brug stop-loss** under Top 10), rug-alarm (likviditeten trækkes), en gevinstsikring hvis kursen er fordoblet og falder 35 % fra toppen, og en tidsgrænse (standard 12 timer), hvis traderen aldrig sælger.
+4. **Grænser**: maks. åbne kopier (standard 3) og køb pr. dag (standard 10). Top 10 har ingen daglig tabsgrænse: den bliver ved med at kopiere, også når resten af botten har ramt dagens tabsgrænse. Vil du have, at den stopper dér, så slå **Stop ved dagens tabsgrænse** til under Top 10. Bankroll-loftet, den samlede tabsgrænse, pause og nødstop gælder altid. Traders, der giver tab over tid, slås automatisk fra.
+
+Under Top 10 ser du dagens traders med deres resultat, hvad botten har tjent på at kopiere hver af dem, og de seneste signaler: hvad traderen gjorde, og hvad botten gjorde (købt, solgt eller sprunget over og hvorfor).
+
+Vær ærlig over for dig selv: dagens vindere er ofte heldige eller bots, og du køber altid lidt efter dem til en højere kurs. Kør det på papir og se resultatet, før du bruger rigtige penge. Funktionen kigger ofte på Solana, så brug en egen RPC (fx en gratis Helius-nøgle i `SOLANA_RPC_URL`).
+
+## Hvad tjener penge, og sniperens bedste mål
+
+- **Hvad tjener penge?** På Hjem står hver strategi (Almindelig, Sniper, Top 10) med antal handler, gevinstprocent, resultat og de seneste handler. Tryk **Hold pause** for at stoppe en strategi, og **Genoptag** for at starte den igen.
+- **Strategi-vagt** (slået fra som standard, slå til med `MEME_STRATEGY_GUARD=true`): taber en strategi på sine seneste 8–12 handler (profitfaktor under 0,8), sættes den selv på hold i 24 timer, næste gang 48, op til 4 døgn, mens den lærer videre som skyggehandler.
+- **Det bedste mål automatisk** (slået til som standard, `MEME_AUTO_TARGETS`): når skyggehandlerne har mindst 40 kursforløb, og et andet gevinstmål og stop klart har virket bedre (mindst 2 procentpoint pr. snipe) og givet overskud, skifter sniperen selv, højst én gang i døgnet. Ændringen står under Læring. Slå det fra under Strategi → Sniper.
+
 ## Sådan lærer den
 
 - Efter hver lukket handel flyttes vægtene på de signaler, der bar handlen (op ved gevinst, ned ved tab). Dashboardet viser vægtene og en lektion pr. handel.
@@ -259,9 +175,14 @@ Vær klar over:
 
 ## Tabsgrænser
 
-- Dagligt tab på `MEME_DAILY_LOSS_PCT` af bankroll (standard 25 %): ingen nye køb resten af døgnet (UTC). Åbne positioner beholder deres stop.
-- Samlet tab på `MEME_MAX_DRAWDOWN_PCT` (standard 50 %): alt sælges, og botten står stille, indtil du trykker **Genoptag**.
-- **Nødstop** sælger alt med det samme.
+Botten bruger aldrig mere end din bankroll (`MEME_BANKROLL_USD`). Det er det mest, den kan tabe, og det loft kan ikke slås fra.
+
+Den daglige tabsgrænse er **slået fra som standard**, og den samlede tabsgrænse er **slået til**. Begge kan ændres under **Mere → Indstillinger → Tabsgrænser** (eller med `MEME_DAILY_LOSS_LIMIT` og `MEME_DRAWDOWN_LIMIT`):
+
+- **Dagligt tabsstop**: når dagens tab når `MEME_DAILY_LOSS_PCT` af bankroll (standard 25 %), køber botten ikke mere resten af døgnet (UTC). Åbne positioner beholder deres stop.
+- **Samlet tabsstop**: når det samlede tab når `MEME_MAX_DRAWDOWN_PCT` (standard 50 %), sælges alt, og botten står stille, indtil du trykker **Genoptag**.
+
+**Nødstop** sælger alt med det samme og virker altid. Sniperen og den almindelige strategi har stadig deres egne stop-loss pr. position.
 
 ## Fra papir til rigtige penge
 
@@ -305,7 +226,7 @@ Botten bruger højst `MEME_BANKROLL_USD` i alt, også hvis du sender flere penge
 - **Claude-research**: `ANTHROPIC_API_KEY` og `MEME_AI_DAILY_BUDGET_USD` (standard 0,50 USD om dagen). Standardmodellen er `claude-opus-5-5` med indsats `medium` og websøgning. Er budgettet brugt, kører botten videre på regler. Vil du bruge en billigere model, kan du sætte `MEME_ANTHROPIC_MODEL`. Ældre modeller skal muligvis have `MEME_ANTHROPIC_WEB_SEARCH_TOOL=web_search_20250305`.
 - **X API**: `X_BEARER_TOKEN` fra developer.x.com (betalt). Botten søger efter kontraktadressen og tickeren og måler, hvor mange forskellige konti der skriver om tokenet. `X_DAILY_REQUESTS` begrænser forbruget.
 - **Copy-trading**: `MEME_COPY_WALLETS=adresse1,adresse2`. Find kandidater på fx GMGN, Birdeye eller Kolscan, og tjek selv deres historik. Første gang botten ser en wallet, husker den kun, hvor den er nået til; gamle handler kopieres aldrig. Et køb fra en fulgt wallet skal stadig bestå alle tjek ovenfor.
-- **Telegram**: samme `TELEGRAM_BOT_TOKEN` og `TELEGRAM_CHAT_ID` som aktiemotoren. Du får besked ved køb, salg, tabsgrænser og fejl.
+- **Telegram**: sæt `TELEGRAM_BOT_TOKEN` og `TELEGRAM_CHAT_ID`. Du får besked ved køb, salg, tabsgrænser og fejl.
 
 ## Kør 24/7
 
@@ -321,3 +242,48 @@ RugCheck og DexScreener har samme beskyttelse:
 
 - **RugCheck** oplyser ingen fast grænse, så botten bruger højst 30 kald i minuttet (`RUGCHECK_RPM`). Svarer RugCheck 429, holder botten pause og prøver ikke den lille opsummering med det samme, da den tæller i samme kvote. Der købes aldrig uden et frisk rug-tjek. Kandidater, der ikke nåede at blive tjekket, afvises ikke, men tjekkes igen i næste runde, også i sniperen.
 - **DexScreener** tæller lister (nye profiler og boosts, 60 i minuttet) og kurser (300 i minuttet) hver for sig. Botten holder sig til 50 og 240. Listerne gemmes i 10–30 sekunder, så sniperen og scanningen deler ét kald. Kurser til dine åbne positioner går altid forrest. Siger DexScreener stop, bruger overvågningen Jupiters kurser imens.
+
+---
+
+# Handelsbordet (seks bots, én gruppechat)
+
+Bygget efter guiden "How to build a trading desk in one group chat", men på Claude og Alpaca i stedet for Grok Bot og TradingView. Bordet kører i samme proces som memebotten, har sin egen side på `/desk` (skifteren øverst på siden) og handler **kun på papirpenge**. Der findes ingen kodevej til rigtige penge for bordet.
+
+## De seks bots
+
+| Bot | Job | Kører på |
+|---|---|---|
+| **SCOUT** | Markerer en ticker på watchlisten, der flytter sig mindst 3 % på en time eller handler mindst 2 gange normal volumen. Højst 5 markeringer om dagen. | fast kode |
+| **NEWS** | Finder grunden med websøgning og Alpaca-nyheder og skriver den på to linjer med link. Uden kilde: "Ingen klar grund". | Claude |
+| **CHART** | Sætter indgang, mål og stop. Stoppet er højst 2 % under indgangen, og målet er mindst 2 gange så langt væk. Ellers "Ingen setup". Kun køb, ingen short. | fast kode |
+| **SKEPTIC** | Giver de tre stærkeste grunde til, at handlen fejler, og afgør BUY, WAIT eller SKIP. Uden klar grund fra NEWS er svaret altid SKIP. Det håndhæves i koden, også hvis Claude siger BUY. | Claude |
+| **SIZER** | Højst 5 % af papirkontoen pr. handel og højst 3 åbne eller ventende. Er en grænse ramt, er svaret 0. | fast kode |
+| **EXECUTOR** | Beder om din godkendelse, lægger en bracket-ordre med stop og mål hos Alpaca, lukker alt kl. 15:50 ET og skriver dagsloggen kl. 16:15 ET med handler og saldo. | fast kode |
+
+SCOUT, CHART og SIZER er bevidst almindelig kode. Tal fra en sprogmodel kan være opdigtede, så kurser, stop og beløb bliver regnet ud fra rigtige kursdata. Claude bruges til det, Claude er god til: at finde og vurdere nyheder og argumentere imod en handel.
+
+## Autopilot eller godkendelser
+
+**Autopilot er slået til som standard** (`DESK_AUTO_APPROVE=true`, eller fluebenet under **Bots**): når SKEPTIC siger BUY og SIZER har sat et beløb, køber EXECUTOR selv på papirkontoen uden at spørge. Samme tjek som ved en manuel godkendelse gælder stadig (kursen må ikke være løbet, lofterne skal holde), og **Stop nu** sætter alt på pause. SCOUT kigger hvert minut (`DESK_SCAN_MINUTES=1`).
+
+Slår du autopiloten fra, ender hver BUY som et kort under **Godkend** (og i chatten) med hele kæden: markering, nyhed med link, de tre modargumenter og beløbet. Du har 10 minutter. Når du trykker **Godkend køb**, tjekker EXECUTOR igen, at kursen ikke er løbet mere end 0,5 % over indgangen og stadig ligger mellem stop og mål, og at SIZER's grænser holder. Ellers lægges ordren ikke. Er Telegram sat op, får du også en besked på telefonen.
+
+## Tal med bordet
+
+Skriv `@SKEPTIC hvorfor WAIT til NVDA?` (eller tryk på en af knapperne over skrivefeltet). Den nævnte bot svarer i sin rolle med bordets tal. Bots kan ikke lægge ordrer eller ændre grænser fra chatten. Skriv **Stop nu** for at sætte alt på pause (ventende godkendelser annulleres, åbne positioner beholder stop og mål), og **Start igen** for at fortsætte.
+
+## Papirmåneden og SKEPTIC's regnskab
+
+- **Uge 1:** godkend intet. Læs med, og tjek, at SKEPTIC siger nej.
+- **Uge 2–4:** godkend de handler, du er enig i.
+- **Slutningen:** fanen **Måneden** sammenligner bordets resultat med at holde SPY siden første dag.
+
+For hver handel, der ikke blev til noget (WAIT, SKIP, afvist eller udløbet), regner bordet efter lukketid ud, om den ville have ramt stop eller mål først (skyggeregnskab). Så kan du se, om SKEPTIC sagde nej med rette. Godkender den mere end halvdelen af mindst 5 afgørelser, får du en advarsel om, at den er for blød. Regler og grænser kan ændres under **Bots**, men aldrig ud over de hårde lofter (10 % pr. handel, 5 åbne, stop 5 %, mål mindst 1,5 gange stoppet).
+
+## Opsætning
+
+1. Opret en papirkonto på [app.alpaca.markets](https://app.alpaca.markets) (kontonavnet øverst til venstre → **Open New Paper Account** → **API Keys → Generate New Keys**) og sæt `DESK_ALPACA_API_KEY` og `DESK_ALPACA_SECRET_KEY` i Railway. Står `ALPACA_API_KEY` og `ALPACA_SECRET_KEY` der allerede, bruges de.
+2. `ANTHROPIC_API_KEY` slår Claude til for NEWS og SKEPTIC. `DESK_AI_DAILY_BUDGET_USD` (standard 1 USD) er et hårdt dagligt loft. Uden nøgle eller budget tager faste regler over, og de er strengere: kun en Alpaca-overskrift fra de sidste 6 timer tæller som grund, og SKEPTIC siger WAIT, hvis kursen ligger mere end 2 % over VWAP.
+3. Alle `DESK_*`-variabler står i `.env.example`. På Railway ligger databasen som `/data/desk.db`.
+
+SCOUT kigger hvert minut fra 9:45 til 15:30 ET (15:45–21:30 dansk tid). Intet her er finansiel rådgivning: bottene foreslår, du beslutter.

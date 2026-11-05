@@ -11,16 +11,13 @@ import pytest
 from fastapi.testclient import TestClient
 
 from trader.app import create_app
-from trader.broker import Account, Clock, NewsItem, Order, Position
-from trader.db import Database
 from trader.desk import rules
+from trader.desk.alpaca import Account, Bar, Clock, NewsItem, Order, Position
 from trader.desk.config import DeskSettings, parse_watchlist
 from trader.desk.engine import DeskEngine
 from trader.desk.store import DeskStore
-from trader.engine import TradingEngine
-from trader.signals import Bar
 
-from test_auth import _login, _settings
+from test_auth import _login, _settings, quiet_engine
 
 ET = ZoneInfo("America/New_York")
 DAY = datetime(2026, 11, 4, tzinfo=ET).date()
@@ -342,8 +339,7 @@ def test_desk_routes_need_login_and_work(tmp_path):
     broker = FakeBroker({"NVDA": ramp_bars()}, news={"NVDA": fresh_news("NVDA")})
     desk, clock = make_desk(tmp_path, broker)
     desk.start = lambda: None  # testen styrer selv minutterne
-    engine = TradingEngine(settings=settings, db=Database(settings.db_path))
-    app = create_app(engine=engine, settings=settings, desk_engine=desk)
+    app = create_app(settings=settings, meme_engine=quiet_engine(), desk_engine=desk)
     with TestClient(app) as client:
         assert client.get("/desk", follow_redirects=False).status_code == 303
         assert client.get("/api/desk/status").status_code == 401

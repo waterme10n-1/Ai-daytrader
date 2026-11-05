@@ -10,8 +10,6 @@ from fastapi.testclient import TestClient
 import meme_fakes
 from meme_fakes import make_engine, raw_pair, safe_report
 from trader.config import Settings
-from trader.db import Database
-from trader.engine import TradingEngine
 from trader.meme.config import MEME_LIVE_PHRASE
 from trader.meme.copytrade import CopyTracker
 from trader.meme.research import Verdict
@@ -247,10 +245,9 @@ def test_dashboard_routes(tmp_path, monkeypatch):
     import dataclasses
 
     settings = dataclasses.replace(settings, db_path=str(tmp_path / "t.db"), host="127.0.0.1", app_username="", app_password="", app_password_hash="", session_secret="")
-    stock = TradingEngine(settings=settings, db=Database(str(tmp_path / "t.db")))
     from trader.app import create_app
 
-    with TestClient(create_app(engine=stock, settings=settings, meme_engine=engine)) as client:
+    with TestClient(create_app(settings=settings, meme_engine=engine)) as client:
         page = client.get("/meme")
         assert page.status_code == 200 and "Memebot" in page.text
         body = client.get("/api/meme/status").json()
@@ -353,9 +350,39 @@ def test_status_is_gzip_compressed(tmp_path, monkeypatch):
         _arm(dex, rug, mint=f"Mint{index}" + "z" * 30, symbol=f"T{index}")
     engine.tick(force_scan=True)
     settings = dataclasses.replace(Settings.from_env(), db_path=str(tmp_path / "t.db"), host="127.0.0.1", app_username="", app_password="", app_password_hash="", session_secret="")
-    stock = TradingEngine(settings=settings, db=Database(settings.db_path))
-    with TestClient(create_app(engine=stock, settings=settings, meme_engine=engine)) as client:
+    with TestClient(create_app(settings=settings, meme_engine=engine)) as client:
         response = client.get("/api/meme/status", headers={"Accept-Encoding": "gzip"})
         assert response.status_code == 200
         assert response.headers.get("content-encoding") == "gzip"
         assert response.json()["mode"] == "paper"
+
+
+def test_daily_loss_limit_is_off_by_default_and_can_be_switched_on(tmp_path):
+    import dataclasses
+
+    from trader.meme.config import MemeSettings
+
+    defaults = MemeSettings.from_env()
+    assert defaults.daily_loss_limit is False and defaults.drawdown_limit is True
+
+    engine, dex, rug, _jup, _notes = make_engine(meme_fakes.settings(daily_loss_pct=0.1, position_usd=3.0, daily_loss_limit=False, drawdown_limit=False))
+    for index, name in enumerate(("First1111111", "Second11111")):
+        _arm(dex, rug, mint=name, symbol=f"L{index}")
+        engine.tick(force_scan=True)
+        dex.set_price(name, 0.0007)
+        engine.tick()  # to stop-loss-tab: over dagens grænse på 1,5 USD
+    status = engine.status()
+    assert status["halted_day"] is False and status["loss_limits"]["daily"] is False
+    assert any("Tabsgrænserne er slået fra" in a["text"] for a in status["alerts"])
+    _arm(dex, rug, mint="Third111111", symbol="THREE")
+    engine.tick(force_scan=True)
+    assert len(engine.store.open_positions("paper")) == 1  # botten køber stadig
+
+    engine.update_loss_limits({"daily": True})
+    _arm(dex, rug, mint="Fourth11111", symbol="FOUR")
+    engine.tick(force_scan=True)
+    assert engine.status()["halted_day"] is True
+    assert [row["mint"] for row in engine.store.open_positions("paper")] == ["Third111111"]
+    engine.update_loss_limits({"daily": False})
+    assert engine.status()["halted_day"] is False
+    assert engine.store.get_json("loss_limits") == {"daily": False, "drawdown": False}

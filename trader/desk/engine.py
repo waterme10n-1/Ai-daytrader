@@ -14,8 +14,8 @@ from datetime import datetime, time, timedelta
 from typing import Any, Callable
 from zoneinfo import ZoneInfo
 
-from trader.broker import AlpacaBroker, BrokerError
-from trader.config import ET_NAME, Settings
+from trader.config import Settings
+from trader.desk.alpaca import ET_NAME, AlpacaPaper, BrokerError
 from trader.desk import rules
 from trader.desk.agents import BOTS, DeskBrain, bot_rules
 from trader.desk.config import (
@@ -88,7 +88,7 @@ class DeskEngine:
         self.store = store or DeskStore(settings.db_path)
         self._broker = broker
         self._injected_broker = broker is not None
-        self.brain = brain or DeskBrain(settings, self.store, main_settings.anthropic_api_key)
+        self.brain = brain or DeskBrain(settings, self.store, settings.anthropic_api_key)
         self._now = now_fn or (lambda: datetime.now(ET))
         self._background = background_replies
         self._order_lock = threading.Lock()
@@ -176,15 +176,12 @@ class DeskEngine:
     # ------------------------------------------------------------------ broker
     @property
     def keys_present(self) -> bool:
-        return self._injected_broker or self.base.own_keys or self.main_settings.paper_keys_present
+        return self._injected_broker or self.base.own_keys
 
     def broker(self):
         if self._broker is None:
-            key = self.base.alpaca_api_key if self.base.own_keys else self.main_settings.alpaca_api_key
-            secret = self.base.alpaca_secret_key if self.base.own_keys else self.main_settings.alpaca_secret_key
-            paper = dataclasses.replace(self.main_settings, alpaca_api_key=key, alpaca_secret_key=secret)
-            # Altid papir. live=True findes ikke for bordet.
-            self._broker = AlpacaBroker(paper, live=False)
+            # Altid papir. Bordet har ingen adresse til rigtige penge.
+            self._broker = AlpacaPaper(self.base.alpaca_api_key, self.base.alpaca_secret_key)
         return self._broker
 
     def _cached(self, name: str, fetch: Callable[[], Any]) -> Any:
@@ -596,7 +593,7 @@ class DeskEngine:
                 self.store.post("executor", "error", f"{row['symbol']}: ordren blev ikke fyldt ({order.exit_reason}).", symbol=row["symbol"], proposal_id=row["id"])
                 continue
             if order.status == "canceled" and fill:
-                # Lukket uden om bordet, fx af aktiemotoren på samme papirkonto.
+                # Lukket uden om bordet, fx manuelt i Alpaca.
                 if held is None:
                     held = {position.symbol for position in broker.get_positions()}
                 if row["symbol"] not in held:
@@ -931,9 +928,7 @@ class DeskEngine:
             week = (now.date() - datetime.fromisoformat(start["date"]).date()).days // 7 + 1
         alerts: list[dict] = []
         if not self.keys_present:
-            alerts.append({"level": "warning", "text": "Mangler Alpaca-papirnøgler. Sæt DESK_ALPACA_API_KEY og DESK_ALPACA_SECRET_KEY (eller ALPACA_API_KEY og ALPACA_SECRET_KEY)."})
-        elif not self.base.own_keys and not self._injected_broker:
-            alerts.append({"level": "info", "text": "Bordet deler papirkonto med aktiemotoren. En separat papirkonto (DESK_ALPACA_API_KEY) giver et rent regnskab."})
+            alerts.append({"level": "warning", "text": "Mangler Alpaca-papirnøgler. Sæt DESK_ALPACA_API_KEY og DESK_ALPACA_SECRET_KEY i Railway."})
         if not self.brain.configured:
             alerts.append({"level": "info", "text": "Ingen Claude-nøgle. NEWS og SKEPTIC kører på faste regler, og SKEPTIC er strengere end normalt."})
         elif self.brain.budget_left() < 0.15:

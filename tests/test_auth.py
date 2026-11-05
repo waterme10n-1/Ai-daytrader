@@ -7,29 +7,14 @@ import re
 import pytest
 from fastapi.testclient import TestClient
 
+from meme_fakes import quiet_engine
+from trader.app import create_app
 from trader.auth import enforce_startup, hash_password, verify_password
 from trader.config import Settings
-from trader.db import Database
-from trader.engine import TradingEngine
-from trader.app import create_app
 
 
 def _settings(tmp_path, **overrides) -> Settings:
     values = dict(
-        alpaca_api_key="",
-        alpaca_secret_key="",
-        alpaca_live_api_key="",
-        alpaca_live_secret_key="",
-        allow_live=False,
-        live_max_capital=1000,
-        anthropic_api_key="",
-        anthropic_model="claude-opus-5-5",
-        anthropic_web_search_tool="web_search_20260209",
-        anthropic_effort="high",
-        anthropic_max_search_uses=5,
-        anthropic_fallbacks="default",
-        telegram_bot_token="",
-        telegram_chat_id="",
         db_path=str(tmp_path / "data" / "trader.db"),
         port=8741,
         host="127.0.0.1",
@@ -42,10 +27,9 @@ def _settings(tmp_path, **overrides) -> Settings:
     return Settings(**values)
 
 
-def _client(tmp_path, **overrides) -> TestClient:
+def _client(tmp_path, meme=None, **overrides) -> TestClient:
     settings = _settings(tmp_path, **overrides)
-    engine = TradingEngine(settings=settings, db=Database(settings.db_path))
-    return TestClient(create_app(engine=engine, settings=settings))
+    return TestClient(create_app(settings=settings, meme_engine=meme or quiet_engine()))
 
 
 def _csrf_from_login(client: TestClient) -> str:
@@ -77,15 +61,15 @@ def test_healthz_is_open_and_everything_else_requires_login(client):
     page = client.get("/", follow_redirects=False)
     assert page.status_code == 303
     assert page.headers["location"] == "/login"
-    for path in ("/api/status", "/api/kill", "/api/resume", "/api/simulate", "/api/live/unlock", "/api/paper"):
-        method = client.get if path == "/api/status" else client.post
+    for path in ("/api/meme/status", "/api/meme/kill", "/api/meme/resume", "/api/meme/scan", "/api/meme/live/unlock", "/api/meme/paper"):
+        method = client.get if path == "/api/meme/status" else client.post
         response = method(path, follow_redirects=False)
         assert response.status_code == 401, path
         assert "Log ind" in response.json()["detail"]
 
 
 def test_login_then_csrf_on_state_changes(client):
-    denied = client.post("/api/kill")
+    denied = client.post("/api/meme/kill")
     assert denied.status_code == 401
 
     wrong = _login(client, password="forkert")
@@ -94,7 +78,7 @@ def test_login_then_csrf_on_state_changes(client):
 
     ok = _login(client)
     assert ok.status_code == 303
-    assert ok.headers["location"] == "/"
+    assert ok.headers["location"] == "/meme"
     set_cookie = " ".join(ok.headers.get_list("set-cookie")).lower()
     assert "httponly" in set_cookie
     assert "samesite=strict" in set_cookie
@@ -103,21 +87,24 @@ def test_login_then_csrf_on_state_changes(client):
     assert "HttpOnly" in session_cookie
     assert "HttpOnly" not in csrf_cookie
 
-    assert client.get("/api/status").status_code == 200
-    assert client.get("/").status_code == 200
-    assert "AI Daytrader" in client.get("/").text
+    assert client.get("/api/meme/status").status_code == 200
+    home = client.get("/", follow_redirects=False)
+    assert home.status_code == 307 and home.headers["location"] == "/meme"
+    page = client.get("/meme")
+    assert page.status_code == 200 and "Memebot" in page.text
+    assert "Daytrader" not in page.text
 
-    blocked = client.post("/api/kill")
+    blocked = client.post("/api/meme/kill")
     assert blocked.status_code == 403
     assert "CSRF" in blocked.json()["detail"]
-    for path in ("/api/resume", "/api/simulate", "/api/live/unlock", "/api/paper", "/logout"):
+    for path in ("/api/meme/resume", "/api/meme/scan", "/api/meme/live/unlock", "/api/meme/paper", "/logout"):
         assert client.post(path).status_code == 403
 
     csrf = client.cookies.get("dt_csrf")
-    killed = client.post("/api/kill", headers={"X-CSRF-Token": csrf})
+    killed = client.post("/api/meme/kill", headers={"X-CSRF-Token": csrf})
     assert killed.status_code == 200
     assert killed.json()["kill_switch"] is True
-    resumed = client.post("/api/resume", headers={"X-CSRF-Token": csrf})
+    resumed = client.post("/api/meme/resume", headers={"X-CSRF-Token": csrf})
     assert resumed.status_code == 200
     assert resumed.json()["kill_switch"] is False
 

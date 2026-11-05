@@ -89,10 +89,12 @@ def parse_wallet_swaps(tx: dict, wallet: str, signature: str = "") -> list[CopyS
 
 
 class CopyTracker:
-    def __init__(self, rpc: SolanaRPC | None, store: MemeStore, wallets: tuple[str, ...]) -> None:
+    def __init__(self, rpc: SolanaRPC | None, store: MemeStore, wallets: tuple[str, ...], *, prefix: str = "copy_last") -> None:
         self.rpc = rpc
         self.store = store
         self.wallets = wallets
+        # Hver tracker husker sin egen plads i hver wallets historik, så to trackers ikke stjæler signaler fra hinanden.
+        self.prefix = prefix
 
     def poll(self, muted: set[str] | None = None, now: float | None = None) -> list[CopySignal]:
         if self.rpc is None or not self.wallets:
@@ -101,7 +103,7 @@ class CopyTracker:
         moment = now if now is not None else time.time()
         signals: list[CopySignal] = []
         for wallet in self.wallets:
-            key = f"copy_last:{wallet}"
+            key = f"{self.prefix}:{wallet}"
             try:
                 rows = self.rpc.signatures_for(wallet, limit=15)
             except SourceError as exc:

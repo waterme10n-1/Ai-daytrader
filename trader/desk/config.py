@@ -67,6 +67,7 @@ class DeskSettings:
     max_chase_pct: float = 0.5
     alpaca_api_key: str = ""
     alpaca_secret_key: str = ""
+    anthropic_api_key: str = ""
     ai_daily_budget_usd: float = 1.0
     ai_model: str = "claude-opus-5-5"
     ai_effort: str = "high"
@@ -102,8 +103,10 @@ class DeskSettings:
             scan_minutes=max(1, min(30, _int(os.getenv("DESK_SCAN_MINUTES"), 1))),
             auto_approve=_flag(os.getenv("DESK_AUTO_APPROVE"), True),
             max_chase_pct=min(2.0, max(0.1, _float(os.getenv("DESK_MAX_CHASE_PCT"), 0.5))),
-            alpaca_api_key=os.getenv("DESK_ALPACA_API_KEY", "").strip(),
-            alpaca_secret_key=os.getenv("DESK_ALPACA_SECRET_KEY", "").strip(),
+            # Egen papirkonto til bordet. ALPACA_API_KEY bruges, hvis du allerede har den sat.
+            alpaca_api_key=(os.getenv("DESK_ALPACA_API_KEY") or os.getenv("ALPACA_API_KEY") or "").strip(),
+            alpaca_secret_key=(os.getenv("DESK_ALPACA_SECRET_KEY") or os.getenv("ALPACA_SECRET_KEY") or "").strip(),
+            anthropic_api_key=os.getenv("ANTHROPIC_API_KEY", "").strip(),
             ai_daily_budget_usd=max(0.0, _float(os.getenv("DESK_AI_DAILY_BUDGET_USD"), 1.0)),
             ai_model=(os.getenv("DESK_ANTHROPIC_MODEL") or os.getenv("ANTHROPIC_MODEL") or "claude-opus-5-5").strip(),
             ai_effort=(os.getenv("DESK_ANTHROPIC_EFFORT") or "high").strip(),
