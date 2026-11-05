@@ -10,8 +10,6 @@ from fastapi.testclient import TestClient
 import meme_fakes
 from meme_fakes import make_engine, raw_pair, safe_report
 from trader.config import Settings
-from trader.db import Database
-from trader.engine import TradingEngine
 from trader.meme.config import MEME_LIVE_PHRASE
 from trader.meme.copytrade import CopyTracker
 from trader.meme.research import Verdict
@@ -247,10 +245,9 @@ def test_dashboard_routes(tmp_path, monkeypatch):
     import dataclasses
 
     settings = dataclasses.replace(settings, db_path=str(tmp_path / "t.db"), host="127.0.0.1", app_username="", app_password="", app_password_hash="", session_secret="")
-    stock = TradingEngine(settings=settings, db=Database(str(tmp_path / "t.db")))
     from trader.app import create_app
 
-    with TestClient(create_app(engine=stock, settings=settings, meme_engine=engine)) as client:
+    with TestClient(create_app(settings=settings, meme_engine=engine)) as client:
         page = client.get("/meme")
         assert page.status_code == 200 and "Memebot" in page.text
         body = client.get("/api/meme/status").json()
@@ -353,8 +350,7 @@ def test_status_is_gzip_compressed(tmp_path, monkeypatch):
         _arm(dex, rug, mint=f"Mint{index}" + "z" * 30, symbol=f"T{index}")
     engine.tick(force_scan=True)
     settings = dataclasses.replace(Settings.from_env(), db_path=str(tmp_path / "t.db"), host="127.0.0.1", app_username="", app_password="", app_password_hash="", session_secret="")
-    stock = TradingEngine(settings=settings, db=Database(settings.db_path))
-    with TestClient(create_app(engine=stock, settings=settings, meme_engine=engine)) as client:
+    with TestClient(create_app(settings=settings, meme_engine=engine)) as client:
         response = client.get("/api/meme/status", headers={"Accept-Encoding": "gzip"})
         assert response.status_code == 200
         assert response.headers.get("content-encoding") == "gzip"

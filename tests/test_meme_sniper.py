@@ -220,15 +220,12 @@ def test_sniper_api_route(tmp_path, monkeypatch):
 
     from trader.app import create_app
     from trader.config import Settings
-    from trader.db import Database
-    from trader.engine import TradingEngine
 
     engine, *_ = make_engine()
     monkeypatch.setattr(engine, "start", lambda: None)
     monkeypatch.setattr(engine, "stop", lambda: None)
     settings = dataclasses.replace(Settings.from_env(), db_path=str(tmp_path / "t.db"), host="127.0.0.1", app_username="", app_password="", app_password_hash="", session_secret="")
-    stock = TradingEngine(settings=settings, db=Database(settings.db_path))
-    with TestClient(create_app(engine=stock, settings=settings, meme_engine=engine)) as client:
+    with TestClient(create_app(settings=settings, meme_engine=engine)) as client:
         body = client.post("/api/meme/sniper", json={"take_profit_pct": 2.0, "enabled": False}).json()
         assert body["sniper"]["settings"]["take_profit_pct"] == 2.0 and body["sniper"]["enabled"] is False
         assert client.post("/api/meme/sniper", json={"stop_loss_pct": "x"}).status_code == 400

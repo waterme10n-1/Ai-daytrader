@@ -39,6 +39,7 @@ JUPITER_RPM_KEYED = 55
 DEXSCREENER_URL = "https://api.dexscreener.com"
 RUGCHECK_URL = "https://api.rugcheck.xyz"
 X_API_URL = "https://api.x.com"
+SOLANATRACKER_URL = "https://data.solanatracker.io"
 
 
 def _https_template(value: str | None, default: str) -> str:
@@ -76,6 +77,9 @@ class MemeSettings:
     rugcheck_api_key: str
     rugcheck_rpm: int
     x_bearer_token: str
+    solanatracker_api_key: str
+    solanatracker_url: str
+    toptraders_enabled: bool
     x_daily_requests: int
     bankroll_usd: float
     position_usd: float
@@ -150,6 +154,9 @@ class MemeSettings:
             rugcheck_api_key=os.getenv("RUGCHECK_API_KEY", "").strip(),
             rugcheck_rpm=min(600, max(5, _int(os.getenv("RUGCHECK_RPM"), 30))),
             x_bearer_token=os.getenv("X_BEARER_TOKEN", "").strip(),
+            solanatracker_api_key=os.getenv("SOLANATRACKER_API_KEY", "").strip(),
+            solanatracker_url=(os.getenv("SOLANATRACKER_API_URL", "").strip() or SOLANATRACKER_URL).rstrip("/"),
+            toptraders_enabled=_flag(os.getenv("MEME_TOPTRADERS"), False),
             x_daily_requests=max(0, _int(os.getenv("X_DAILY_REQUESTS"), 40)),
             bankroll_usd=bankroll,
             position_usd=min(bankroll, max(0.5, _float(os.getenv("MEME_POSITION_USD"), 3.0))),
@@ -379,6 +386,92 @@ def sniper_from(data: dict | None, settings: MemeSettings) -> SniperSettings:
     return cfg
 
 
+@dataclass
+class TopTraderSettings:
+    """Følg dagens mest profitable traders: køb lige efter dem, og sælg når de sælger.
+
+    Kan slås til og fra i dashboardet. Hvert køb skal stadig bestå rug-tjek og exit-rute-tjek,
+    og bankroll-loftet og tabsgrænserne gælder som for alt andet.
+    """
+
+    enabled: bool = False
+    count: int = 10
+    days: int = 1
+    position_usd: float = 2.0
+    max_open: int = 3
+    max_per_day: int = 10
+    stop_loss_pct: float = 0.3
+    max_hold_minutes: float = 720.0
+    min_liquidity_usd: float = 8_000.0
+    max_signal_age_seconds: float = 120.0
+    min_leader_sol: float = 0.1
+    follow_sells: bool = True
+    # Fra som standard: Top 10 bliver ved med at kopiere, selv om resten af botten har ramt dagens tabsgrænse.
+    daily_loss_stop: bool = False
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+
+TOP_BOUNDS: dict[str, tuple[float, float]] = {
+    "count": (3, 25),
+    "days": (1, 7),
+    "position_usd": (1.0, 1_000.0),
+    "max_open": (1, 10),
+    "max_per_day": (1, 50),
+    "stop_loss_pct": (0.1, 0.8),
+    "max_hold_minutes": (15.0, 4_320.0),
+    "min_liquidity_usd": (1_000.0, 500_000.0),
+    "max_signal_age_seconds": (20.0, 900.0),
+    "min_leader_sol": (0.0, 50.0),
+}
+TOP_INTS = ("count", "days", "max_open", "max_per_day")
+TOP_BOOLS = ("enabled", "follow_sells", "daily_loss_stop")
+TOP_LABELS: dict[str, str] = {
+    "enabled": "Følg top-traders",
+    "count": "Antal traders",
+    "days": "Periode (dage)",
+    "position_usd": "Beløb pr. handel",
+    "max_open": "Maks. åbne",
+    "max_per_day": "Maks. køb pr. dag",
+    "stop_loss_pct": "Stop-loss",
+    "max_hold_minutes": "Maks. holdetid",
+    "min_liquidity_usd": "Mindste likviditet",
+    "max_signal_age_seconds": "Køb kun, hvis deres køb er højst",
+    "min_leader_sol": "Ignorer køb under",
+    "follow_sells": "Sælg når de sælger",
+    "daily_loss_stop": "Stop ved dagens tabsgrænse",
+}
+# Når en kopieret position er steget meget, sikres gevinsten, hvis traderen aldrig sælger.
+TOP_TRAIL_ACTIVATION = 1.0
+TOP_TRAIL = 0.35
+
+
+def clamp_top(name: str, value: float, cap_usd: float | None = None) -> float:
+    low, high = TOP_BOUNDS[name]
+    if name == "position_usd" and cap_usd is not None:
+        high = min(high, cap_usd)
+        low = min(low, high)
+    if name == "days":
+        return 1 if value < 4 else 7  # leaderboardet har faste vinduer: i dag eller en uge
+    clamped = min(high, max(low, value))
+    return int(round(clamped)) if name in TOP_INTS else clamped
+
+
+def top_from(data: dict | None, settings: MemeSettings) -> TopTraderSettings:
+    cfg = TopTraderSettings(enabled=settings.toptraders_enabled, position_usd=min(2.0, settings.position_usd))
+    for key, value in (data or {}).items():
+        if key in TOP_BOOLS:
+            setattr(cfg, key, bool(value))
+        elif key in TOP_BOUNDS:
+            try:
+                setattr(cfg, key, clamp_top(key, float(value), settings.position_usd))
+            except (TypeError, ValueError):
+                continue
+    cfg.position_usd = clamp_top("position_usd", cfg.position_usd, settings.position_usd)
+    return cfg
+
+
 def public_meme_settings(settings: MemeSettings) -> dict:
     """Til dashboardet. Ingen hemmeligheder."""
     return {
@@ -408,6 +501,7 @@ def public_meme_settings(settings: MemeSettings) -> dict:
         "jupiter_keyed": bool(settings.jupiter_api_key),
         "jupiter_rpm": settings.jupiter_rpm,
         "rugcheck_rpm": settings.rugcheck_rpm,
+        "toptraders_api": bool(settings.solanatracker_api_key),
         "goal_usd_per_month": settings.goal_usd_per_month,
         "confirmation_phrase": MEME_LIVE_PHRASE,
         "unlock_min_trades": UNLOCK_MIN_TRADES,

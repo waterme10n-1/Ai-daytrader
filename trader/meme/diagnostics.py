@@ -107,6 +107,23 @@ def run_checks(engine: Any) -> dict:
 
         check("claude", "Claude API", claude, "Tjek ANTHROPIC_API_KEY og MEME_ANTHROPIC_MODEL.", optional=True)
 
+    top = getattr(clients, "top", None)
+    if top is not None:
+
+        def toptraders() -> str:
+            traders = top.top_traders(1, 3)
+            first = traders[0]
+            earned = f", {first.pnl_usd:+,.0f} USD i dag" if first.pnl_usd is not None else ""
+            return f"{len(traders)} traders hentet · nr. 1: {first.wallet[:4]}…{first.wallet[-4:]}{earned}"
+
+        check(
+            "toptraders",
+            "Solana Tracker: dagens top-traders",
+            toptraders,
+            "Tjek SOLANATRACKER_API_KEY fra solanatracker.io. Står der 'ingen wallets', har API'et ændret sit svar: send skærmbilledet, så tilpasses læsningen.",
+            optional=True,
+        )
+
     main = engine.main_settings
     if main is not None and main.telegram_bot_token:
 

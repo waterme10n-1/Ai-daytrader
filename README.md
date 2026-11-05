@@ -1,10 +1,6 @@
-# AI Daytrader
+# Memebot
 
-Lokal daytrader til likvide amerikanske aktier og ETF'er. Dansk brugerflade, papirpenge først, og en simulator der kører en hel dag gennem den samme motor.
-
-**Memebot** (`/meme`): en 24/7-bot til Solana-memecoins med rug-tjek (RugCheck, Jupiter), exit-rute-tjek, valgfri X- og Claude-research, copy-trading af udvalgte wallets og en model, der lærer af hver lukket handel. Den starter på papirpenge med rigtige kurser og kan først handle med rigtige penge fra en separat Phantom-konto, når papirresultatet er positivt. Se afsnittet *Memebot* i [LÆS_MIG.md](LÆS_MIG.md).
-
-Fuld opsætning af Alpaca-papirnøgler og Anthropic står i [LÆS_MIG.md](LÆS_MIG.md).
+En 24/7-bot til memecoins på Solana med rug-tjek (RugCheck, Jupiter), exit-rute-tjek, en sniper til helt nye tokens, Top 10 (køb lige efter dagens mest profitable traders og sælg, når de sælger), valgfri X- og Claude-research, copy-trading af udvalgte wallets og en model, der lærer af hver lukket handel. Den starter på papirpenge med rigtige kurser og kan først handle med rigtige penge fra en separat Phantom-konto, når papirresultatet er positivt. Dansk brugerflade, bygget til mobil og kan lægges på hjemmeskærmen som app.
 
 ```bash
 pip install -r requirements.txt
@@ -12,7 +8,7 @@ cp .env.example .env
 python run.py
 ```
 
-Åbn http://127.0.0.1:8741. Uden nøgler bruges **Simulér én dag** (syntetiske kurser, kun regler). Syntetiske resultater siger intet om rigtig performance. Udgivelse på Railway med login står i [LÆS_MIG.md](LÆS_MIG.md).
+Åbn http://127.0.0.1:8741. Opsætning, Railway og alle indstillinger står i [LÆS_MIG.md](LÆS_MIG.md).
 
 ```bash
 pytest
