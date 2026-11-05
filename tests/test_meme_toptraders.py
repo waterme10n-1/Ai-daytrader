@@ -287,3 +287,48 @@ def test_top_10_ignores_the_daily_loss_limit_unless_you_turn_it_on():
     _poll(engine)
     rows = engine.store.open_positions("paper") + engine.store.closed_positions("paper")
     assert all(row["mint"] != second for row in rows)  # intet nyt køb efter den samlede tabsgrænse
+
+
+def test_your_own_list_replaces_the_automatic_one():
+    engine, rpc, _dex, _rug = _engine()  # med Solana Tracker-nøgle
+    result = engine.add_top_traders([f"{OUTSIDER} Ansem", "ikke-en-adresse", OUTSIDER])
+    assert result["added"] == 1 and len(result["errors"]) == 2
+    engine.update_toptraders({"enabled": True})
+    _poll(engine)
+    assert engine.clients.top.calls == 0  # den automatiske liste bruges ikke
+    status = engine.status()["toptraders"]
+    assert status["source_kind"] == "own" and status["source"] == "din egen liste"
+    assert [(row["wallet"], row["name"]) for row in status["leaders"]] == [(OUTSIDER, "Ansem")]
+
+    rpc.buy(A, "a-buy")  # A er kun på den automatiske liste: ignoreres nu
+    rpc.buy(OUTSIDER, "own-buy")
+    _poll(engine)
+    rows = engine.store.open_positions("paper")
+    assert [row["source"] for row in rows] == [f"copy:{OUTSIDER}"]
+
+    engine.remove_top_trader(OUTSIDER)
+    assert engine.status()["toptraders"]["source_kind"] == "api"
+    with pytest.raises(ValueError):
+        engine.remove_top_trader(OUTSIDER)
+    with pytest.raises(ValueError, match="ikke en Solana-adresse"):
+        engine.add_top_traders("hej")
+
+
+def test_own_list_over_http(tmp_path):
+    import dataclasses
+
+    from fastapi.testclient import TestClient
+
+    from trader.app import create_app
+    from trader.config import Settings
+
+    engine, *_ = _engine(top=None)
+    engine.start = lambda: None
+    engine.stop = lambda: None
+    settings = dataclasses.replace(Settings(), db_path=str(tmp_path / "t.db"))
+    with TestClient(create_app(settings=settings, meme_engine=engine)) as client:
+        body = client.post("/api/meme/toptraders", json={"add_traders": [A, f"{B} Kol"]}).json()
+        assert [row["wallet"] for row in body["toptraders"]["own"]] == [A, B]
+        body = client.post("/api/meme/toptraders", json={"remove_trader": A}).json()
+        assert [row["wallet"] for row in body["toptraders"]["leaders"]] == [B]
+        assert client.post("/api/meme/toptraders", json={"add_traders": ["x"]}).status_code == 400
