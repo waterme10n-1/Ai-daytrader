@@ -104,6 +104,8 @@ class DeskEngine:
         self._last_error_post = 0.0
         self.last_tick: str | None = None
         self.scanning = False
+        self._quotes: dict = {"ts": None, "items": []}
+        self.last_scan: str | None = None
         if self.store.get_state("welcome") is None:
             self.store.set_state("welcome", "1")
             self.store.post(
@@ -360,14 +362,18 @@ class DeskEngine:
             day = now.date().isoformat()
             flagged = self.store.flagged_today(day)
             left = cfg.max_flags_per_day - len(flagged)
+            broker = self.broker()
+            # Ét kald for hele watchlisten (+ SPY): giver radaren kurser og SCOUT sine barer.
+            everything = list(dict.fromkeys([*cfg.watchlist, "SPY"]))
+            intraday = broker.get_intraday(everything, now)
+            daily = self._daily(broker, everything, now)
+            self._quotes = {"ts": now.isoformat(timespec="seconds"), "items": rules.quotes(everything, intraday, daily, now, flagged)}
+            self.last_scan = now.isoformat(timespec="seconds")
             if left <= 0:
                 return 0
             symbols = [symbol for symbol in cfg.watchlist if symbol not in flagged]
             if not symbols:
                 return 0
-            broker = self.broker()
-            intraday = broker.get_intraday(symbols, now)
-            daily = self._daily(broker, symbols, now)
             found = []
             for symbol in symbols:
                 flag = rules.scout(
@@ -385,6 +391,9 @@ class DeskEngine:
                 if self.paused:
                     break
                 self._pipeline(flag, intraday.get(flag.symbol, []), now, cfg)
+            marked = set(self.store.flagged_today(day))
+            for item in self._quotes["items"]:
+                item["flagged"] = item["symbol"] in marked
             return min(len(found), left)
         finally:
             self.scanning = False
@@ -1113,6 +1122,13 @@ class DeskEngine:
                 "open": self._open_count(),
                 "max_open": cfg.max_open,
             },
+            "quotes": self._quotes,
+            "systems": {
+                "last_scan": self.last_scan,
+                "last_tick": self.last_tick,
+                "telegram": bool(self.main_settings.telegram_bot_token and self.main_settings.telegram_chat_id),
+            },
+            "equity_curve": _curve(trades),
             "kpis": {
                 "trades": len(trades),
                 "pnl": pnl,
@@ -1127,6 +1143,16 @@ class DeskEngine:
             "alerts": alerts,
             "engine": {"last_tick": self.last_tick, "last_error": self.last_error},
         }
+
+
+def _curve(trades: list[dict], points: int = 60) -> list[float]:
+    """Bordets samlede resultat efter hver lukket handel (de seneste `points`)."""
+    total = 0.0
+    curve = [0.0]
+    for row in trades:
+        total += float(row["pnl"])
+        curve.append(round(total, 2))
+    return curve[-points:]
 
 
 def _proposal(row: dict) -> dict:
