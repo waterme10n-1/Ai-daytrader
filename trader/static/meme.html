@@ -16,7 +16,7 @@
 <meta name="format-detection" content="telephone=no">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400..700&family=Geist+Mono:wght@400..600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400..700&family=JetBrains+Mono:wght@400..700&family=Space+Grotesk:wght@500..700&display=swap" rel="stylesheet">
 <style>
   /* ---------- Farver og mål ---------- */
   :root {
@@ -485,6 +485,176 @@
   .appnav a[aria-current="page"] { opacity: 1; background: rgba(127, 127, 127, 0.28); }
   @media (max-width: 360px) { .appnav a { padding: 6px 10px; } }
 </style>
+<style id="future">
+  /* ---------- Fremtid: neon, glas og et svævende gitter ---------- */
+  :root {
+    --bg: #04050b;
+    --surface: rgba(14, 17, 31, 0.8); --surface-2: rgba(255, 255, 255, 0.035);
+    --raised: rgba(255, 255, 255, 0.065); --raised-2: rgba(255, 255, 255, 0.12);
+    --border: rgba(150, 165, 255, 0.13); --border-strong: rgba(150, 165, 255, 0.24);
+    --text: #eef2ff; --text-2: #b8c0dc; --muted: #7c86a6;
+    --accent: #9a86ff; --accent-soft: rgba(154, 134, 255, 0.16);
+    --cyan: #22e1ff; --mint: #14f195; --violet: #a26bff;
+    --up: #2ef2a0; --up-soft: rgba(46, 242, 160, 0.12);
+    --down: #ff4d6d; --down-soft: rgba(255, 77, 109, 0.13);
+    --info: #5cc8ff; --info-soft: rgba(92, 200, 255, 0.13);
+    --grad: linear-gradient(120deg, #a26bff 0%, #5b8cff 42%, #22e1ff 72%, #14f195 100%);
+    --edge: linear-gradient(140deg, rgba(162, 107, 255, 0.55), rgba(34, 225, 255, 0.22) 38%, rgba(255, 255, 255, 0.04) 66%, rgba(20, 241, 149, 0.2));
+    --glass: rgba(5, 7, 15, 0.74); --glass-nav: rgba(7, 9, 19, 0.92); --seg-on: rgba(255, 255, 255, 0.13);
+    --display: "Space Grotesk", var(--font);
+    --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  :root[data-theme="light"] {
+    --bg: #eef1f8;
+    --surface: rgba(255, 255, 255, 0.88); --surface-2: rgba(10, 20, 60, 0.035);
+    --raised: rgba(10, 20, 60, 0.06); --raised-2: rgba(10, 20, 60, 0.11);
+    --border: rgba(40, 60, 140, 0.12); --border-strong: rgba(40, 60, 140, 0.22);
+    --text: #0a0f24; --text-2: #39415c; --muted: #66708c;
+    --accent: #6a4dff; --accent-soft: rgba(106, 77, 255, 0.1); --cyan: #0098c7;
+    --up: #00a86b; --up-soft: rgba(0, 168, 107, 0.1); --down: #e0284f; --down-soft: rgba(224, 40, 79, 0.1);
+    --edge: linear-gradient(140deg, rgba(106, 77, 255, 0.35), rgba(0, 170, 220, 0.18) 40%, rgba(10, 20, 60, 0.06) 70%);
+    --glass: rgba(238, 241, 248, 0.84); --glass-nav: rgba(248, 250, 255, 0.95); --seg-on: #fff;
+  }
+  body {
+    background:
+      radial-gradient(1100px 700px at 12% -12%, rgba(162, 107, 255, 0.24), transparent 60%),
+      radial-gradient(900px 600px at 100% -4%, rgba(34, 225, 255, 0.15), transparent 60%),
+      radial-gradient(800px 600px at 50% 115%, rgba(20, 241, 149, 0.09), transparent 60%),
+      var(--bg);
+    background-attachment: fixed;
+  }
+  :root[data-theme="light"] body { background: radial-gradient(900px 600px at 10% -10%, rgba(106, 77, 255, 0.12), transparent 60%), radial-gradient(800px 500px at 100% 0%, rgba(0, 170, 220, 0.1), transparent 60%), var(--bg); }
+  body::before { display: none; }
+  body::after {
+    content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+    background-image: linear-gradient(rgba(140, 160, 255, 0.07) 1px, transparent 1px), linear-gradient(90deg, rgba(140, 160, 255, 0.07) 1px, transparent 1px);
+    background-size: 44px 44px;
+    -webkit-mask-image: radial-gradient(ellipse 85% 60% at 50% 0%, #000 25%, transparent 78%);
+    mask-image: radial-gradient(ellipse 85% 60% at 50% 0%, #000 25%, transparent 78%);
+    animation: grid-drift 28s linear infinite;
+  }
+  @keyframes grid-drift { to { background-position: 0 44px, 44px 0; } }
+  h1, h2, h3, .page-head h2, .brand h1, .sym, .ltitle { font-family: var(--display); }
+  .card {
+    border: 1px solid transparent;
+    background: linear-gradient(180deg, var(--surface), var(--surface)) padding-box, var(--edge) border-box;
+    -webkit-backdrop-filter: blur(14px) saturate(140%); backdrop-filter: blur(14px) saturate(140%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 26px 60px -38px rgba(70, 90, 255, 0.6);
+  }
+  :root[data-theme="light"] .card { box-shadow: 0 1px 2px rgba(10, 20, 60, 0.04), 0 18px 40px -28px rgba(40, 60, 160, 0.3); }
+  .card-head h2 > .i { color: var(--cyan); filter: drop-shadow(0 0 6px rgba(34, 225, 255, 0.55)); }
+  .label, .stats3 span, .mini-stats span, .stat .k { font-family: var(--mono); font-size: 10.5px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; }
+  .num, .equity, .kpi .v, .lright b, .pnl-big, .mini-stats b, .stats3 b, .target-big, .ring b, .big { font-family: var(--mono); letter-spacing: -0.03em; }
+  .equity { background: linear-gradient(180deg, #ffffff, #aebcff); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 0 24px rgba(90, 140, 255, 0.4)); }
+  :root[data-theme="light"] .equity { background: none; color: var(--text); filter: none; }
+  .hero {
+    background:
+      radial-gradient(120% 90% at 0% 0%, rgba(162, 107, 255, 0.24), transparent 55%),
+      radial-gradient(90% 70% at 100% 0%, rgba(34, 225, 255, 0.15), transparent 60%),
+      linear-gradient(180deg, var(--surface), var(--surface)) padding-box, var(--edge) border-box;
+  }
+  .appbar { border-bottom: 1px solid var(--border); }
+  .tabbar::before { content: ""; position: absolute; left: 0; right: 0; top: -1px; height: 1px; background: var(--grad); opacity: 0.75; }
+  .nav-item[aria-current="page"] .i { color: var(--cyan); filter: drop-shadow(0 0 8px rgba(34, 225, 255, 0.75)); }
+  .nav-item[aria-current="page"]::after { content: ""; position: absolute; bottom: 1px; width: 18px; height: 3px; border-radius: 3px; background: var(--grad); box-shadow: 0 0 10px rgba(34, 225, 255, 0.8); }
+  @media (min-width: 1000px) {
+    .tabbar::before { left: auto; right: -1px; top: 0; bottom: 0; width: 1px; height: auto; }
+    .nav-item[aria-current="page"]::after { left: 0; top: 12px; bottom: 12px; width: 3px; height: auto; }
+  }
+  .qa .qa-ic { box-shadow: inset 0 0 0 1px var(--border-strong); }
+  .qa.primary .qa-ic { box-shadow: 0 0 0 4px rgba(34, 225, 255, 0.12), 0 0 28px rgba(90, 140, 255, 0.75); }
+  .btn.primary { box-shadow: 0 0 26px -8px rgba(34, 225, 255, 0.8); }
+  .switch[aria-checked="true"] { background: linear-gradient(90deg, #14f195, #22e1ff); box-shadow: 0 0 16px -2px rgba(34, 225, 255, 0.7); }
+  .avatar { box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.06), 0 0 18px -6px hsl(var(--h, 260) 90% 60%); }
+  .segmented, .seg { background: rgba(255, 255, 255, 0.05); box-shadow: inset 0 0 0 1px var(--border); }
+  :root[data-theme="light"] .segmented, :root[data-theme="light"] .seg { background: var(--raised); }
+  .appnav-in { background: var(--glass); box-shadow: inset 0 0 0 1px var(--border); }
+  .appnav a { font: 600 12.5px/1.2 var(--mono); letter-spacing: 0.04em; }
+  .appnav a[aria-current="page"] { background: var(--seg-on); box-shadow: 0 0 14px -4px rgba(34, 225, 255, 0.7); }
+
+  .rows.num > div > span:first-child { font-family: var(--font); letter-spacing: 0; }
+
+  /* ---------- Ticker ---------- */
+  .ticker { overflow: hidden; border-bottom: 1px solid var(--border); background: rgba(0, 0, 0, 0.22); -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent); mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent); }
+  :root[data-theme="light"] .ticker { background: rgba(10, 20, 60, 0.03); }
+  .ticker[hidden] { display: none; }
+  .ticker-track { display: inline-flex; gap: 30px; padding: 8px 0; white-space: nowrap; font: 600 12px var(--mono); animation: ticker 45s linear infinite; }
+  .ticker:hover .ticker-track { animation-play-state: paused; }
+  @keyframes ticker { to { transform: translateX(-50%); } }
+  .tick { display: inline-flex; align-items: center; gap: 7px; color: var(--text-2); }
+  .tick b { color: var(--text); font-weight: 700; }
+  .tick .dot { width: 6px; height: 6px; }
+
+  /* ---------- 4 hovedtal ---------- */
+  .stats4 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .stat { padding: 14px 14px 13px; border-radius: 18px; }
+  .stat .k { color: var(--muted); }
+  .stat .v { margin-top: 7px; font: 700 23px/1.1 var(--mono); letter-spacing: -0.03em; }
+  .stat .s { margin-top: 3px; font-size: 12px; color: var(--muted); }
+  .stat.up .v { color: var(--up); text-shadow: 0 0 20px rgba(46, 242, 160, 0.35); }
+  .stat.down .v { color: var(--down); text-shadow: 0 0 20px rgba(255, 77, 109, 0.35); }
+  :root[data-theme="light"] .stat .v { text-shadow: none !important; }
+  .live { display: inline-flex; align-items: center; gap: 6px; font: 700 10.5px var(--mono); letter-spacing: 0.16em; color: var(--up); }
+  .live::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--up); box-shadow: 0 0 10px var(--up); animation: pulse 2.2s ease-out infinite; }
+
+  /* ---------- Live-radar ---------- */
+  .radar-wrap { position: relative; width: min(100%, 320px); aspect-ratio: 1; margin: 0 auto; }
+  .radar-wrap svg { display: block; width: 100%; height: 100%; overflow: visible; }
+  .sweep { position: absolute; inset: 4%; border-radius: 50%; pointer-events: none; background: conic-gradient(from 0deg, transparent 0deg, transparent 290deg, rgba(34, 225, 255, 0.22) 350deg, rgba(34, 225, 255, 0.55) 360deg); animation: sweep 4.5s linear infinite; mix-blend-mode: screen; }
+  :root[data-theme="light"] .sweep { mix-blend-mode: multiply; opacity: 0.5; }
+  @keyframes sweep { to { transform: rotate(360deg); } }
+  .blip { cursor: pointer; transition: r 0.2s; }
+  .blip.bought { animation: blink 1.6s ease-in-out infinite; }
+  .blip.picked { stroke: #fff; stroke-width: 2; }
+  @keyframes blink { 50% { opacity: 0.35; } }
+  .radar-caption { min-height: 42px; margin-top: 10px; text-align: center; font-size: 13px; line-height: 1.45; color: var(--text-2); }
+  .radar-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 14px; margin-top: 8px; font: 600 11px var(--mono); color: var(--muted); }
+  .radar-legend i { display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; vertical-align: 0; }
+
+  /* ---------- Positionsfliser ---------- */
+  .tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .tile { position: relative; overflow: hidden; padding: 12px 12px 8px; border-radius: 16px; border: 1px solid var(--border); background: var(--surface-2); color: inherit; font: inherit; text-align: left; cursor: pointer; }
+  .tile.up { background: linear-gradient(160deg, rgba(46, 242, 160, var(--a, 0.12)), transparent 72%), var(--surface-2); border-color: rgba(46, 242, 160, 0.28); }
+  .tile.down { background: linear-gradient(160deg, rgba(255, 77, 109, var(--a, 0.12)), transparent 72%), var(--surface-2); border-color: rgba(255, 77, 109, 0.28); }
+  .tile .t-top { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+  .tile .t-sym { font: 700 14.5px var(--display); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tile .t-pct { margin: 5px 0 1px; font: 700 21px var(--mono); letter-spacing: -0.03em; }
+  .tile .t-sub { font: 11.5px var(--mono); color: var(--muted); }
+  .tile svg { display: block; width: 100%; height: 36px; margin-top: 6px; }
+  .tile:active { transform: scale(0.98); }
+
+  /* ---------- Systemstatus ---------- */
+  .hud { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+  .gauge { text-align: center; }
+  .gauge svg { display: block; width: 66px; height: 66px; margin: 0 auto; }
+  .gauge b { display: block; margin-top: 2px; font: 700 13px var(--mono); }
+  .gauge span { font: 600 9.5px var(--mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+  .hud-line { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 12px; margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--border); font: 12px var(--mono); color: var(--muted); }
+  .hud-line b { color: var(--text); font-weight: 600; }
+
+  /* ---------- Terminal-log ---------- */
+  .term { list-style: none; margin: 0; padding: 12px 12px 10px; max-height: 360px; overflow-y: auto; border-radius: 14px; background: rgba(0, 0, 0, 0.38); box-shadow: inset 0 0 0 1px var(--border); font: 12px/1.55 var(--mono); }
+  :root[data-theme="light"] .term { background: rgba(10, 20, 60, 0.04); }
+  .term li { display: grid; grid-template-columns: auto auto minmax(0, 1fr); gap: 8px; padding: 3px 0; }
+  .term time { color: var(--muted); }
+  .term .tag { font-weight: 700; }
+  .term .tag.buy { color: var(--up); } .term .tag.sell { color: var(--cyan); } .term .tag.warning { color: var(--warn); }
+  .term .tag.error { color: var(--down); } .term .tag.info { color: var(--accent); }
+  .term li:first-child .msg::after { content: "\2588"; margin-left: 3px; color: var(--cyan); animation: caret 1s steps(1) infinite; }
+  @keyframes caret { 50% { opacity: 0; } }
+
+  /* ---------- Flere tal ---------- */
+  .more-card { padding: 0; }
+  .more-card > summary { padding: 16px 18px; font: 700 15px var(--display); }
+  .more-card[open] > summary { border-bottom: 1px solid var(--border); }
+  .more-body { display: grid; gap: 18px; padding: 16px 18px 18px; }
+  .more-body h3 { margin: 0 0 10px; display: flex; align-items: center; gap: 8px; font-size: 14px; }
+  .more-body h3 .i { color: var(--cyan); }
+
+  @media (min-width: 640px) { .tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  @media (min-width: 760px) { .stats4 { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+  @media (max-width: 639px) { .more-card { padding: 0; } }
+</style>
 </head>
 <body>
 <nav class="appnav" aria-label="Skift side"><div class="appnav-in"><a href="/meme" aria-current="page">Memebot</a><a href="/desk">Handelsbordet</a></div></nav>
@@ -503,6 +673,7 @@
     <button class="icon-btn" id="menu-btn" type="button" aria-label="Menu" aria-haspopup="dialog"></button>
   </div>
 </header>
+<div class="ticker" id="ticker" hidden aria-hidden="true"><div class="ticker-track" id="ticker-track"></div></div>
 
 <nav class="tabbar" aria-label="Sektioner">
   <div class="side-brand"><img src="/icons/icon-192.png" alt="">Memebot</div>
@@ -520,7 +691,7 @@
     <div class="card hero">
       <div class="hero-top">
         <div>
-          <div class="label">Egenkapital</div>
+          <div class="label">Egenkapital <span class="live" id="live-badge" style="margin-left:8px">LIVE</span></div>
           <div class="equity num" id="equity">—</div>
         </div>
         <div class="seg" role="group" aria-label="Tidsrum" id="range">
@@ -532,48 +703,67 @@
       <div class="chips" id="equity-chips"></div>
       <div class="chart-box" id="equity-chart"><div class="tip" id="equity-tip"></div><div id="equity-svg"></div></div>
     </div>
+    <div class="stats4" id="stats4"></div>
     <div class="quick">
       <button class="qa primary" id="scan" type="button"></button>
       <button class="qa" id="pause" type="button"></button>
       <button class="qa danger" id="kill" type="button"></button>
     </div>
-    <div class="kpis" id="kpis"></div>
     <div class="cols">
       <div class="col">
         <div class="card">
           <div class="card-head"><h2 id="open-title"></h2><button class="btn small" type="button" data-goto="positioner">Se alle</button></div>
           <div id="open-mini"></div>
         </div>
+        <div class="card" id="radar-card">
+          <div class="card-head"><h2 id="live-radar-title"></h2><span class="muted small-txt" id="live-radar-when"></span></div>
+          <div class="radar-wrap"><div id="live-radar" style="width:100%;height:100%"></div><div class="sweep"></div></div>
+          <div class="radar-caption" id="radar-caption">Hver prik er en coin, botten har kigget på. Tryk på en prik.</div>
+          <div class="radar-legend"><span><i style="background:var(--up)"></i>købt</span><span><i style="background:#ffcf5c"></i>score</span><span><i style="background:var(--info)"></i>marked</span><span><i style="background:var(--down)"></i>rug</span><span><i style="background:var(--accent)"></i>andet</span></div>
+        </div>
         <div class="card" id="strat-card">
           <div class="card-head"><h2 id="strat-title"></h2><span class="muted small-txt">Resultat pr. strategi</span></div>
           <div id="strats"></div>
         </div>
-        <div class="card">
-          <div class="card-head"><h2 id="funnel-title"></h2><span class="muted small-txt" id="funnel-when"></span></div>
-          <div class="funnel" id="funnel"></div>
-          <div class="chips" id="funnel-errors" style="margin-top:12px"></div>
-        </div>
-        <div class="card">
-          <div class="card-head"><h2 id="daily-title"></h2><span class="muted small-txt">pr. dag (UTC)</span></div>
-          <div class="chart-box flat" id="daily-box"><div class="tip" id="daily-tip"></div><div id="daily"></div></div>
-        </div>
-        <div class="card">
-          <div class="card-head"><h2 id="exits-title"></h2></div>
-          <div class="list" id="exits"></div>
-        </div>
       </div>
       <div class="col">
+        <div class="card">
+          <div class="card-head"><h2 id="hud-title"></h2><span class="live">ONLINE</span></div>
+          <div class="hud" id="hud"></div>
+          <div class="hud-line" id="hud-line"></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h2 id="feed-title"></h2></div>
+          <ul class="term" id="feed"></ul>
+        </div>
         <div class="card goal" id="goal"></div>
         <div class="card">
           <div class="card-head"><h2 id="lesson-title"></h2><button class="btn small" type="button" data-goto="laering">Mere</button></div>
           <div id="lesson-latest"></div>
         </div>
-        <div class="card">
-          <div class="card-head"><h2 id="feed-title"></h2></div>
-          <ul class="feed" id="feed"></ul>
-        </div>
       </div>
     </div>
+    <details class="card more-card">
+      <summary>Flere tal og grafer</summary>
+      <div class="more-body">
+        <div class="kpis" id="kpis"></div>
+        <div>
+          <h3 id="funnel-title"></h3><span class="muted small-txt" id="funnel-when"></span>
+          <div class="funnel" id="funnel"></div>
+          <div class="chips" id="funnel-errors" style="margin-top:12px"></div>
+        </div>
+        <div class="sn-grid">
+          <div>
+            <h3 id="daily-title"></h3>
+            <div class="chart-box flat" id="daily-box"><div class="tip" id="daily-tip"></div><div id="daily"></div></div>
+          </div>
+          <div>
+            <h3 id="exits-title"></h3>
+            <div class="list" id="exits"></div>
+          </div>
+        </div>
+      </div>
+    </details>
   </section>
 
   <section class="panel" id="panel-positioner" role="tabpanel" hidden>
@@ -1176,7 +1366,7 @@ function renderAlerts(data) {
 }
 function renderHero(data) {
   const k = data.kpis;
-  document.getElementById("equity").textContent = money(k.equity);
+  countTo(document.getElementById("equity"), k.equity, money);
   put("equity-chips", `
     <span class="chip ${tone(k.total_pnl)}">${icon(k.total_pnl >= 0 ? "upr" : "downr", "sm")}${esc(signed(k.total_pnl))} · ${esc(spct(k.return_pct))} i alt</span>
     <span class="chip ${tone(k.today_pnl)}">I dag ${esc(signed(k.today_pnl))}</span>
@@ -1248,7 +1438,7 @@ function renderActions(data) {
 }
 function renderOverview(data) {
   const scan = data.engine.last_scan || {};
-  document.getElementById("funnel-title").innerHTML = icon("funnel") + "Seneste scanning" + (data.sniper ? ` <button class="chip ${data.sniper.enabled ? "accent" : ""}" type="button" data-goto="sniper" style="border:0;cursor:pointer">${icon("target", "sm")}Sniper ${data.sniper.enabled ? "til · mål " + spct(data.sniper.settings.take_profit_pct) : "fra"}</button>` : "");
+  document.getElementById("funnel-title").innerHTML = icon("funnel") + "Seneste scanning" + (false && data.sniper ? ` <button class="chip ${data.sniper.enabled ? "accent" : ""}" type="button" data-goto="sniper" style="border:0;cursor:pointer">${icon("target", "sm")}Sniper ${data.sniper.enabled ? "til · mål " + spct(data.sniper.settings.take_profit_pct) : "fra"}</button>` : "");
   document.getElementById("funnel-when").textContent = data.engine.last_scan_at ? ago(data.engine.last_scan_at) : "venter på første scanning";
   const steps = [["Fundet", scan.discovered], ["Ikke set for nylig", scan.fresh], ["Bestod markedsfiltre", scan.market_ok], ["Bestod rug-tjek", scan.rug_ok], ["Høj nok score", scan.scored], ["Købt", scan.bought]];
   const top = Math.max(1, scan.discovered || 0);
@@ -1258,10 +1448,12 @@ function renderOverview(data) {
   document.getElementById("feed-title").innerHTML = icon("activity") + "Aktivitet";
   const events = (data.events || []).slice(0, 18);
   put("feed", events.length ? events.map((ev) => {
-    let cls = ev.level, ic = ev.level === "error" ? "x" : ev.level === "warning" ? "alert" : "info";
-    if (ev.level === "trade") { const buy = /^Købt/.test(ev.message); cls = buy ? "buy" : "sell"; ic = buy ? "plus" : "minus"; }
-    return `<li><span class="ico ${esc(cls)}">${icon(ic, "sm")}</span><div><div>${esc(ev.message)}</div><div class="when">${esc(ago(ev.ts))}</div></div></li>`;
-  }).join("") : `<li style="display:block">${empty("Intet endnu.", "activity")}</li>`);
+    let cls = ev.level, tag = ev.level === "error" ? "FEJL" : ev.level === "warning" ? "ADVAR" : "INFO";
+    if (ev.level === "trade") { const buy = /^Købt/.test(ev.message); cls = buy ? "buy" : "sell"; tag = buy ? "KØB" : "SALG"; }
+    const d = new Date(ev.ts);
+    const t = Number.isNaN(d.getTime()) ? "--:--" : d.toLocaleTimeString("da-DK", { hour: "2-digit", minute: "2-digit" });
+    return `<li><time>${esc(t)}</time><span class="tag ${esc(cls)}">[${tag}]</span><span class="msg">${esc(ev.message)}</span></li>`;
+  }).join("") : `<li><time>--:--</time><span class="tag info">[INFO]</span><span class="msg">Venter på første hændelse…</span></li>`);
 
   document.getElementById("daily-title").innerHTML = icon("bars") + "Dagligt resultat";
   dailyChart(data.daily_pnl);
@@ -1273,7 +1465,17 @@ function renderOverview(data) {
 
   document.getElementById("open-title").innerHTML = icon("coins") + "Åbne positioner";
   const pos = data.positions || [];
-  put("open-mini", pos.length ? pos.map((p) => `<button class="lrow tap" type="button" data-goto="positioner">${avatar(p.symbol, p.mint)}<div class="lmain"><div class="ltitle">${esc(p.symbol)}${p.strategy === "sniper" ? '<span class="stage-tag claude">sniper</span>' : p.strategy === "toptrader" ? '<span class="stage-tag ok">top 10</span>' : ""}</div><div class="lsub">${esc(p.source)} · ${esc(minutes(p.minutes))} · ${esc(money(p.cost_usd))} indsat</div></div><div class="lright"><b class="${tone(p.change_pct)}">${esc(spct(p.change_pct))}</b><span class="${tone(p.unrealized_usd)}">${esc(signed(p.unrealized_usd))}</span></div></button>`).join("") : empty("Ingen åbne positioner. Botten køber kun, når et token består alle tjek.", "shield"));
+  put("open-mini", pos.length ? `<div class="tiles">${pos.map((p) => {
+    const ch = Number(p.change_pct) || 0;
+    const a = Math.min(0.32, 0.08 + Math.abs(ch) * 0.5).toFixed(2);
+    const tag = p.strategy === "sniper" ? "SNIPE" : p.strategy === "toptrader" ? "TOP 10" : "AUTO";
+    return `<button class="tile ${ch >= 0 ? "up" : "down"}" type="button" data-goto="positioner" style="--a:${a}">
+      <div class="t-top"><span class="t-sym">${esc(p.symbol)}</span><span class="t-sub">${tag}</span></div>
+      <div class="t-pct ${tone(ch)}">${esc(spct(ch))}</div>
+      <div class="t-sub">${esc(signed(p.unrealized_usd))} · ${esc(minutes(p.minutes))}</div>
+      ${sparkline(p.path, ch >= 0)}
+    </button>`;
+  }).join("")}</div>` : empty("Ingen åbne positioner. Botten køber kun, når et token består alle tjek.", "shield"));
 
   document.getElementById("lesson-title").innerHTML = icon("brain") + "Seneste lektion";
   const lesson = (data.lessons || [])[0];
@@ -1878,6 +2080,10 @@ function render(data) {
   renderTop(data);
   renderLimits(data);
   renderStrategies(data);
+  renderStats4(data);
+  renderLiveRadar(data);
+  renderHud(data);
+  renderTicker(data);
   renderRadar(data);
   renderJournal(data);
   renderLearning(data);
@@ -2097,7 +2303,7 @@ setInterval(() => { if (active === "wallets") refreshWallet(false); }, 5000);
 setInterval(() => {
   if (!state) return;
   const left = Math.max(0, Math.round((state.engine.next_scan_in || 0) - (Date.now() - countdownBase) / 1000));
-  if (left !== countdown) { countdown = left; renderHeader(state); }
+  if (left !== countdown) { countdown = left; renderHeader(state); updateScanRing(); }
 }, 1000);
 
 /* ---------- Start ---------- */
@@ -2403,6 +2609,130 @@ document.getElementById("top-leaders").addEventListener("click", (ev) => {
   ask("Fjern traderen fra listen?", short(wallet), { confirm: "Fjern", danger: true })
     .then((ok) => ok && act(() => post("/api/meme/toptraders", { remove_trader: wallet }), "Traderen er fjernet"));
 });
+
+/* ---------- Fremtid: tal der tæller, mini-grafer, live-radar, systemstatus og ticker ---------- */
+const reduceMotion = (() => { try { return window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) { return false; } })();
+function countTo(el, value, fmt) {
+  if (!el) return;
+  const target = Number(value);
+  if (!Number.isFinite(target)) { el.textContent = fmt(value); return; }
+  const from = Number(el.dataset.v);
+  el.dataset.v = String(target);
+  if (reduceMotion || !Number.isFinite(from) || Math.abs(from - target) < 1e-9) { el.textContent = fmt(target); return; }
+  const t0 = performance.now(), dur = 700;
+  const step = (now) => {
+    const k = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - k, 3);
+    el.textContent = fmt(from + (target - from) * e);
+    if (k < 1 && el.dataset.v === String(target)) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+function sparkline(path, up) {
+  const pts = (path || []).map(Number).filter((v) => Number.isFinite(v));
+  if (pts.length < 2) return `<svg viewBox="0 0 100 36" preserveAspectRatio="none" aria-hidden="true"><line x1="0" x2="100" y1="18" y2="18" stroke="var(--border-strong)" stroke-dasharray="3 4"/></svg>`;
+  const lo = Math.min(...pts, 1), hi = Math.max(...pts, 1), span = Math.max(1e-6, hi - lo);
+  const xy = pts.map((v, i) => [(i / (pts.length - 1)) * 100, 33 - ((v - lo) / span) * 30]);
+  const line = xy.map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
+  const c = up ? "var(--up)" : "var(--down)";
+  const base = (33 - ((1 - lo) / span) * 30).toFixed(1);
+  return `<svg viewBox="0 0 100 36" preserveAspectRatio="none" aria-hidden="true"><line x1="0" x2="100" y1="${base}" y2="${base}" stroke="var(--border-strong)" stroke-dasharray="2 3"/><path d="${line} L100,36 L0,36 Z" fill="${c}" opacity="0.13"/><path d="${line}" fill="none" stroke="${c}" stroke-width="1.8" vector-effect="non-scaling-stroke" stroke-linejoin="round"/></svg>`;
+}
+function renderStats4(data) {
+  const k = data.kpis;
+  const tiles = [
+    ["I dag", k.today_pnl, signed(k.today_pnl), "resultat i dag", tone(k.today_pnl)],
+    ["I alt", k.total_pnl, signed(k.total_pnl), `${spct(k.return_pct)} siden start`, tone(k.total_pnl)],
+    ["Vinder", null, k.win_rate == null ? "—" : pct(k.win_rate), `${k.wins} vindere · ${k.losses} tabere`, ""],
+    ["Åbne", null, fmtInt.format(k.open), `${money(k.deployed)} i spil`, ""],
+  ];
+  const html = tiles.map(([l, , v, sub, cls], i) => `<div class="card stat ${cls}"><div class="k">${esc(l)}</div><div class="v" id="stat4-${i}">${esc(v)}</div><div class="s">${esc(sub)}</div></div>`).join("");
+  if (cache.stats4 !== html) {
+    const box = document.getElementById("stats4");
+    const keep = [0, 1].map((i) => { const el = document.getElementById(`stat4-${i}`); return el ? el.dataset.v : undefined; });
+    put("stats4", html);
+    [0, 1].forEach((i) => {
+      const el = document.getElementById(`stat4-${i}`);
+      if (el && keep[i] !== undefined) el.dataset.v = keep[i];
+      countTo(el, i === 0 ? k.today_pnl : k.total_pnl, signed);
+    });
+  }
+}
+const BLIP = { "købt": ["var(--up)", 0.26], score: ["#ffcf5c", 0.42], claude: ["var(--accent)", 0.5], rute: ["var(--accent)", 0.56], risiko: ["var(--accent)", 0.62], sniper: ["var(--info)", 0.7], marked: ["var(--info)", 0.78], rug: ["var(--down)", 0.9], "køb": ["var(--down)", 0.6] };
+let radarRows = [];
+function renderLiveRadar(data) {
+  document.getElementById("live-radar-title").innerHTML = icon("radar") + "Live-radar";
+  const seen = new Set();  // én prik pr. coin, den nyeste
+  const rows = (data.candidates || []).filter((c) => !seen.has(c.mint) && seen.add(c.mint)).slice(0, 48);
+  radarRows = rows;
+  document.getElementById("live-radar-when").textContent = rows.length ? `${rows.length} coins · seneste ${ago(rows[0].ts)}` : "venter på første scanning";
+  const rings = [0.25, 0.5, 0.75, 1].map((r) => `<circle cx="50" cy="50" r="${(r * 46).toFixed(1)}" fill="none" stroke="var(--border-strong)" stroke-width="0.35"/>`).join("");
+  const blips = rows.map((c, i) => {
+    const [color, rr] = BLIP[c.stage] || ["var(--accent)", 0.6];
+    const ang = (hue(c.mint) / 360) * Math.PI * 2;
+    const jitter = ((hue(c.mint + "r") % 100) / 100 - 0.5) * 0.14;
+    const r = Math.max(0.08, Math.min(0.97, rr + jitter)) * 46;
+    const x = 50 + Math.cos(ang) * r, y = 50 + Math.sin(ang) * r;
+    const age = Math.max(0, (Date.now() - new Date(c.ts).getTime()) / 60000);
+    const op = Math.max(0.35, 1 - age / 180).toFixed(2);
+    const size = c.stage === "købt" ? 2.6 : 1.8;
+    return `<circle class="blip${c.stage === "købt" ? " bought" : ""}" data-blip="${i}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${size}" fill="${color}" opacity="${op}" style="filter:drop-shadow(0 0 2px ${color})"><title>${esc(c.symbol || short(c.mint))}</title></circle>`;
+  }).join("");
+  put("live-radar", `<svg viewBox="0 0 100 100" role="img" aria-label="Radar over de seneste ${rows.length} coins">
+    <defs><radialGradient id="rg" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="rgba(34,225,255,0.10)"/><stop offset="1" stop-color="rgba(34,225,255,0)"/></radialGradient></defs>
+    <circle cx="50" cy="50" r="46" fill="url(#rg)"/>${rings}
+    <line x1="4" x2="96" y1="50" y2="50" stroke="var(--border)" stroke-width="0.35"/><line x1="50" x2="50" y1="4" y2="96" stroke="var(--border)" stroke-width="0.35"/>
+    <circle cx="50" cy="50" r="1.4" fill="var(--cyan)"/>${blips}</svg>`);
+}
+document.getElementById("live-radar").addEventListener("click", (ev) => {
+  const b = ev.target.closest("[data-blip]");
+  if (!b) return;
+  const c = radarRows[Number(b.dataset.blip)];
+  if (!c) return;
+  document.querySelectorAll("#live-radar .blip.picked").forEach((x) => x.classList.remove("picked"));
+  b.classList.add("picked");
+  document.getElementById("radar-caption").innerHTML = `<b>${esc(c.symbol || short(c.mint))}</b> <span class="stage-tag ${STAGE_CLASS[c.stage] || ""}">${esc(STAGES[c.stage] || c.stage)}</span><br><span class="muted">${esc(String(c.reason || "").slice(0, 140))}</span>`;
+});
+function gauge(frac, label, value, color) {
+  const f = Math.max(0, Math.min(1, Number(frac) || 0));
+  const r = 26, c = 2 * Math.PI * r;
+  const col = color || (f > 0.85 ? "var(--down)" : f > 0.6 ? "var(--warn)" : "var(--cyan)");
+  return `<div class="gauge"><svg viewBox="0 0 66 66" aria-hidden="true"><circle cx="33" cy="33" r="${r}" fill="none" stroke="var(--raised-2)" stroke-width="5"/><circle cx="33" cy="33" r="${r}" fill="none" stroke="${col}" stroke-width="5" stroke-linecap="round" stroke-dasharray="${(c * f).toFixed(1)} ${c.toFixed(1)}" transform="rotate(-90 33 33)" style="filter:drop-shadow(0 0 4px ${col})"/></svg><b>${esc(value)}</b><span>${esc(label)}</span></div>`;
+}
+function quotaFrac(q) { return q && q.per_minute ? q.used_last_minute / q.per_minute : 0; }
+function renderHud(data) {
+  document.getElementById("hud-title").innerHTML = icon("zap") + "Systemstatus";
+  const e = data.engine || {};
+  const j = e.jupiter, rc = e.rugcheck, dx = e.dexscreener;
+  const scanTotal = Math.max(1, e.scan_seconds || 60);
+  put("hud", `<div id="scan-gauge">${gauge(1 - (countdown || 0) / scanTotal, "Scan", countdown ? `${countdown}s` : "nu", "var(--mint)")}</div>`
+    + gauge(quotaFrac(j), "Jupiter", j ? `${j.used_last_minute}/${j.per_minute}` : "—")
+    + gauge(quotaFrac(rc), "RugCheck", rc ? `${rc.used_last_minute}/${rc.per_minute}` : "—")
+    + gauge(dx && dx.pairs ? quotaFrac(dx.pairs) : 0, "Dex", dx && dx.pairs ? `${dx.pairs.used_last_minute}/${dx.pairs.per_minute}` : "—"));
+  const st = data.toptraders || {};
+  put("hud-line", `<span>Motor <b>${e.running ? "kører" : "stoppet"}</b></span><span>Sidste runde <b>${esc(ago(e.last_tick))}</b></span><span>SOL <b>${esc(e.sol_usd ? money(e.sol_usd) : "—")}</b></span><span>Sniper <b>${data.sniper && data.sniper.enabled ? "til" : "fra"}</b></span><span>Top 10 <b>${st.enabled ? "til" : "fra"}</b></span>`);
+}
+function updateScanRing() {
+  if (!state || active !== "oversigt") return;
+  const el = document.getElementById("scan-gauge");
+  if (!el) return;
+  const total = Math.max(1, (state.engine && state.engine.scan_seconds) || 60);
+  el.innerHTML = gauge(1 - (countdown || 0) / total, "Scan", countdown ? `${countdown}s` : "nu", "var(--mint)");
+}
+function renderTicker(data) {
+  const pos = (data.positions || []).map((p) => `<span class="tick"><span class="dot ${Number(p.change_pct) >= 0 ? "ok" : "bad"}"></span><b>${esc(p.symbol)}</b><span class="${tone(p.change_pct)}">${esc(spct(p.change_pct))}</span></span>`);
+  const k = data.kpis;
+  const extra = [
+    `<span class="tick">EGENKAPITAL <b>${esc(money(k.equity))}</b></span>`,
+    `<span class="tick">I DAG <b class="${tone(k.today_pnl)}">${esc(signed(k.today_pnl))}</b></span>`,
+    data.engine && data.engine.sol_usd ? `<span class="tick">SOL <b>${esc(money(data.engine.sol_usd))}</b></span>` : "",
+    ...(data.events || []).filter((ev) => ev.level === "trade").slice(0, 4).map((ev) => `<span class="tick">${esc(String(ev.message).slice(0, 60))}</span>`),
+  ].filter(Boolean);
+  const items = pos.concat(extra);
+  const box = document.getElementById("ticker");
+  box.hidden = !items.length;
+  const one = items.join("");
+  put("ticker-track", one + one);  // to gange, så rullen er sømløs
+}
 
 /* ---------- Pop-op-ark (i stedet for browserens grå bokse) ---------- */
 let sheetSeq = 0;

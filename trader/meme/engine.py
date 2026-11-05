@@ -122,6 +122,9 @@ SNIPER_LOOP_SECONDS = 5
 TOP_POLL_SECONDS = 8
 TOP_REFRESH_SECONDS = 1800
 TOP_SIGNALS_KEPT = 40
+# Mini-grafer: et punkt hvert 20. sekund, de seneste 90 punkter (ca. en halv time).
+PATH_STEP_SECONDS = 20
+PATH_POINTS = 90
 # Din egen Top 10-liste: højst så mange traders.
 TOP_OWN_MAX = 25
 # Strategi-vagt: taber en strategi på de seneste handler, sættes den på hold, mens den lærer videre som skygge.
@@ -298,6 +301,9 @@ class MemeEngine:
         self._sell_queue: set[int] = set()
         self._missing_price: dict[int, int] = {}
         self._copy_sells: set[tuple[str, str]] = set()
+        # Kursforløb pr. åben position til mini-grafer på dashboardet (kun i hukommelsen).
+        self._paths: dict[int, deque] = {}
+        self._path_at: dict[int, float] = {}
         self.last_tick: str | None = None
         self.last_scan_at: str | None = None
         self.last_scan: dict[str, Any] = {}
@@ -682,6 +688,7 @@ class MemeEngine:
                     self._sell(pos, 1.0, "no_price", "Ingen kurs i lang tid. Forsøger at sælge.", wallet, sol_usd)
                 continue
             self._missing_price.pop(pos["id"], None)
+            self._record_path(int(pos["id"]), price / float(pos["entry_price_usd"]))
             ratio = price / float(pos["entry_price_usd"])
             peak = max(float(pos["peak_ratio"] or 1.0), ratio)
             liquidity = pairs[mint].liquidity_usd if mint in pairs else pos.get("liquidity_last")
@@ -760,7 +767,17 @@ class MemeEngine:
         self._notify(f"Solgt {fraction * 100:.0f} % af {pos['symbol']} (+{fill.usd:.2f} USD). {reason}")
         return True
 
+    def _record_path(self, position_id: int, ratio: float) -> None:
+        now = time.time()
+        if now - self._path_at.get(position_id, 0.0) < PATH_STEP_SECONDS:
+            return
+        self._path_at[position_id] = now
+        path = self._paths.setdefault(position_id, deque([1.0], maxlen=PATH_POINTS))
+        path.append(round(ratio, 5))
+
     def _close(self, pos: dict, proceeds: float, fees: float, kind: str, reason: str, signatures: list) -> None:
+        self._paths.pop(int(pos["id"]), None)
+        self._path_at.pop(int(pos["id"]), None)
         cost = float(pos["cost_usd"])
         pnl = proceeds - cost - fees
         pnl_pct = pnl / cost if cost > 0 else 0.0
@@ -2869,6 +2886,7 @@ class MemeEngine:
             "peak_pct": (float(row["peak_ratio"] or 1.0) - 1.0),
             "partial": bool(row["partial_taken"]),
             "strategy": row.get("strategy") or "momentum",
+            "path": list(self._paths.get(int(row["id"]), [])) if row["status"] == "open" else [],
             "watching": bool(self.settings.dev_watch and (watch.get("dev") or watch.get("holders"))),
             "stop_pct": stop_pct,
             "tp_pct": tp_pct,
