@@ -357,13 +357,13 @@ def test_status_is_gzip_compressed(tmp_path, monkeypatch):
         assert response.json()["mode"] == "paper"
 
 
-def test_loss_limits_are_off_by_default_and_can_be_switched_on(tmp_path):
+def test_daily_loss_limit_is_off_by_default_and_can_be_switched_on(tmp_path):
     import dataclasses
 
     from trader.meme.config import MemeSettings
 
     defaults = MemeSettings.from_env()
-    assert defaults.daily_loss_limit is False and defaults.drawdown_limit is False
+    assert defaults.daily_loss_limit is False and defaults.drawdown_limit is True
 
     engine, dex, rug, _jup, _notes = make_engine(meme_fakes.settings(daily_loss_pct=0.1, position_usd=3.0, daily_loss_limit=False, drawdown_limit=False))
     for index, name in enumerate(("First1111111", "Second11111")):

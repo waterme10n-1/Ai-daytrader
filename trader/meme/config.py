@@ -166,9 +166,9 @@ class MemeSettings:
             max_trades_per_day=max(1, min(50, _int(os.getenv("MEME_MAX_TRADES_PER_DAY"), 8))),
             daily_loss_pct=min(0.9, max(0.05, _float(os.getenv("MEME_DAILY_LOSS_PCT"), 0.25))),
             max_drawdown_pct=min(0.95, max(0.1, _float(os.getenv("MEME_MAX_DRAWDOWN_PCT"), 0.5))),
-            # Fra som standard: botten stopper ikke ved tab. Bankroll-loftet er altid det største, den kan tabe.
+            # Ingen daglig tabsgrænse som standard. Den samlede tabsgrænse er slået til.
             daily_loss_limit=_flag(os.getenv("MEME_DAILY_LOSS_LIMIT"), False),
-            drawdown_limit=_flag(os.getenv("MEME_DRAWDOWN_LIMIT"), False),
+            drawdown_limit=_flag(os.getenv("MEME_DRAWDOWN_LIMIT"), True),
             sol_reserve=max(0.005, _float(os.getenv("MEME_SOL_RESERVE"), 0.02)),
             slippage_bps=max(50, min(1500, _int(os.getenv("MEME_SLIPPAGE_BPS"), 300))),
             priority_fee_lamports=max(0, min(5_000_000, _int(os.getenv("MEME_PRIORITY_FEE_LAMPORTS"), 100_000))),
@@ -411,8 +411,8 @@ class TopTraderSettings:
     max_signal_age_seconds: float = 120.0
     min_leader_sol: float = 0.1
     follow_sells: bool = True
-    # Fra som standard: Top 10 sælger, når traderen sælger, ikke ved et fast tab.
-    stop_loss_on: bool = False
+    # Stop-loss som sikkerhedsnet, hvis traderen aldrig sælger. Kan slås fra under Top 10.
+    stop_loss_on: bool = True
     # Fra som standard: Top 10 bliver ved med at kopiere, selv om resten af botten har ramt dagens tabsgrænse.
     daily_loss_stop: bool = False
 
