@@ -379,6 +379,18 @@ def create_app(
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         return meme().status()
 
+    @app.post("/api/meme/toptraders")
+    async def meme_toptraders(request: Request) -> dict:
+        try:
+            body = await request.json()
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Ugyldig JSON.") from exc
+        try:
+            meme().update_toptraders(body if isinstance(body, dict) else {})
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return meme().status()
+
     @app.post("/api/meme/diagnostics")
     def meme_diagnostics() -> dict:
         return meme().run_diagnostics()

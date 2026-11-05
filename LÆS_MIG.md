@@ -146,6 +146,19 @@ Vær klar over:
 - Professionelle snipere køber i samme blok, som poolen oprettes, med private noder. Denne bot er bevidst langsommere, fordi den tjekker tokenet først. Den køber derfor sjældent i bunden.
 - Claude bruges ikke til snipes som standard, fordi research tager op til et par minutter. Du kan slå det til, men så kommer botten senere ind.
 
+## Top 10: følg dagens bedste traders
+
+Under **Strategi → Top 10** kan du slå en funktion til, der køber lige efter de traders, der har tjent mest i dag, og sælger, når de sælger. Den er slået fra, til du tænder den.
+
+1. **Listen**: med `SOLANATRACKER_API_KEY` (fra solanatracker.io) henter botten hver halve time de 10 mest profitable Solana-traders i dag eller den seneste uge. Uden nøgle bruger den de wallets, du selv følger under Wallet.
+2. **Køb**: hvert 8. sekund kigger botten efter nye handler fra dem. Køber en af dem et token for mindst 0,1 SOL, og er købet højst 2 minutter gammelt, tjekker botten tokenet (likviditet, RugCheck og at det kan sælges igen) og køber for dit beløb pr. handel. Claude springes over her, fordi det skal gå hurtigt.
+3. **Salg**: sælger traderen tokenet, sælger botten hele positionen med det samme. Det gælder også, hvis traderen er røget af listen, eller funktionen er slået fra. Som sikkerhedsnet er der stop-loss (standard 30 %), en gevinstsikring hvis kursen er fordoblet og falder 35 % fra toppen, og en tidsgrænse (standard 12 timer), hvis traderen aldrig sælger.
+4. **Grænser**: maks. åbne kopier (standard 3) og køb pr. dag (standard 10). Bankroll-loftet, tabsgrænserne, pause og nødstop gælder som for alt andet. Traders, der giver tab over tid, slås automatisk fra.
+
+Under Top 10 ser du dagens traders med deres resultat, hvad botten har tjent på at kopiere hver af dem, og de seneste signaler: hvad traderen gjorde, og hvad botten gjorde (købt, solgt eller sprunget over og hvorfor).
+
+Vær ærlig over for dig selv: dagens vindere er ofte heldige eller bots, og du køber altid lidt efter dem til en højere kurs. Kør det på papir og se resultatet, før du bruger rigtige penge. Funktionen kigger ofte på Solana, så brug en egen RPC (fx en gratis Helius-nøgle i `SOLANA_RPC_URL`).
+
 ## Sådan lærer den
 
 - Efter hver lukket handel flyttes vægtene på de signaler, der bar handlen (op ved gevinst, ned ved tab). Dashboardet viser vægtene og en lektion pr. handel.

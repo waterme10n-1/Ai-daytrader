@@ -12,6 +12,7 @@ import dataclasses
 import logging
 import threading
 import time
+from collections import deque
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable
 
@@ -23,6 +24,7 @@ from trader.meme.clients import (
     RateLimited,
     RugCheck,
     SolanaRPC,
+    SolanaTracker,
     SourceError,
     TokenInfo,
     XClient,
@@ -38,16 +40,24 @@ from trader.meme.config import (
     SNIPER_LABELS,
     SNIPER_LEARNABLE,
     SOL_MINT,
+    TOP_BOOLS,
+    TOP_BOUNDS,
+    TOP_LABELS,
+    TOP_TRAIL,
+    TOP_TRAIL_ACTIVATION,
     UNLOCK_MIN_DAYS,
     UNLOCK_MIN_PROFIT_FACTOR,
     UNLOCK_MIN_TRADES,
     MemeSettings,
     SniperSettings,
     StrategyParams,
+    TopTraderSettings,
     clamp_param,
     clamp_sniper,
+    clamp_top,
     public_meme_settings,
     sniper_from,
+    top_from,
 )
 from trader.meme.copytrade import CopyTracker
 from trader.meme.learning import (
@@ -74,6 +84,7 @@ from trader.meme.risk import (
     evaluate_entry,
     exit_decision,
     sniper_exit_decision,
+    top_exit_decision,
 )
 from trader.meme.safety import market_rejections, roundtrip_rejections, rug_rejections, sniper_rejections
 from trader.meme.store import MemeStore, loads, now_iso, utc_day
@@ -107,6 +118,10 @@ FEE_MARGIN_USD = 0.05
 # Vis beskeden om en kildes rate limit (Jupiter, RugCheck, DexScreener) i ti minutter efter seneste 429.
 JUPITER_ALERT_SECONDS = 600
 SNIPER_LOOP_SECONDS = 5
+# Top-traders: kig efter deres nye handler hvert 8. sekund, og hent listen igen hver halve time.
+TOP_POLL_SECONDS = 8
+TOP_REFRESH_SECONDS = 1800
+TOP_SIGNALS_KEPT = 40
 SNIPER_DEEP_CHECKS = 4
 SNIPER_SEEN_HOURS = 6
 
@@ -117,6 +132,11 @@ SOURCE_LABELS = {
     "dex_boost": "DexScreener: boost",
     "dex_profile": "DexScreener: ny profil",
 }
+
+
+def _dk(value: float, digits: int = 2) -> str:
+    """Tal med dansk komma og punktum, fx 1.234,50."""
+    return f"{value:,.{digits}f}".replace(",", "§").replace(".", ",").replace("§", ".")
 
 
 def source_label(source: str) -> str:
@@ -179,8 +199,10 @@ class MemeClients:
         jup: Any = None,
         x: Any = None,
         rpc: Any = None,
+        top: Any = None,
     ) -> None:
         self.dex = dex or DexScreener()
+        self.top = top if top is not None else (SolanaTracker(settings) if settings.solanatracker_api_key else None)
         self.rug = rug or RugCheck(settings)
         self.jup = jup or Jupiter(settings)
         self.x = x if x is not None else (XClient(settings.x_bearer_token) if settings.x_configured else None)
@@ -192,7 +214,7 @@ class MemeClients:
             self.rpc = None
 
     def close(self) -> None:
-        for client in (self.dex, self.rug, self.jup, self.x, self.rpc):
+        for client in (self.dex, self.rug, self.jup, self.x, self.rpc, self.top):
             closer = getattr(client, "close", None)
             if callable(closer):
                 try:
@@ -226,6 +248,11 @@ class MemeEngine:
         self._last_snipe = 0.0
         self.last_snipe: dict[str, Any] = {}
         self.copy = CopyTracker(self.clients.rpc, self.store, self._all_wallets())
+        self.top_cfg: TopTraderSettings = top_from(self.store.get_json("toptraders"), self.settings)
+        self.top_copy = CopyTracker(self.clients.rpc, self.store, (), prefix="top_last")
+        self._last_top_poll = 0.0
+        self.top_signals: deque = deque(self.store.get_json("top_signals", []) or [], maxlen=TOP_SIGNALS_KEPT)
+        self.top_last: dict[str, Any] = {}
         self._paper = PaperWallet(self.settings, self.store, self.clients.jup)
         self._live: SolanaWallet | None = None
         self._pubkey_cache: tuple[str, str] | None = None
@@ -301,7 +328,7 @@ class MemeEngine:
 
     def _loop_seconds(self) -> float:
         """Sniperen kræver hurtigere runder, så stop og gevinstmål rammes i tide."""
-        if self.sniper.enabled:
+        if self.sniper.enabled or self.top_cfg.enabled:
             return float(min(self.settings.monitor_seconds, SNIPER_LOOP_SECONDS))
         return float(self.settings.monitor_seconds)
 
@@ -565,6 +592,9 @@ class MemeEngine:
                 if self.sniper.enabled and (requested or now - self._last_snipe >= self.settings.sniper_scan_seconds):
                     self._last_snipe = now
                     self._snipe(wallet, sol_usd, day, entries_allowed=entries_allowed)
+                if (self.top_cfg.enabled or self._held_top_wallets()) and (requested or now - self._last_top_poll >= TOP_POLL_SECONDS):
+                    self._last_top_poll = now
+                    self._follow_top(wallet, sol_usd, day, entries_allowed=entries_allowed)
                 if now - self._last_snapshot >= 300:
                     self._last_snapshot = now
                     self.store.add_equity(self.mode, self._totals()["equity"])
@@ -644,6 +674,8 @@ class MemeEngine:
             )
             if pos.get("strategy") == "sniper":
                 decision = sniper_exit_decision(cfg=self.sniper, **common)
+            elif pos.get("strategy") == "toptrader":
+                decision = top_exit_decision(cfg=self.top_cfg, **common)
             else:
                 decision = exit_decision(params=self.params, **common)
             if decision.sell:
@@ -1267,7 +1299,9 @@ class MemeEngine:
         summary: dict[str, Any] = {"discovered": 0, "fresh": 0, "market_ok": 0, "rug_ok": 0, "scored": 0, "bought": 0, "errors": []}
         self._marked_shadow_budget = SHADOW_MARKED_PER_SCAN
         self.last_scan = summary
-        self.copy.wallets = self._all_wallets()
+        # Wallets, som top-trader-kopieringen følger, håndteres dér (hurtigere og med egne grænser).
+        top_wallets = self._top_wallet_set()
+        self.copy.wallets = tuple(w for w in self._all_wallets() if w not in top_wallets)
         self.copy.rpc = self.clients.rpc
         closed_all = self.store.closed_positions(self.mode)
         stats = source_stats(closed_all)
@@ -1525,6 +1559,252 @@ class MemeEngine:
                 seen.pop(mint, None)
             self.store.set_json("sniper_seen", seen)
 
+    # ------------------------------------------------------------------ top-traders
+    def _ensure_rpc(self):
+        if self.clients.rpc is None:
+            self.clients.rpc = SolanaRPC(self.settings.rpc_url)
+        return self.clients.rpc
+
+    def _manual_leaders(self) -> list[dict]:
+        wallets = list(self._all_wallets())[: self.top_cfg.count]
+        return [{"wallet": w, "rank": i + 1, "pnl_usd": None, "win_rate": None, "trades": None} for i, w in enumerate(wallets)]
+
+    def _top_leaders(self) -> list[dict]:
+        """Dagens top-traders fra Solana Tracker. Uden nøgle: de wallets, du selv følger."""
+        cfg = self.top_cfg
+        if self.clients.top is None:
+            return self._manual_leaders()
+        cached = self.store.get_json("top_traders", None) or {}
+        fresh = cached.get("days") == cfg.days and time.time() - float(cached.get("ts") or 0) < TOP_REFRESH_SECONDS
+        # Hent igen hver halve time, eller hvis du har bedt om flere traders end listen blev hentet med.
+        if fresh and int(cached.get("count") or 0) >= cfg.count:
+            return cached["traders"][: cfg.count]
+        try:
+            traders = self.clients.top.top_traders(cfg.days, cfg.count)
+        except SourceError as exc:
+            self.top_last["error"] = f"Solana Tracker: {exc}"
+            return (cached.get("traders") or [])[: cfg.count]
+        rows = [{"wallet": t.wallet, "rank": t.rank, "pnl_usd": t.pnl_usd, "win_rate": t.win_rate, "trades": t.trades} for t in traders]
+        before = {row["wallet"] for row in cached.get("traders") or []}
+        added = [row for row in rows if row["wallet"] not in before]
+        self.store.set_json("top_traders", {"ts": time.time(), "at": now_iso(), "days": cfg.days, "count": cfg.count, "traders": rows})
+        self.top_last.pop("error", None)
+        if before and added:
+            self.store.add_event("info", f"Listen over top-traders er opdateret: {len(added)} nye.")
+        return rows[: cfg.count]
+
+    def _top_wallet_set(self) -> set[str]:
+        """Hvem top-trader-kopieringen følger lige nu, uden at kalde API'et."""
+        if not self.top_cfg.enabled:
+            return set()
+        if self.clients.top is None:
+            return {row["wallet"] for row in self._manual_leaders()}
+        cached = self.store.get_json("top_traders", None) or {}
+        return {row["wallet"] for row in (cached.get("traders") or [])[: self.top_cfg.count]}
+
+    def _held_top_wallets(self) -> list[str]:
+        return [
+            str(row["source"])[5:]
+            for row in self.store.open_positions(self.mode)
+            if row.get("strategy") == "toptrader" and str(row.get("source") or "").startswith("copy:")
+        ]
+
+    def _note_top(self, signal, action: str, detail: str, symbol: str = "") -> None:
+        self.top_signals.appendleft(
+            {
+                "ts": now_iso(),
+                "wallet": signal.wallet,
+                "mint": signal.mint,
+                "symbol": symbol,
+                "side": signal.side,
+                "sol": round(float(signal.sol), 4),
+                "action": action,
+                "detail": detail,
+            }
+        )
+        self.store.set_json("top_signals", list(self.top_signals))
+
+    def _follow_top(self, wallet, sol_usd: float, day: str, *, entries_allowed: bool) -> None:
+        """Kig efter nye handler fra top-traderne: køb lige efter dem, og sælg når de sælger."""
+        cfg = self.top_cfg
+        held = self._held_top_wallets()
+        leaders = self._top_leaders() if cfg.enabled else []
+        watch = list(dict.fromkeys([row["wallet"] for row in leaders] + held))
+        self.top_last.update({"at": now_iso(), "watching": len(watch)})
+        if not watch:
+            return
+        self.top_copy.rpc = self._ensure_rpc()
+        self.top_copy.wallets = tuple(watch)
+        stats = source_stats(self.store.closed_positions(self.mode))
+        muted = {source for source, entry in stats.items() if entry["muted"]}
+        try:
+            signals = self.top_copy.poll(muted)
+        except Exception as exc:  # én dårlig wallet eller RPC-fejl må ikke stoppe runden
+            self.top_last["error"] = f"Kunne ikke læse traderne: {exc}"
+            return
+        leader_set = {row["wallet"] for row in leaders}
+        open_rows = self.store.open_positions(self.mode)
+        held_pairs = {(str(row["source"])[5:], row["mint"]): row for row in open_rows if str(row.get("source") or "").startswith("copy:")}
+        sold = 0
+        for signal in signals:
+            if signal.side != "sell":
+                continue
+            row = held_pairs.get((signal.wallet, signal.mint))
+            if row is None:
+                continue
+            if cfg.follow_sells or row.get("strategy") != "toptrader":
+                self._copy_sells.add((signal.wallet, signal.mint))
+                self._note_top(signal, "sælger", "Traderen solgte. Botten sælger også.", row.get("symbol") or "")
+                sold += 1
+        if sold:
+            self._monitor(wallet, sol_usd)
+        buys = [signal for signal in signals if signal.side == "buy" and signal.wallet in leader_set]
+        bought = 0
+        for signal in buys:
+            if not entries_allowed:
+                self._note_top(signal, "sprunget over", "Ingen nye køb lige nu (pause, nødstop eller tabsgrænse).")
+                continue
+            if self._copy_buy(signal, wallet, sol_usd, day, leaders):
+                bought += 1
+        self.top_last.update({"buys": len(buys), "sells": sold, "bought": bought})
+
+    def _copy_buy(self, signal, wallet, sol_usd: float, day: str, leaders: list[dict]) -> bool:
+        cfg = self.top_cfg
+        mint = signal.mint
+        age = max(0.0, time.time() - signal.block_time) if signal.block_time else 0.0
+        if signal.block_time and age > cfg.max_signal_age_seconds:
+            self._note_top(signal, "sprunget over", f"Deres køb er {age:.0f} s gammelt. Grænsen er {cfg.max_signal_age_seconds:.0f} s.")
+            return False
+        if signal.sol < cfg.min_leader_sol:
+            self._note_top(signal, "sprunget over", f"Lille køb på {_dk(signal.sol, 3)} SOL (under {_dk(cfg.min_leader_sol)} SOL).")
+            return False
+        if mint in QUOTE_MINTS or self.store.ever_rugged(mint) or mint in {row["mint"] for row in self._blacklist()}:
+            self._note_top(signal, "sprunget over", "Tokenet er blokeret eller har rugget før.")
+            return False
+        if any(row["mint"] == mint for row in self.store.open_positions(self.mode)):
+            self._note_top(signal, "sprunget over", "Botten ejer allerede tokenet.")
+            return False
+        try:
+            pair = self.clients.dex.pairs_for([mint]).get(mint)
+        except SourceError as exc:
+            self._note_top(signal, "sprunget over", f"Ingen kurs lige nu: {exc}")
+            return False
+        if pair is None or pair.price_usd <= 0:
+            self._note_top(signal, "sprunget over", "Intet handelspar på DexScreener endnu.")
+            return False
+        leader = next((row for row in leaders if row["wallet"] == signal.wallet), {})
+        cand: dict[str, Any] = {
+            "mint": mint,
+            "pair": pair,
+            "source": f"copy:{signal.wallet}",
+            "copy": True,
+            "boosted": False,
+            "token": None,
+            "leader": {"rank": leader.get("rank"), "pnl_usd": leader.get("pnl_usd"), "sol": float(signal.sol), "age": age},
+        }
+        if pair.liquidity_usd < cfg.min_liquidity_usd:
+            reason = f"Top-trader købte, men likviditeten er kun {_dk(pair.liquidity_usd, 0)} $ (grænse {_dk(cfg.min_liquidity_usd, 0)} $)."
+            self._record(cand, "marked", False, reason)
+            self._note_top(signal, "sprunget over", reason, pair.symbol)
+            return False
+        try:
+            report = self.clients.rug.report(mint, max_age=300.0)
+        except RateLimited:
+            self._note_top(signal, "sprunget over", "RugCheck holder pause. Uden rug-tjek købes der ikke.", pair.symbol)
+            return False
+        except SourceError:
+            report = None
+        reasons = rug_rejections(report, None, self.params)
+        if reasons:
+            self._record(cand, "rug", False, "; ".join(reasons[:3]))
+            self._note_top(signal, "sprunget over", "Rug-tjek: " + "; ".join(reasons[:2]), pair.symbol)
+            return False
+        features = build_features(pair, report=report, copy_signal=True, now_ms=int(time.time() * 1000))
+        cand.update({"report": report, "buzz": None, "features": features, "score": self.model.score(features)})
+        if self._try_buy(cand, wallet, sol_usd, day, strategy="toptrader"):
+            self._note_top(signal, "købt", f"Købt {pair.symbol} for {_dk(cfg.position_usd)} USD, {age:.0f} s efter traderen.", pair.symbol)
+            return True
+        latest = self.store.recent_candidates(self.mode, 1)
+        why = latest[0]["reason"] if latest and latest[0]["mint"] == mint else "Ikke købt."
+        if cand.get("retry"):
+            why = "Jupiter holder pause (rate limit). Købet blev ikke sendt."
+        self._note_top(signal, "sprunget over", why, pair.symbol)
+        return False
+
+    def update_toptraders(self, changes: dict) -> None:
+        if not isinstance(changes, dict):
+            raise ValueError("Ugyldige indstillinger.")
+        updated = dataclasses.replace(self.top_cfg)
+        for key, value in changes.items():
+            if key in TOP_BOOLS:
+                setattr(updated, key, bool(value))
+            elif key in TOP_BOUNDS:
+                try:
+                    setattr(updated, key, clamp_top(key, float(value), self.settings.position_usd))
+                except (TypeError, ValueError) as exc:
+                    raise ValueError(f"{TOP_LABELS.get(key, key)} skal være et tal.") from exc
+        was_on = self.top_cfg.enabled
+        reload_list = updated.days != self.top_cfg.days or updated.count > self.top_cfg.count
+        # Byt hele objektet på én gang: ingen halve ændringer midt i en runde.
+        self.top_cfg = updated
+        self.store.set_json("toptraders", updated.to_dict())
+        if reload_list:
+            self.store.set_json("top_traders", {})
+        if updated.enabled != was_on:
+            self.store.add_event(
+                "info",
+                "Top-trader-kopiering er slået til." if updated.enabled else "Top-trader-kopiering er slået fra. Åbne kopier sælges stadig, når traderen sælger.",
+            )
+            self._last_top_poll = 0.0
+        self._wake.set()
+
+    def _top_status(self, closed: list[dict], open_rows: list[dict], day: str) -> dict:
+        cfg = self.top_cfg
+        defaults = top_from({}, self.settings)
+        copies = [row for row in closed if row.get("strategy") == "toptrader"]
+        pnl = [float(row["pnl_usd"]) for row in copies]
+        wins = [value for value in pnl if value > 0]
+        kinds = {
+            "count": "int", "days": "days", "position_usd": "usd", "max_open": "int", "max_per_day": "int", "stop_loss_pct": "pct",
+            "max_hold_minutes": "min", "min_liquidity_usd": "usd", "max_signal_age_seconds": "sec", "min_leader_sol": "sol",
+        }
+        fields = []
+        for name, (low, high) in TOP_BOUNDS.items():
+            if name == "position_usd":
+                high = min(high, self.settings.position_usd)
+            fields.append({"name": name, "label": TOP_LABELS[name], "value": getattr(cfg, name), "default": getattr(defaults, name), "bounds": [low, high], "kind": kinds[name]})
+        fields.append({"name": "follow_sells", "label": TOP_LABELS["follow_sells"], "value": cfg.follow_sells, "default": defaults.follow_sells, "kind": "bool"})
+        api = self.clients.top is not None
+        cached = (self.store.get_json("top_traders", None) or {}) if api else {}
+        leaders = (cached.get("traders") or [])[: cfg.count] if api else self._manual_leaders()
+        stats = source_stats(closed)
+        held = {str(row["source"])[5:] for row in open_rows if row.get("strategy") == "toptrader"}
+        view = []
+        for row in leaders:
+            ours = stats.get(f"copy:{row['wallet']}", {})
+            view.append({**row, "copied": ours.get("trades", 0), "copied_pnl": ours.get("pnl", 0.0), "muted": bool(ours.get("muted")), "holding": row["wallet"] in held})
+        return {
+            "enabled": cfg.enabled,
+            "settings": cfg.to_dict(),
+            "fields": fields,
+            "api": api,
+            "source": "Solana Tracker" if api else "dine fulgte wallets",
+            "refreshed_at": cached.get("at"),
+            "leaders": view,
+            "signals": list(self.top_signals)[:25],
+            "last": dict(self.top_last),
+            "poll_seconds": TOP_POLL_SECONDS,
+            "stats": {
+                "trades": len(copies),
+                "wins": len(wins),
+                "win_rate": len(wins) / len(copies) if copies else None,
+                "pnl": sum(pnl),
+                "followed_exits": sum(1 for row in copies if row.get("exit_reason") == "copy_exit"),
+                "open": sum(1 for row in open_rows if row.get("strategy") == "toptrader"),
+                "today": self.store.trades_opened_on(self.mode, day, "toptrader"),
+            },
+        }
+
     def _save_sniper(self) -> None:
         self.store.set_json("sniper", self.sniper.to_dict())
 
@@ -1615,6 +1895,7 @@ class MemeEngine:
         totals = self._totals()
         open_rows = self.store.open_positions(self.mode)
         sniping = strategy == "sniper"
+        topping = strategy == "toptrader"
         same_strategy = [row for row in open_rows if (row.get("strategy") or "momentum") == strategy]
         try:
             cash = wallet.cash_usd(sol_usd)
@@ -1635,10 +1916,10 @@ class MemeEngine:
                 halted_drawdown=False,
             ),
             self.settings,
-            position_usd=self.sniper.position_usd if sniping else None,
-            max_open=self.settings.sniper_max_open if sniping else None,
-            max_trades=self.settings.sniper_max_per_day if sniping else None,
-            label="sniper-" if sniping else "",
+            position_usd=self.sniper.position_usd if sniping else (self.top_cfg.position_usd if topping else None),
+            max_open=self.settings.sniper_max_open if sniping else (self.top_cfg.max_open if topping else None),
+            max_trades=self.settings.sniper_max_per_day if sniping else (self.top_cfg.max_per_day if topping else None),
+            label="sniper-" if sniping else ("top-trader-" if topping else ""),
         )
         if not decision.allowed:
             self._record(cand, "risiko", False, decision.reason, cand["score"], cand["features"])
@@ -1661,7 +1942,8 @@ class MemeEngine:
             return False
 
         verdict: Verdict | None = None
-        if (not sniping or self.sniper.use_claude) and self.researcher.available():
+        # Top-trader-køb skal gå hurtigt efter traderen, så Claude springes over dér.
+        if (strategy == "momentum" or (sniping and self.sniper.use_claude)) and self.researcher.available():
             verdict = self.researcher.research(self._ai_payload(cand, buy_quote, sell_quote), self._lessons_text())
             # Research kan tage tid. Tjek straks de åbne positioner, så et stop-loss ikke venter.
             self._monitor(wallet, sol_usd)
@@ -1694,6 +1976,15 @@ class MemeEngine:
             reasoning = (
                 f"Sniper: ny token, {cand.get('age_minutes', 0):.0f} min. gammel, likviditet ${pair.liquidity_usd:,.0f}{holders}. "
                 f"Bestod rug-tjek og exit-rute. {exit_plan}"
+            )
+        elif topping:
+            lead = cand.get("leader") or {}
+            who = f"nr. {lead['rank']} på listen" if lead.get("rank") else "en top-trader"
+            earned = f", {'+' if lead['pnl_usd'] >= 0 else '-'}{_dk(abs(lead['pnl_usd']), 0)} USD i perioden" if isinstance(lead.get("pnl_usd"), (int, float)) else ""
+            exit_plan = "Sælger, når traderen sælger" if self.top_cfg.follow_sells else "Følger ikke traderens salg"
+            reasoning = (
+                f"Top-trader {source_label(cand['source'])[6:]} ({who}{earned}) købte for {_dk(lead.get('sol', 0))} SOL for {lead.get('age', 0):.0f} s siden. "
+                f"Bestod rug-tjek og exit-rute. {exit_plan}, stop ved -{self.top_cfg.stop_loss_pct * 100:.0f} %."
             )
         else:
             reasoning = f"Score {cand['score']:.2f}. Kilde: {source_label(cand['source'])}. Stærkeste signaler: {', '.join(drivers) or 'ingen enkeltstående'}."
@@ -2143,6 +2434,7 @@ class MemeEngine:
             ],
             "blacklist": list(reversed(self._blacklist())),
             "sniper": self._sniper_status(closed, self.store.open_positions(mode), today),
+            "toptraders": self._top_status(closed, self.store.open_positions(mode), today),
             "wallet": self.wallet_info(),
             "unlock": unlock,
             "events": self.store.recent_events(150),
@@ -2244,6 +2536,11 @@ class MemeEngine:
                 trail = max(0.0, peak * (1.0 - MOONBAG_TRAIL) - 1.0)
             stop_pct, tp_pct = -self.sniper.stop_loss_pct, None if row["partial_taken"] else self.sniper.take_profit_pct
             max_hold = self.sniper.max_hold_minutes
+        elif row.get("strategy") == "toptrader":
+            if peak >= 1.0 + TOP_TRAIL_ACTIVATION:
+                trail = peak * (1.0 - TOP_TRAIL) - 1.0
+            stop_pct, tp_pct = -self.top_cfg.stop_loss_pct, None
+            max_hold = self.top_cfg.max_hold_minutes
         else:
             if peak >= 1.0 + self.params.trail_activation_pct:
                 trail = peak * (1.0 - self.params.trailing_stop_pct) - 1.0

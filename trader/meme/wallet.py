@@ -99,7 +99,7 @@ class PaperWallet:
 
     def _penalty(self, strategy: str) -> float:
         """Ekstra slippage i papir: kursen når at flytte sig, før en rigtig handel lander."""
-        pct = self.settings.paper_slippage_pct + (self.settings.paper_sniper_extra_pct if strategy == "sniper" else 0.0)
+        pct = self.settings.paper_slippage_pct + (self.settings.paper_sniper_extra_pct if strategy in ("sniper", "toptrader") else 0.0)
         return max(0.0, min(0.5, pct / 100.0))
 
     def _failed(self, fee: float, what: str) -> Fill | None:

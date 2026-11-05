@@ -16,7 +16,7 @@ from typing import Any
 
 import httpx
 
-from trader.meme.config import DEXSCREENER_URL, RUGCHECK_URL, SOL_MINT, X_API_URL, MemeSettings
+from trader.meme.config import DEXSCREENER_URL, RUGCHECK_URL, SOL_MINT, SOLANATRACKER_URL, X_API_URL, MemeSettings
 
 logger = logging.getLogger("trader.meme.clients")
 
@@ -797,6 +797,144 @@ class Jupiter:
                     for mint in sorted(self._infos, key=lambda key: self._infos[key][0])[:1000]:
                         self._infos.pop(mint, None)
         return result
+
+
+# --------------------------------------------------------------------------- Solana Tracker (top-traders)
+
+SOLANATRACKER_RPM = 20
+_WALLET_KEYS = ("wallet", "address", "walletAddress", "wallet_address", "owner", "account", "trader")
+_PNL_KEYS = ("realizedPnl", "realized_pnl", "realizedPnlUsd", "realized", "totalPnl", "total_pnl", "pnlUsd", "pnl_usd", "pnl", "profit", "total")
+_WINRATE_KEYS = ("winRate", "win_rate", "winrate", "winPercentage", "win_percentage")
+_TRADES_KEYS = ("trades", "totalTrades", "total_trades", "tradeCount", "trade_count", "txCount", "numTrades", "totalTransactions")
+
+
+@dataclass
+class TopTrader:
+    wallet: str
+    rank: int
+    pnl_usd: float | None = None
+    win_rate: float | None = None
+    trades: int | None = None
+
+
+def _looks_like_wallet(text: str) -> bool:
+    return 32 <= len(text) <= 44 and all(ch in "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz" for ch in text)
+
+
+def _first_number(row: dict, keys: tuple[str, ...]) -> float | None:
+    for key in keys:
+        value = row.get(key)
+        if isinstance(value, dict):
+            for inner in ("realized", "total", "usd", "value", "amount"):
+                if isinstance(value.get(inner), (int, float, str)):
+                    number = _num(value.get(inner), float("nan"))
+                    if not math.isnan(number):
+                        return number
+            continue
+        if isinstance(value, (int, float)) or (isinstance(value, str) and value.strip()):
+            number = _num(value, float("nan"))
+            if not math.isnan(number):
+                return number
+    return None
+
+
+def _trader_rows(data: Any) -> list[dict]:
+    if isinstance(data, list):
+        return [row for row in data if isinstance(row, dict)]
+    if not isinstance(data, dict):
+        return []
+    for key in ("traders", "wallets", "leaderboard", "results", "items", "data"):
+        value = data.get(key)
+        if isinstance(value, list):
+            return [row for row in value if isinstance(row, dict)]
+        if isinstance(value, dict):
+            inner = _trader_rows(value)
+            if inner:
+                return inner
+    return []
+
+
+def parse_top_traders(data: Any) -> list[TopTrader]:
+    """Leaderboardet fra Solana Tracker. Feltnavnene læses forsigtigt, så små ændringer ikke vælter botten."""
+    traders: list[TopTrader] = []
+    seen: set[str] = set()
+    for row in _trader_rows(data):
+        wallet = ""
+        for key in _WALLET_KEYS:
+            value = row.get(key)
+            if isinstance(value, dict):
+                value = value.get("address") or value.get("wallet")
+            if isinstance(value, str) and _looks_like_wallet(value.strip()):
+                wallet = value.strip()
+                break
+        if not wallet or wallet in seen:
+            continue
+        seen.add(wallet)
+        # Tallene kan ligge direkte i rækken eller i en "stats"-blok. Kig begge steder.
+        places = [row["stats"], row] if isinstance(row.get("stats"), dict) else [row]
+
+        def pick(keys: tuple[str, ...]) -> float | None:
+            for place in places:
+                value = _first_number(place, keys)
+                if value is not None:
+                    return value
+            return None
+
+        win = pick(_WINRATE_KEYS)
+        if win is not None and win > 1.0:
+            win /= 100.0  # nogle API'er giver procent, andre en brøk
+        trades = pick(_TRADES_KEYS)
+        for place in places:
+            if trades is None and isinstance(place.get("buys"), (int, float)) and isinstance(place.get("sells"), (int, float)):
+                trades = float(place["buys"]) + float(place["sells"])
+        traders.append(
+            TopTrader(
+                wallet=wallet,
+                rank=len(traders) + 1,
+                pnl_usd=pick(_PNL_KEYS),
+                win_rate=win,
+                trades=int(trades) if trades is not None else None,
+            )
+        )
+    return traders
+
+
+def describe_shape(data: Any) -> str:
+    """Til forbindelsestesten: hvilke felter svaret har, hvis vi ikke kunne finde nogen wallets."""
+    rows = _trader_rows(data)
+    if rows:
+        return "felter: " + ", ".join(sorted(rows[0].keys())[:12])
+    if isinstance(data, dict):
+        return "nøgler: " + ", ".join(sorted(data.keys())[:12])
+    return f"type: {type(data).__name__}"
+
+
+class SolanaTracker:
+    """Dagens (eller ugens) mest profitable Solana-traders fra Solana Tracker."""
+
+    def __init__(self, settings: MemeSettings, *, transport: httpx.BaseTransport | None = None, budget: CallBudget | None = None) -> None:
+        self.budget = budget or CallBudget(SOLANATRACKER_RPM)
+        headers = {"x-api-key": settings.solanatracker_api_key} if settings.solanatracker_api_key else None
+        self.http = _Http(settings.solanatracker_url or SOLANATRACKER_URL, headers=headers, timeout=15.0, budget=self.budget, transport=transport)
+        self.last_shape = ""
+
+    def close(self) -> None:
+        self.http.close()
+
+    def usage(self) -> dict:
+        return self.budget.snapshot()
+
+    def top_traders(self, days: int = 1, limit: int = 10) -> list[TopTrader]:
+        data = self.http.get(
+            "/v2/pnl/leaderboard/top",
+            params={"days": str(int(days)), "limit": str(max(1, min(100, int(limit) * 2)))},
+            priority="normal",
+        )
+        traders = parse_top_traders(data)
+        self.last_shape = describe_shape(data)
+        if not traders:
+            raise SourceError(f"Solana Tracker gav ingen wallets ({self.last_shape}).")
+        return traders[: int(limit)]
 
 
 class JitoSender:

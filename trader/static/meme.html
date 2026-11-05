@@ -610,6 +610,36 @@
     </div>
   </section>
 
+  <section class="panel" id="panel-top" role="tabpanel" hidden>
+    <div class="card">
+      <div class="card-head">
+        <div class="sn-head"><h2 id="top-title"></h2><button class="switch" id="top-switch" type="button" role="switch" aria-checked="false" aria-label="Følg top-traders til eller fra"></button></div>
+        <span class="muted small-txt" id="top-when"></span>
+      </div>
+      <p class="muted small-txt" id="top-state" style="margin:-6px 0 12px"></p>
+      <div class="mini-stats num" id="top-stats"></div>
+      <div class="chips" id="top-chips" style="margin-top:12px"></div>
+    </div>
+    <div class="sn-grid">
+      <div class="card">
+        <div class="card-head"><h2 id="top-signals-title"></h2><span class="muted small-txt">Hvad de gjorde, og hvad botten gjorde</span></div>
+        <div id="top-signals"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2 id="top-leaders-title"></h2><span class="muted small-txt" id="top-leaders-note"></span></div>
+        <div id="top-leaders"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h2 id="top-form-title"></h2><span class="muted small-txt">Rug-tjek og exit-rute-tjek kører altid</span></div>
+      <div id="top-form"></div>
+    </div>
+    <div class="card savebar" id="top-savebar">
+      <span class="dirty" id="top-dirty" hidden></span>
+      <button class="btn primary" type="button" id="top-save">Gem indstillinger</button>
+    </div>
+  </section>
+
   <section class="panel" id="panel-radar" role="tabpanel" hidden>
     <div class="card">
       <div class="card-head"><h2 id="radar-title"></h2><span class="muted small-txt">Alle tokens botten har set på, og hvor de faldt fra</span></div>
@@ -759,6 +789,7 @@
 <script>
 "use strict";
 const ICONS = {
+  trophy: '<path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/>',
   home: '<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5"/>',
   menu: '<path d="M4 7h16M4 12h16M4 17h10"/>',
   more: '<rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><circle cx="17.5" cy="17.5" r="3.5"/>',
@@ -818,13 +849,13 @@ function icon(name, cls) { return `<svg class="i${cls ? " " + cls : ""}" viewBox
 const NAV = [
   ["hjem", "Hjem", "home", ["oversigt"]],
   ["handler", "Handler", "trades", ["positioner", "journal"]],
-  ["snipe", "Sniper", "target", ["sniper", "radar"]],
+  ["snipe", "Strategi", "target", ["sniper", "top", "radar"]],
   ["wallet", "Wallet", "wallet", ["wallets"]],
   ["mere", "Mere", "more", ["laering", "krav"]],
 ];
-const VIEWS = { oversigt: ["Oversigt", "grid"], positioner: ["Åbne", "coins"], journal: ["Historik", "book"], sniper: ["Sniper", "target"], radar: ["Radar", "radar"], wallets: ["Wallet", "wallet"], laering: ["Læring", "brain"], krav: ["Indstillinger", "shield"] };
-const VIEW_ORDER = ["oversigt", "positioner", "sniper", "radar", "journal", "laering", "wallets", "krav"];
-const TITLES = { handler: "Handler", snipe: "Sniper", wallet: "Wallet", mere: "Mere" };
+const VIEWS = { oversigt: ["Oversigt", "grid"], positioner: ["Åbne", "coins"], journal: ["Historik", "book"], sniper: ["Sniper", "target"], top: ["Top 10", "trophy"], radar: ["Radar", "radar"], wallets: ["Wallet", "wallet"], laering: ["Læring", "brain"], krav: ["Indstillinger", "shield"] };
+const VIEW_ORDER = ["oversigt", "positioner", "sniper", "radar", "journal", "laering", "wallets", "krav", "top"];
+const TITLES = { handler: "Handler", snipe: "Strategier", wallet: "Wallet", mere: "Mere" };
 const lastView = {};
 const STAGES = { "købt": "Købt", sniper: "Sniper-filter", marked: "Markedsfilter", rug: "Rug-tjek", score: "Score", rute: "Exit-rute", claude: "Claude", risiko: "Risiko", "køb": "Køb fejlede" };
 const STAGE_CLASS = { "købt": "ok", rug: "rug", claude: "claude", risiko: "risiko", rute: "rute", sniper: "risiko" };
@@ -954,8 +985,8 @@ function renderSeg() {
   put("seg", nav[3].map((v) => `<button type="button" role="tab" data-view="${v}" aria-selected="${v === active}">${icon(VIEWS[v][1], "sm")}${esc(VIEWS[v][0])}${navCounts[v] ? `<span class="count">${navCounts[v]}</span>` : ""}</button>`).join(""));
 }
 function renderTabs(data) {
-  navCounts = { positioner: (data.positions || []).length, journal: data.kpis.trades, sniper: data.sniper ? data.sniper.stats.open : 0, wallets: (data.copy_wallets || []).length };
-  const badge = { handler: navCounts.positioner, snipe: navCounts.sniper };
+  navCounts = { positioner: (data.positions || []).length, journal: data.kpis.trades, sniper: data.sniper ? data.sniper.stats.open : 0, top: data.toptraders ? data.toptraders.stats.open : 0, wallets: (data.copy_wallets || []).length };
+  const badge = { handler: navCounts.positioner, snipe: (navCounts.sniper || 0) + (navCounts.top || 0) };
   const current = navOf(active)[0];
   put("nav", NAV.map(([id, label, ic]) => `<button class="nav-item" type="button" data-nav="${id}"${id === current ? ' aria-current="page"' : ""}>${icon(ic)}<span>${esc(label)}</span>${badge[id] ? `<span class="badge">${badge[id]}</span>` : ""}</button>`).join(""));
   renderSeg();
@@ -1218,7 +1249,7 @@ function renderOverview(data) {
 
   document.getElementById("open-title").innerHTML = icon("coins") + "Åbne positioner";
   const pos = data.positions || [];
-  put("open-mini", pos.length ? pos.map((p) => `<button class="lrow tap" type="button" data-goto="positioner">${avatar(p.symbol, p.mint)}<div class="lmain"><div class="ltitle">${esc(p.symbol)}${p.strategy === "sniper" ? '<span class="stage-tag claude">sniper</span>' : ""}</div><div class="lsub">${esc(p.source)} · ${esc(minutes(p.minutes))} · ${esc(money(p.cost_usd))} indsat</div></div><div class="lright"><b class="${tone(p.change_pct)}">${esc(spct(p.change_pct))}</b><span class="${tone(p.unrealized_usd)}">${esc(signed(p.unrealized_usd))}</span></div></button>`).join("") : empty("Ingen åbne positioner. Botten køber kun, når et token består alle tjek.", "shield"));
+  put("open-mini", pos.length ? pos.map((p) => `<button class="lrow tap" type="button" data-goto="positioner">${avatar(p.symbol, p.mint)}<div class="lmain"><div class="ltitle">${esc(p.symbol)}${p.strategy === "sniper" ? '<span class="stage-tag claude">sniper</span>' : p.strategy === "toptrader" ? '<span class="stage-tag ok">top 10</span>' : ""}</div><div class="lsub">${esc(p.source)} · ${esc(minutes(p.minutes))} · ${esc(money(p.cost_usd))} indsat</div></div><div class="lright"><b class="${tone(p.change_pct)}">${esc(spct(p.change_pct))}</b><span class="${tone(p.unrealized_usd)}">${esc(signed(p.unrealized_usd))}</span></div></button>`).join("") : empty("Ingen åbne positioner. Botten køber kun, når et token består alle tjek.", "shield"));
 
   document.getElementById("lesson-title").innerHTML = icon("brain") + "Seneste lektion";
   const lesson = (data.lessons || [])[0];
@@ -1264,7 +1295,7 @@ function renderPositions(data) {
       <div class="pos-top">
         ${avatar(p.symbol, p.mint)}
         <div style="min-width:0">
-          <div class="sym">${esc(p.symbol)}${p.strategy === "sniper" ? ` <span class="chip accent">${icon("target", "sm")}Sniper</span>` : ""}</div>
+          <div class="sym">${esc(p.symbol)}${p.strategy === "sniper" ? ` <span class="chip accent">${icon("target", "sm")}Sniper</span>` : p.strategy === "toptrader" ? ` <span class="chip up">${icon("trophy", "sm")}Top 10</span>` : ""}</div>
           <div class="pos-sub">${esc(p.name || "")}${p.name ? " · " : ""}${esc(p.source)}${p.partial ? ' · <span class="up">delsalg taget</span>' : ""}</div>
         </div>
         <div><div class="pnl-big num ${tone(p.change_pct)}">${esc(spct(p.change_pct))}</div><div class="num ${tone(p.unrealized_usd)}" style="text-align:right;font-size:13px">${esc(signed(p.unrealized_usd))}</div></div>
@@ -1310,7 +1341,7 @@ function renderJournal(data) {
     const open = expanded.has(t.id);
     const sigs = (t.signatures || []).filter((s) => /^[1-9A-HJ-NP-Za-km-z]{40,100}$/.test(s));
     return `<div class="lrow tap" data-row="${esc(t.id)}" aria-expanded="${open}" role="button" tabindex="0">${avatar(t.symbol, t.mint)}
-      <div class="lmain"><div class="ltitle">${esc(t.symbol)}${t.strategy === "sniper" ? '<span class="stage-tag claude">sniper</span>' : ""}</div><div class="lsub">${esc(t.exit_reason)} · ${esc(minutes(t.hold_minutes))} · ${esc(stamp(t.closed_at))}</div></div>
+      <div class="lmain"><div class="ltitle">${esc(t.symbol)}${t.strategy === "sniper" ? '<span class="stage-tag claude">sniper</span>' : t.strategy === "toptrader" ? '<span class="stage-tag ok">top 10</span>' : ""}</div><div class="lsub">${esc(t.exit_reason)} · ${esc(minutes(t.hold_minutes))} · ${esc(stamp(t.closed_at))}</div></div>
       <div class="lright"><b class="${tone(t.pnl_usd)}">${esc(signed(t.pnl_usd))}</b><span class="${tone(t.pnl_pct)}">${esc(spct(t.pnl_pct))}</span></div>
       ${open ? `<div class="ldetail"><div class="stats3 num"><div><span>Indsat</span><b>${esc(money(t.cost_usd))}</b></div><div><span>Top</span><b>${esc(spct(t.peak_pct))}</b></div><div><span>Kilde</span><b style="font-size:12.5px">${esc(t.source)}</b></div></div><p class="why" style="margin-top:0">${esc(t.reasoning || "")}</p>${t.ai_summary ? `<p class="why"><b>Claude:</b> ${esc(t.ai_summary)}</p>` : ""}<div class="links">${tokenLinks(t.mint, t.pair_url)}${sigs.map((s) => `<a href="https://solscan.io/tx/${s}" target="_blank" rel="noopener noreferrer">${icon("ext", "sm")}tx ${esc(short(s))}</a>`).join("")}</div></div>` : ""}
     </div>`;
@@ -1822,6 +1853,7 @@ function render(data) {
   renderOverview(data);
   renderPositions(data);
   renderSniper(data);
+  renderTop(data);
   renderRadar(data);
   renderJournal(data);
   renderLearning(data);
@@ -2027,7 +2059,7 @@ document.addEventListener("keydown", (ev) => {
   if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
   const tag = (ev.target.tagName || "").toLowerCase();
   if (tag === "input" || tag === "textarea") { if (ev.key === "Escape") ev.target.blur(); return; }
-  if (/^[1-8]$/.test(ev.key)) { setTab(VIEW_ORDER[Number(ev.key) - 1], true); return; }
+  if (/^[1-9]$/.test(ev.key)) { setTab(VIEW_ORDER[Number(ev.key) - 1], true); return; }
   const k = ev.key.toLowerCase();
   if (k === "s") document.getElementById("scan").click();
   else if (k === "p") document.getElementById("pause").click();
@@ -2117,6 +2149,134 @@ setInterval(() => {
   if (Date.now() - lastPoll >= wait - 50) { lastPoll = Date.now(); refresh(); }
 }, 1000);
 document.addEventListener("visibilitychange", () => { if (!document.hidden && Date.now() - lastPoll > 3000) { lastPoll = Date.now(); refresh(); } });
+
+/* ---------- Top 10: følg dagens mest profitable traders ---------- */
+let topDraft = null;
+let topDirty = false;
+let topKey = "";
+const TOP_UNIT = { pct: "%", usd: "$", min: "t.", sec: "sek.", int: "", sol: "SOL" };
+function topToUi(f, v) { return f.kind === "pct" ? Math.round(v * 1000) / 10 : f.kind === "min" ? Math.round(v / 6) / 10 : v; }
+function topFromUi(f, v) { return f.kind === "pct" ? v / 100 : f.kind === "min" ? v * 60 : v; }
+function topField(f) {
+  if (f.kind === "bool") return `<div class="field"><div class="field-top"><span>${esc(f.label)}</span><button class="switch" type="button" role="switch" aria-checked="${topDraft[f.name] ? "true" : "false"}" data-tb="${f.name}" aria-label="${esc(f.label)}"></button></div><span class="muted small-txt">Botten sælger hele positionen, så snart traderen sælger tokenet. Stop-loss og tidsgrænse gælder stadig.</span></div>`;
+  if (f.kind === "days") return `<div class="field"><div class="field-top"><span>${esc(f.label)}</span><div class="seg" role="group" aria-label="Periode">${[[1, "I dag"], [7, "7 dage"]].map(([v, l]) => `<button type="button" data-tdays="${v}" aria-pressed="${Number(topDraft.days) === v}">${l}</button>`).join("")}</div></div><span class="muted small-txt">Hvem der har tjent mest det seneste døgn eller den seneste uge.</span></div>`;
+  const v = topToUi(f, topDraft[f.name]);
+  const lo = topToUi(f, f.bounds[0]), hi = topToUi(f, f.bounds[1]);
+  const step = f.kind === "pct" ? 1 : f.kind === "usd" ? 0.5 : f.kind === "min" ? 0.5 : f.kind === "sol" ? 0.05 : f.kind === "sec" ? 10 : 1;
+  return `<div class="field"><div class="field-top"><span>${esc(f.label)}</span></div><div class="row"><input type="number" min="${lo}" max="${hi}" step="${step}" value="${esc(v)}" data-tf="${f.name}" aria-label="${esc(f.label)}"><span class="muted">${esc(TOP_UNIT[f.kind] || "")} · ${esc(fmtNum.format(lo))}–${esc(fmtNum.format(hi))}</span></div></div>`;
+}
+function renderTopForm(data) {
+  const fields = data.toptraders.fields;
+  const order = ["count", "days", "position_usd", "max_open", "max_per_day", "follow_sells", "stop_loss_pct", "max_hold_minutes", "min_liquidity_usd", "max_signal_age_seconds", "min_leader_sol"];
+  const byName = {}; for (const f of fields) byName[f.name] = f;
+  put("top-form", `<div class="sn-grid" style="gap:0 24px">${order.filter((n) => byName[n]).map((n) => topField(byName[n])).join("")}</div>`);
+}
+function markTopDirty() {
+  topDirty = true;
+  const bar = document.getElementById("top-savebar");
+  bar.classList.add("floating");
+  const d = document.getElementById("top-dirty");
+  d.hidden = false;
+  d.innerHTML = icon("alert", "sm") + "Ændringerne er ikke gemt";
+}
+function renderTop(data) {
+  const tt = data.toptraders;
+  if (!tt) return;
+  document.getElementById("top-title").innerHTML = icon("trophy") + "Følg top-traders";
+  document.getElementById("top-switch").setAttribute("aria-checked", tt.enabled ? "true" : "false");
+  const n = tt.settings.count;
+  const period = tt.settings.days === 1 ? "dagens" : "ugens";
+  document.getElementById("top-state").textContent = tt.enabled
+    ? `Følger ${period} ${n} mest profitable traders (${tt.source}). Køber lige efter dem og sælger, når de sælger. Kigger efter nye handler hvert ${tt.poll_seconds}. sekund.`
+    : `Slået fra. Tænd for at købe lige efter ${period} ${n} mest profitable traders og sælge, når de sælger.`;
+  document.getElementById("top-when").textContent = tt.last && tt.last.at ? "seneste kig " + ago(tt.last.at) : "";
+  const st = tt.stats;
+  put("top-stats", [
+    ["Kopierede handler", fmtInt.format(st.trades)],
+    ["Gevinstprocent", st.win_rate == null ? "—" : pct(st.win_rate)],
+    ["Resultat", `<span class="${tone(st.pnl)}">${esc(signed(st.pnl))}</span>`],
+    ["Åbne", `${st.open} / ${tt.settings.max_open}`],
+    ["I dag", `${st.today} / ${tt.settings.max_per_day}`],
+    ["Solgt med traderen", fmtInt.format(st.followed_exits)],
+  ].map(([l, v]) => `<div><span>${esc(l)}</span><b>${v}</b></div>`).join(""));
+  const chips = [];
+  if (!tt.api) chips.push(`<span class="chip warn">${icon("alert", "sm")}Ingen SOLANATRACKER_API_KEY: bruger dine fulgte wallets i stedet</span>`);
+  if (tt.last && tt.last.error) chips.push(`<span class="chip warn" title="${esc(tt.last.error)}">${icon("alert", "sm")}${esc(tt.last.error.slice(0, 90))}</span>`);
+  if (tt.enabled && tt.last && tt.last.watching != null) chips.push(`<span class="chip">Følger <b class="num">${esc(tt.last.watching)}</b> wallets</span>`);
+  put("top-chips", chips.join("") + `<p class="note" style="flex-basis:100%;margin-top:${chips.length ? 4 : 0}px">Dagens vindere er ofte heldige eller bots, og du køber altid lidt efter dem til en højere kurs. Følg resultatet her på papir, før du bruger rigtige penge.</p>`);
+
+  document.getElementById("top-leaders-title").innerHTML = icon("trophy") + (tt.settings.days === 1 ? "Dagens top-traders" : "Ugens top-traders");
+  document.getElementById("top-leaders-note").textContent = tt.api ? (tt.refreshed_at ? "opdateret " + ago(tt.refreshed_at) : "hentes, når du tænder") : "fra Wallet-fanen";
+  const leaders = tt.leaders || [];
+  const usd0 = (v) => (Math.abs(v) >= 100 ? (v > 0 ? "+" : v < 0 ? "-" : "") + fmtInt.format(Math.abs(v)) + " $" : signed(v));
+  put("top-leaders", leaders.length ? leaders.map((r) => {
+    const bits = [];
+    if (r.win_rate != null) bits.push(`${esc(pct(r.win_rate))} vinder`);
+    if (r.trades != null) bits.push(`${esc(fmtInt.format(r.trades))} handler`);
+    if (r.copied) bits.push(`kopieret ${esc(r.copied)}× <span class="${tone(r.copied_pnl)}">${esc(signed(r.copied_pnl))}</span>`);
+    bits.push(`<a href="https://gmgn.ai/sol/address/${esc(safeMint(r.wallet))}" target="_blank" rel="noopener noreferrer">GMGN</a>`);
+    return `<div class="lrow">${avatar(r.wallet.slice(0, 2), r.wallet)}<div class="lmain">
+      <div class="ltitle"><span class="muted num">#${esc(r.rank)}</span><span class="addr">${esc(short(r.wallet))}</span>${r.holding ? '<span class="stage-tag ok">ejer</span>' : ""}${r.muted ? '<span class="stage-tag rug">slået fra</span>' : ""}</div>
+      <div class="lsub">${bits.join(" · ")}</div>
+    </div><div class="lright"><b class="${tone(r.pnl_usd)}">${r.pnl_usd == null ? "—" : esc(usd0(r.pnl_usd))}</b><span class="muted">${tt.settings.days === 1 ? "i dag" : "7 dage"}</span></div></div>`;
+  }).join("")
+    : empty(tt.api ? (tt.enabled ? "Listen hentes. Det tager et øjeblik." : "Tænd for funktionen, så hentes dagens top-traders.") : "Ingen wallets endnu. Tilføj traders under Wallet → Fulgte wallets, eller sæt SOLANATRACKER_API_KEY for at få listen automatisk.", "trophy"));
+
+  document.getElementById("top-signals-title").innerHTML = icon("activity") + "Seneste signaler";
+  const sigs = tt.signals || [];
+  const tag = { "købt": "ok", "sælger": "claude", "sprunget over": "" };
+  put("top-signals", sigs.length ? sigs.map((g) => `<div class="lrow two">${avatar(g.symbol || g.mint, g.mint)}<div class="lmain">
+      <div class="ltitle">${esc(g.symbol || short(g.mint))}<span class="stage-tag ${tag[g.action] || ""}">${esc(g.action)}</span></div>
+      <div class="lsub">${esc(short(g.wallet))} ${g.side === "buy" ? "købte" : "solgte"}${g.sol ? ` for ${esc(fmtNum.format(g.sol))} SOL` : ""}. ${esc(g.detail)}</div>
+      <div class="lmeta"><span>${esc(ago(g.ts))}</span>${tokenLinks(g.mint, "")}</div>
+    </div></div>`).join("") : empty(tt.enabled ? "Ingen handler endnu. Botten husker kun, hvor traderne er, første gang, og kopierer derefter nye køb." : "Signaler fra traderne vises her, når funktionen er tændt.", "activity"));
+
+  document.getElementById("top-form-title").innerHTML = icon("sliders") + "Indstillinger";
+  const key = JSON.stringify(tt.settings) + JSON.stringify(tt.fields.map((f) => f.bounds));
+  if (!topDirty && key !== topKey) {
+    topKey = key;
+    topDraft = { ...tt.settings };
+    renderTopForm(data);
+  }
+}
+document.getElementById("top-switch").addEventListener("click", () => {
+  const on = !(state && state.toptraders && state.toptraders.enabled);
+  act(() => post("/api/meme/toptraders", { enabled: on }), on ? "Top-trader-kopiering er tændt" : "Top-trader-kopiering er slukket");
+});
+document.getElementById("panel-top").addEventListener("click", (ev) => {
+  const sw = ev.target.closest("[data-tb]");
+  const day = ev.target.closest("[data-tdays]");
+  if (sw && topDraft) {
+    topDraft[sw.dataset.tb] = !topDraft[sw.dataset.tb];
+    sw.setAttribute("aria-checked", topDraft[sw.dataset.tb] ? "true" : "false");
+    markTopDirty();
+  } else if (day && topDraft) {
+    topDraft.days = Number(day.dataset.tdays);
+    document.querySelectorAll("[data-tdays]").forEach((b) => b.setAttribute("aria-pressed", Number(b.dataset.tdays) === topDraft.days ? "true" : "false"));
+    markTopDirty();
+  }
+});
+document.getElementById("panel-top").addEventListener("input", (ev) => {
+  const name = ev.target.dataset && ev.target.dataset.tf;
+  if (!name || !topDraft || !state) return;
+  const f = state.toptraders.fields.find((x) => x.name === name);
+  const v = Number(ev.target.value);
+  if (!f || Number.isNaN(v)) return;
+  topDraft[name] = topFromUi(f, v);
+  markTopDirty();
+});
+document.getElementById("top-save").addEventListener("click", () => {
+  if (!topDraft) return;
+  const { enabled, ...rest } = topDraft;
+  act(async () => {
+    const b = await post("/api/meme/toptraders", rest);
+    topDirty = false;
+    topKey = "";
+    document.getElementById("top-savebar").classList.remove("floating");
+    document.getElementById("top-dirty").hidden = true;
+    return b;
+  }, "Indstillingerne for top-traders er gemt");
+});
 
 /* ---------- Pop-op-ark (i stedet for browserens grå bokse) ---------- */
 let sheetSeq = 0;
