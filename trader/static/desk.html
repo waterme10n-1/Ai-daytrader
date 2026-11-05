@@ -125,19 +125,12 @@
   .node .nm { font-size: 11px; font-weight: 700; letter-spacing: 0.05em; color: var(--c); }
   .node .when { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 
-  /* beskeder og uge */
+  /* beskeder */
   .alerts { display: grid; gap: 8px; margin-bottom: 12px; }
   .alert { display: flex; gap: 10px; align-items: flex-start; padding: 11px 14px; border-radius: 14px; font-size: 13.5px; background: var(--info-soft); color: var(--text); border: 1px solid var(--border); }
   .alert::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--info); margin-top: 6px; flex: none; }
   .alert.warning { background: var(--warn-soft); } .alert.warning::before { background: var(--warn); }
   .alert.error { background: var(--down-soft); } .alert.error::before { background: var(--down); }
-  .week { padding: 14px 16px; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow); margin-bottom: 14px; font-size: 13.5px; }
-  .week-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 8px; }
-  .week-head b { font-family: "Space Grotesk", sans-serif; font-size: 15px; }
-  .weeks { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-bottom: 9px; }
-  .weeks span { height: 6px; border-radius: 3px; background: var(--raised); }
-  .weeks span.done { background: var(--hero); }
-  .weeks span.now { background: var(--hero); opacity: 0.55; }
   .up { color: var(--up); } .down { color: var(--down); }
   section[hidden] { display: none; }
 
@@ -269,7 +262,7 @@
       <button role="tab" data-tab="approve" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>Godkend</span><span class="badge" id="badge" hidden>0</span></button>
       <button role="tab" data-tab="trades" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg><span>Handler</span></button>
       <button role="tab" data-tab="bots" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 4v4M9 13h.01M15 13h.01"/></svg><span>Bots</span></button>
-      <button role="tab" data-tab="month" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><span>Måneden</span></button>
+      <button role="tab" data-tab="learn" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><span>Læring</span></button>
     </nav>
   </div>
 </header>
@@ -291,7 +284,6 @@
   </div>
   <div class="crew" id="crew" aria-label="Holdet"></div>
   <div class="alerts" id="alerts"></div>
-  <div class="week" id="week" hidden></div>
 
   <section id="tab-chat">
     <div class="chat" id="chat" aria-live="polite"></div>
@@ -353,25 +345,19 @@
     </div>
   </section>
 
-  <section id="tab-month" hidden>
+  <section id="tab-learn" hidden>
     <div class="card" style="margin-bottom:12px">
       <h3>Bordet mod S&amp;P 500</h3>
       <div id="compare" class="small muted">Henter …</div>
     </div>
-    <div class="plan">
-      <div class="card"><h3>Uge 1</h3><p class="small">Godkend intet. Læs, hvad hver bot skriver, og tjek, at SKEPTIC faktisk siger nej. Vinker den de fleste handler igennem, så stram dens regler før uge 2.</p></div>
-      <div class="card"><h3>Uge 2–4</h3><p class="small">Godkend de papirhandler, du er enig i. Skriv ned, hvilke du ville springe over og hvorfor. Så finder du ud af, om bordet eller din mavefornemmelse handler bedst.</p></div>
-      <div class="card"><h3>Månedens slutning</h3><p class="small">Sammenlign bordets resultat med bare at holde S&amp;P 500. Slår bordet det ikke på papir, hjælper rigtige penge ikke.</p></div>
+    <div class="card" style="margin-bottom:12px">
+      <h3>Lærte regler</h3>
+      <p class="muted small" style="margin:0 0 10px">Hver handel tæller, også dem bordet sagde nej til: for dem regnes det ud, hvad der ville være sket. Taber et mønster mindst <span id="learn-min">3</span> gange med højst en tredjedel vindere, slår reglen til, og den slags køb får WAIT. Reglen slår selv fra igen, når mønstret vinder oftere.</p>
+      <div id="learn-rules"></div>
     </div>
-    <div class="card" style="margin-top:12px">
-      <h3>Fem ting, der bider</h3>
-      <ul class="small" style="margin:0;padding-left:18px">
-        <li>Store tal fra andre er skærmbilleder, ikke bevis. Ingen viser de tabende uger.</li>
-        <li>En SKEPTIC, der siger ja til alt, er i stykker. Den skal afvise langt mere, end den godkender.</li>
-        <li>Rammer Alpaca en fejl, bliver bordet stille. Tjek nøglerne, hvis der ikke sker noget i åbningstiden.</li>
-        <li>Claude koster penge pr. kald. Bordet har et hårdt dagsbudget, og kun NEWS og SKEPTIC bruger Claude af sig selv.</li>
-        <li>Det er dit valg hver gang. Bottene foreslår, du godkender. Intet her er finansiel rådgivning.</li>
-      </ul>
+    <div class="card">
+      <h3>Lektioner</h3>
+      <div id="lessons" class="small"></div>
     </div>
   </section>
 </main>
@@ -457,10 +443,10 @@ let tab = "chat";
 function showTab(name) {
   tab = name;
   document.querySelectorAll("nav.tabs button").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === name)));
-  ["chat", "approve", "trades", "bots", "month"].forEach((t) => { $("tab-" + t).hidden = t !== name; });
+  ["chat", "approve", "trades", "bots", "learn"].forEach((t) => { $("tab-" + t).hidden = t !== name; });
   $("composer").hidden = name !== "chat";
   document.body.classList.toggle("chatting", name === "chat");
-  if (name === "month") loadCompare();
+  if (name === "learn") loadCompare();
   if (name === "chat") scrollDown(true);
   try { localStorage.setItem("desk-tab", name); } catch (e) {}
 }
@@ -519,6 +505,20 @@ function ago(iso) {
   if (min < 1440) return hhmm(iso);
   return d.toLocaleDateString("da-DK", { day: "numeric", month: "short" });
 }
+function renderLearning(l) {
+  $("learn-min").textContent = l.min_trades || 3;
+  $("learn-rules").innerHTML = (l.rules || []).map((r) => {
+    const stats = r.n ? `${r.wins} af ${r.n} vandt · snit ${r.avg_pct > 0 ? "+" : ""}${r.avg_pct}%` : "Ingen handler af den slags endnu";
+    return `<div class="row" style="padding:9px 0;border-bottom:1px solid var(--border);flex-wrap:nowrap;align-items:flex-start">
+      <span class="tag ${r.active ? "SKIP" : ""}" style="flex:none;min-width:58px;text-align:center">${r.active ? "AKTIV" : "slukket"}</span>
+      <div><b>${esc(r.label)}</b><div class="muted small">${esc(stats)}</div></div></div>`;
+  }).join("");
+  const lessons = l.lessons || [];
+  $("lessons").innerHTML = lessons.length
+    ? lessons.map((x) => `<div style="padding:8px 0;border-bottom:1px solid var(--border)"><span class="muted">${esc(x.day.slice(5))}</span> · ${esc(x.text)}</div>`).join("")
+    : `<p class="muted" style="margin:0">Ingen lektioner endnu. Efter hver handelsdag skriver bordet her, hvad det lærte.</p>`;
+}
+
 function renderCrew() {
   const keys = ["scout", "news", "chart", "skeptic", "sizer", "executor"];
   $("crew").innerHTML = keys.map((k) => {
@@ -570,22 +570,12 @@ function render(data, fresh) {
     data.paused ? "På pause" : "",
   ].filter(Boolean).map((t) => `<span class="hchip">${esc(t)}</span>`).join("");
   $("alerts").innerHTML = (data.alerts || []).map((a) => `<div class="alert ${esc(a.level)}">${esc(a.text)}</div>`).join("");
-  const pm = data.paper_month || {};
-  const week = $("week");
-  if (pm.week) {
-    const tip = data.params.auto_approve ? "Autopilot køber selv på papir. Læs med, og tjek at SKEPTIC siger nej langt oftere end ja."
-      : pm.week === 1 ? "Godkend intet i denne uge. Læs med, og tjek at SKEPTIC siger nej."
-      : pm.week <= 4 ? "Godkend de papirhandler, du er enig i, og skriv ned, hvilke du ville springe over."
-      : "Måneden er gået. Sammenlign med S&P 500 under Måneden, før du overvejer noget som helst andet.";
-    const bars = [1, 2, 3, 4].map((n) => `<span class="${n < pm.week ? "done" : n === pm.week ? "now" : ""}"></span>`).join("");
-    week.innerHTML = `<div class="week-head"><b>Papirmåneden · uge ${Math.min(pm.week, 4)} af 4</b><span class="muted small">${pm.week > 4 ? "færdig" : ""}</span></div><div class="weeks">${bars}</div><div class="muted">${esc(tip)}</div>`;
-    week.hidden = false;
-  } else week.hidden = true;
   $("s-equity").innerHTML = data.account ? `${money(data.account.equity)}<small>USD</small>` : "–";
   $("s-flags").textContent = `${data.today.flags} / ${data.today.max_flags}`;
   $("s-open").textContent = `${data.today.open} / ${data.today.max_open}`;
   $("s-pnl").textContent = money(data.kpis.pnl, true);
   renderCrew();
+  renderLearning(data.learning || {});
   const count = (data.approvals || []).length;
   $("badge").hidden = !count; $("badge").textContent = count;
   notifyApprovals(data.approvals || []);
@@ -697,7 +687,7 @@ async function loadCompare() {
       ${row("S&P 500 (SPY)", c.spy_pct === null ? "–" : `${c.spy_pct > 0 ? "+" : ""}${c.spy_pct}%`)}
       ${row("Handler", c.trades)}
       ${row("Vindere", c.win_rate === null ? "–" : Math.round(c.win_rate * 100) + "%")}
-      ${row("Dag", c.days + 1)}
+      ${row("Dage", c.days + 1)}
     </div><p style="margin:10px 0 0;color:var(--text)">${esc(c.text)}</p>`;
   } catch (err) { $("compare").textContent = "Kunne ikke hente sammenligningen."; }
 }
@@ -735,7 +725,7 @@ async function refresh() {
     $("alerts").innerHTML = `<div class="alert error">Ingen forbindelse til serveren.</div>`;
   } finally { busy = false; }
 }
-try { const t = localStorage.getItem("desk-tab"); if (t) showTab(t); } catch (e) {}
+try { const t = localStorage.getItem("desk-tab"); if (t && document.getElementById("tab-" + t)) showTab(t); } catch (e) {}
 refresh();
 setInterval(() => { if (!document.hidden) refresh(); }, 4000);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
