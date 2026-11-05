@@ -535,9 +535,8 @@
           <div id="open-mini"></div>
         </div>
         <div class="card" id="strat-card">
-          <div class="card-head"><h2 id="strat-title"></h2><div class="sn-head"><span class="muted small-txt">Strategi-vagt</span><button class="switch" id="strat-guard" type="button" role="switch" aria-checked="false" aria-label="Strategi-vagt til eller fra"></button></div></div>
+          <div class="card-head"><h2 id="strat-title"></h2><span class="muted small-txt">Resultat pr. strategi</span></div>
           <div id="strats"></div>
-          <p class="note" id="strat-note"></p>
         </div>
         <div class="card">
           <div class="card-head"><h2 id="funnel-title"></h2><span class="muted small-txt" id="funnel-when"></span></div>
@@ -2322,7 +2321,6 @@ const STRAT_ICON = { momentum: "activity", sniper: "target", toptrader: "trophy"
 function renderStrategies(data) {
   const list = data.strategies || [];
   document.getElementById("strat-title").innerHTML = icon("bars") + "Hvad tjener penge?";
-  document.getElementById("strat-guard").setAttribute("aria-checked", data.strategy_guard ? "true" : "false");
   document.getElementById("auto-targets").setAttribute("aria-checked", data.auto_targets ? "true" : "false");
   put("strats", list.map((st) => {
     let tag = "", action = "";
@@ -2343,9 +2341,6 @@ function renderStrategies(data) {
       </div>
       <div class="lright"><b class="${tone(st.pnl)}">${esc(signed(st.pnl))}</b><span>${action}</span></div></div>`;
   }).join(""));
-  document.getElementById("strat-note").textContent = data.strategy_guard
-    ? "Strategi-vagten sætter en strategi på hold i 24 timer (længere, hvis det sker igen), når dens seneste 8–12 handler taber penge. Imens følger den tokens som skyggehandler og lærer videre."
-    : "Strategi-vagten er slået fra. Tabende strategier bliver ved med at handle.";
 }
 document.getElementById("strat-card").addEventListener("click", (ev) => {
   const hold = ev.target.closest("[data-shold]");
@@ -2358,9 +2353,6 @@ document.getElementById("strat-card").addEventListener("click", (ev) => {
   } else if (resume) {
     const id = resume.dataset.sresume;
     act(() => post("/api/meme/strategies", { resume: id }), `${label(id)} kører igen`);
-  } else if (ev.target.closest("#strat-guard")) {
-    const on = !(state && state.strategy_guard);
-    act(() => post("/api/meme/strategies", { guard: on }), on ? "Strategi-vagten er slået til" : "Strategi-vagten er slået fra");
   }
 });
 document.getElementById("auto-targets").addEventListener("click", () => {

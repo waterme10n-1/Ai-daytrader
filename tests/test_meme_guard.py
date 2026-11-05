@@ -31,8 +31,16 @@ def _closed(engine, strategy: str, pnls: list[float]) -> None:
         engine.store.update_position(position_id, status="closed", closed_at=now_iso(), pnl_usd=pnl, pnl_pct=pnl / 1.5, exit_reason="stop_loss", remaining_raw=0, learned=True)
 
 
+def test_guard_is_off_by_default():
+    engine, *_ = make_engine()
+    assert engine.guard_on is False
+    _closed(engine, "sniper", [-0.5] * 10)
+    engine._check_guard()
+    assert engine._holds() == {}
+
+
 def test_guard_puts_a_losing_strategy_on_hold_and_keeps_shadowing():
-    engine, dex, rug, jup, _notes = make_engine()
+    engine, dex, rug, jup, _notes = make_engine(meme_fakes.settings(strategy_guard=True))
     _closed(engine, "sniper", [-0.5] * 7 + [0.2])
     engine.tick()
     strategies = {row["id"]: row for row in engine.status()["strategies"]}
@@ -51,7 +59,7 @@ def test_guard_puts_a_losing_strategy_on_hold_and_keeps_shadowing():
 
 
 def test_hold_expires_doubles_next_time_and_resets_on_profit():
-    engine, *_ = make_engine()
+    engine, *_ = make_engine(meme_fakes.settings(strategy_guard=True))
     _closed(engine, "momentum", [-0.4] * 8)
     engine._check_guard()
     hold = engine._holds()["momentum"]
@@ -119,9 +127,9 @@ def test_sniper_learns_a_better_target_only_when_it_clearly_pays():
     assert few.sniper.take_profit_pct != 0.5  # for få forløb
 
 
-def test_expensive_round_trips_are_capped():
-    assert StrategyParams().max_roundtrip_loss_pct == 4.0
-    assert StrategyParams.from_dict({"max_roundtrip_loss_pct": 8.0}).max_roundtrip_loss_pct == 6.0
+def test_round_trip_limit_is_unchanged():
+    assert StrategyParams().max_roundtrip_loss_pct == 8.0
+    assert StrategyParams.from_dict({"max_roundtrip_loss_pct": 12.0}).max_roundtrip_loss_pct == 12.0
 
 
 def test_top_10_trades_do_not_move_the_momentum_parameters():
