@@ -443,3 +443,13 @@ def test_autopilot_and_scan_interval_can_be_changed(tmp_path):
     with pytest.raises(ValueError):
         desk.update_params({"scan_minutes": 0})
     assert DeskSettings().auto_approve is True and DeskSettings().scan_minutes == 1
+
+
+def test_keys_are_cleaned_and_wrong_keys_are_explained():
+    from trader.desk.config import clean_key, key_problem
+
+    assert clean_key(' "PKABC 123" ') == "PKABC123"
+    assert clean_key("DESK_ALPACA_API_KEY=PKXYZ") == "PKXYZ"
+    assert "live-nøgle" in key_problem("AKLIVE")
+    assert "byttet om" in key_problem("abc123secret")
+    assert key_problem("PKFINE") == ""

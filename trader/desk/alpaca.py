@@ -194,6 +194,12 @@ class AlpacaPaper:
             raise BrokerError(f"Alpaca kunne ikke kontaktes: {exc}") from exc
         if response.status_code == 404 and method == "DELETE":
             return {}
+        if response.status_code in (401, 403):
+            raise BrokerError(
+                f"Alpaca afviser nøglerne ({response.status_code}). Brug papirnøgler (Key starter med PK) fra "
+                "app.alpaca.markets, tjek at Key og Secret ikke er byttet om, og lav nye nøgler, hvis du har "
+                "genereret nogen siden."
+            )
         if response.status_code >= 400:
             detail = response.text[:300]
             raise BrokerError(f"Alpaca svarede {response.status_code}: {detail}")

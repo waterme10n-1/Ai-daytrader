@@ -25,6 +25,7 @@ from trader.desk.config import (
     HARD_MAX_STOP_PCT,
     HARD_MIN_REWARD_RISK,
     DeskSettings,
+    key_problem,
     parse_watchlist,
 )
 from trader.desk.store import DeskStore
@@ -929,6 +930,9 @@ class DeskEngine:
         alerts: list[dict] = []
         if not self.keys_present:
             alerts.append({"level": "warning", "text": "Mangler Alpaca-papirnøgler. Sæt DESK_ALPACA_API_KEY og DESK_ALPACA_SECRET_KEY i Railway."})
+        problem = key_problem(self.base.alpaca_api_key) if not self._injected_broker else ""
+        if problem:
+            alerts.append({"level": "error", "text": problem})
         if not self.brain.configured:
             alerts.append({"level": "info", "text": "Ingen Claude-nøgle. NEWS og SKEPTIC kører på faste regler, og SKEPTIC er strengere end normalt."})
         elif self.brain.budget_left() < 0.15:
