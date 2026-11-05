@@ -62,4 +62,6 @@ def test_every_page_links_to_the_other_two(tmp_path):
             assert 'class="appnav"' in page, path
             for target in ('href="/meme"', 'href="/desk"', 'href="/"'):
                 assert target in page, (path, target)
-            assert page.count('aria-current="page"') == 1, path
+            nav = page[page.index('<nav class="appnav"'):]
+            nav = nav[: nav.index('</nav>')]
+            assert nav.count('aria-current="page"') == 1, path
