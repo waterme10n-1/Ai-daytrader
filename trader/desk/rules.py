@@ -288,3 +288,38 @@ def shadow_outcome(entry: float, stop: float, target: float, bars: list[Bar], si
         "pct": round(pct, 2),
         "reason": "close",
     }
+
+
+# ---------------------------------------------------------------------- radar
+def quotes(symbols: list[str], intraday: dict, daily: dict, now: datetime, flagged: list[str], points: int = 24) -> list[dict]:
+    """Kurs, dagens bevægelse, timens bevægelse, volumen og en lille kurve pr. ticker. Kun fra barer, vi allerede har."""
+    out = []
+    for symbol in symbols:
+        bars = completed(intraday.get(symbol, []), now)
+        if not bars:
+            continue
+        last = bars[-1]
+        day_open = bars[0].open
+        start = last.ts - timedelta(minutes=60)
+        window = [bar for bar in bars if bar.ts > start]
+        ref = window[0].open if window else day_open
+        per_minute = normal_volume_per_minute(daily.get(symbol, []))
+        vol_x = (sum(bar.volume for bar in window) / max(1, len(window))) / per_minute if per_minute > 0 else 0.0
+        level = vwap(bars) or last.close
+        step = max(1, len(bars) // points)
+        spark = [round(bar.close, 2) for bar in bars[::step]][-points:]
+        if spark and spark[-1] != round(last.close, 2):
+            spark.append(round(last.close, 2))
+        out.append(
+            {
+                "symbol": symbol,
+                "price": round(last.close, 2),
+                "day_pct": round((last.close - day_open) / day_open * 100.0, 2) if day_open else 0.0,
+                "move_pct": round((last.close - ref) / ref * 100.0, 2) if ref else 0.0,
+                "volume_x": round(vol_x, 1),
+                "vs_vwap_pct": round((last.close - level) / level * 100.0, 2) if level else 0.0,
+                "flagged": symbol in flagged,
+                "spark": spark,
+            }
+        )
+    return out
