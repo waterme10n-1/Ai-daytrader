@@ -379,6 +379,18 @@ def create_app(
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         return meme().status()
 
+    @app.post("/api/meme/strategies")
+    async def meme_strategies(request: Request) -> dict:
+        try:
+            body = await request.json()
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Ugyldig JSON.") from exc
+        try:
+            meme().set_strategy(body if isinstance(body, dict) else {})
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return meme().status()
+
     @app.post("/api/meme/limits")
     async def meme_limits(request: Request) -> dict:
         try:

@@ -89,6 +89,8 @@ class MemeSettings:
     max_drawdown_pct: float
     daily_loss_limit: bool
     drawdown_limit: bool
+    strategy_guard: bool
+    auto_targets: bool
     sol_reserve: float
     slippage_bps: int
     priority_fee_lamports: int
@@ -169,6 +171,9 @@ class MemeSettings:
             # Ingen daglig tabsgrænse som standard. Den samlede tabsgrænse er slået til.
             daily_loss_limit=_flag(os.getenv("MEME_DAILY_LOSS_LIMIT"), False),
             drawdown_limit=_flag(os.getenv("MEME_DRAWDOWN_LIMIT"), True),
+            # Strategi-vagt (sæt en tabende strategi på hold af sig selv) er fra. Sniperen lærer sit bedste mål.
+            strategy_guard=_flag(os.getenv("MEME_STRATEGY_GUARD"), False),
+            auto_targets=_flag(os.getenv("MEME_AUTO_TARGETS"), True),
             sol_reserve=max(0.005, _float(os.getenv("MEME_SOL_RESERVE"), 0.02)),
             slippage_bps=max(50, min(1500, _int(os.getenv("MEME_SLIPPAGE_BPS"), 300))),
             priority_fee_lamports=max(0, min(5_000_000, _int(os.getenv("MEME_PRIORITY_FEE_LAMPORTS"), 100_000))),
