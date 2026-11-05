@@ -25,6 +25,7 @@ from trader.desk.config import (
     HARD_MAX_STOP_PCT,
     HARD_MIN_REWARD_RISK,
     DeskSettings,
+    clean_key,
     key_problem,
     parse_watchlist,
 )
@@ -177,12 +178,62 @@ class DeskEngine:
     # ------------------------------------------------------------------ broker
     @property
     def keys_present(self) -> bool:
-        return self._injected_broker or self.base.own_keys
+        key, secret, _, _ = self.keys()
+        return self._injected_broker or bool(key and secret)
+
+    def keys(self) -> tuple[str, str, str, str]:
+        """(key, secret, hvor key kommer fra, hvor secret kommer fra). Nøgler gemt på siden vinder over Railway."""
+        saved = self.store.get_json("alpaca_keys") or {}
+        if saved.get("key") and saved.get("secret"):
+            return saved["key"], saved["secret"], "gemt på siden", "gemt på siden"
+        return self.base.alpaca_api_key, self.base.alpaca_secret_key, self.base.key_source, self.base.secret_source
+
+    def test_keys(self, key: str, secret: str, *, save: bool) -> dict:
+        """Prøver nøgler fra siden hos Alpaca. Gemmes kun, hvis Alpaca godtager dem og save er sat."""
+        key, secret = clean_key(key), clean_key(secret)
+        if not key or not secret:
+            raise ValueError("Indsæt både Key og Secret.")
+        info = {"key_start": key[:2], "key_length": len(key), "secret_length": len(secret), "hint": key_problem(key)}
+        if secret.upper().startswith(("PK", "AK")) and not key.upper().startswith(("PK", "AK")):
+            info["hint"] = "Secret starter med PK eller AK. Key og Secret er nok byttet om."
+        client = AlpacaPaper(key, secret)
+        try:
+            account = client.get_account()
+        except BrokerError as exc:
+            return {"ok": False, "saved": False, **info, "text": str(exc)}
+        finally:
+            client.close()
+        if save:
+            self.store.set_json("alpaca_keys", {"key": key, "secret": secret})
+            self._reset_broker()
+            self.last_error = ""
+            self.store.post("system", "info", "Nye Alpaca-nøgler er gemt på siden og bruges fra nu af.")
+        return {
+            "ok": True,
+            "saved": save,
+            **info,
+            "text": f"Alpaca godtager nøglerne. Papirkontoen har {account.equity:,.2f} USD." + (" Nøglerne er gemt og bruges nu." if save else ""),
+        }
+
+    def forget_keys(self) -> None:
+        self.store.set_json("alpaca_keys", {})
+        self._reset_broker()
+        self.store.post("system", "info", "Nøglerne gemt på siden er slettet. Bordet bruger igen nøglerne fra Railway.")
+
+    def _reset_broker(self) -> None:
+        if self._broker is not None and not self._injected_broker:
+            try:
+                self._broker.close()
+            except Exception:
+                pass
+            self._broker = None
+        self._cache.clear()
 
     def broker(self):
         if self._broker is None:
             # Altid papir. Bordet har ingen adresse til rigtige penge.
-            self._broker = AlpacaPaper(self.base.alpaca_api_key, self.base.alpaca_secret_key)
+            key, secret, _, _ = self.keys()
+            self._broker = AlpacaPaper(key, secret)
         return self._broker
 
     def _cached(self, name: str, fetch: Callable[[], Any]) -> Any:
@@ -865,17 +916,17 @@ class DeskEngine:
 
     def diagnose(self) -> dict:
         """Knappen 'Test Alpaca-forbindelsen': hver del for sig, så man kan se præcis, hvad der fejler."""
-        key, secret = self.base.alpaca_api_key, self.base.alpaca_secret_key
+        key, secret, key_source, secret_source = self.keys()
         keys = {
-            "key_source": self.base.key_source or ("testmægler" if self._injected_broker else "mangler"),
-            "secret_source": self.base.secret_source or ("testmægler" if self._injected_broker else "mangler"),
+            "key_source": key_source or ("testmægler" if self._injected_broker else "mangler"),
+            "secret_source": secret_source or ("testmægler" if self._injected_broker else "mangler"),
             "key_start": key[:2] if key else "",
             "key_length": len(key),
             "secret_length": len(secret),
             "hints": [],
         }
-        if self.base.key_source and self.base.secret_source and self.base.key_source.startswith("DESK") != self.base.secret_source.startswith("DESK"):
-            keys["hints"].append(f"Key kommer fra {self.base.key_source}, men Secret fra {self.base.secret_source}. De skal være et par fra samme sted.")
+        if key_source and secret_source and key_source.startswith("DESK") != secret_source.startswith("DESK"):
+            keys["hints"].append(f"Key kommer fra {key_source}, men Secret fra {secret_source}. De skal være et par fra samme sted.")
         problem = key_problem(key)
         if problem:
             keys["hints"].append(problem)
@@ -992,7 +1043,7 @@ class DeskEngine:
         alerts: list[dict] = []
         if not self.keys_present:
             alerts.append({"level": "warning", "text": "Mangler Alpaca-papirnøgler. Sæt DESK_ALPACA_API_KEY og DESK_ALPACA_SECRET_KEY i Railway."})
-        problem = key_problem(self.base.alpaca_api_key) if not self._injected_broker else ""
+        problem = key_problem(self.keys()[0]) if not self._injected_broker else ""
         if problem:
             alerts.append({"level": "error", "text": problem})
         if not self.brain.configured:
@@ -1016,7 +1067,8 @@ class DeskEngine:
             "market": self._market(),
             "account": self._account(),
             "keys_present": self.keys_present,
-            "own_account": self.base.own_keys,
+            "own_account": self.keys_present,
+            "keys_saved_on_page": bool((self.store.get_json("alpaca_keys") or {}).get("key")),
             "ai": {
                 "configured": self.brain.configured,
                 "model": self.base.ai_model,

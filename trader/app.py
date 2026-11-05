@@ -544,6 +544,24 @@ def create_app(
             raise HTTPException(status_code=409, detail=str(exc)) from exc
         return {"ok": True, "text": text}
 
+    @app.post("/api/desk/keys")
+    async def desk_keys(request: Request) -> dict:
+        try:
+            body = await request.json()
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Ugyldig JSON.") from exc
+        body = body if isinstance(body, dict) else {}
+        if body.get("forget"):
+            desk().forget_keys()
+            return {"ok": True, "text": "Slettet. Bordet bruger igen nøglerne fra Railway."}
+        save = bool(body.get("save"))
+        if save:
+            require_code(request, str(body.get("code") or ""))
+        try:
+            return desk().test_keys(str(body.get("key") or ""), str(body.get("secret") or ""), save=save)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     @app.post("/api/desk/diagnose")
     def desk_diagnose() -> dict:
         return desk().diagnose()
