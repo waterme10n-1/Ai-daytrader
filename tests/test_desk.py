@@ -525,3 +525,39 @@ def test_learned_rule_turns_a_buy_into_wait_and_day_log_writes_lessons(tmp_path)
     lessons = desk.store.get_json("lessons")
     assert lessons and lessons[0]["day"] == DAY.isoformat()
     assert any(m["kind"] == "lesson" and m["text"].startswith("Lært i dag") for m in desk.store.messages(limit=500))
+
+
+def test_keys_from_the_page_are_tested_saved_and_used(tmp_path, monkeypatch):
+    from trader.desk import engine as desk_engine
+    from trader.desk.alpaca import BrokerError
+
+    seen = []
+
+    class FakePaper:
+        def __init__(self, key, secret):
+            seen.append((key, secret))
+            self.key = key
+
+        def get_account(self):
+            if self.key != "PKGOODKEY":
+                raise BrokerError("Alpaca afviser nøglerne ved handelskontoen (401: unauthorized)")
+            return Account(equity=100_000.0, cash=100_000.0, buying_power=200_000.0, daytrade_count=0)
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(desk_engine, "AlpacaPaper", FakePaper)
+    cfg = DeskSettings(db_path=str(tmp_path / "desk.db"), alpaca_api_key="PKRAILWAY", alpaca_secret_key="s" * 40, key_source="DESK_ALPACA_API_KEY", secret_source="DESK_ALPACA_SECRET_KEY")
+    desk = DeskEngine(cfg, _settings(tmp_path), store=DeskStore(cfg.db_path), background_replies=False)
+
+    bad = desk.test_keys("PKWRONG", "x" * 40, save=True)
+    assert not bad["ok"] and not bad["saved"] and desk.keys()[0] == "PKRAILWAY"
+    ok = desk.test_keys(' "PKGOODKEY" ', "y" * 40, save=True)
+    assert ok["ok"] and ok["saved"] and desk.keys()[:3] == ("PKGOODKEY", "y" * 40, "gemt på siden")
+    desk.broker()
+    assert seen[-1] == ("PKGOODKEY", "y" * 40)
+    assert "PKGOODKEY" not in str(desk.status())  # nøglen vises aldrig
+    desk.forget_keys()
+    assert desk.keys()[0] == "PKRAILWAY"
+    with pytest.raises(ValueError):
+        desk.test_keys("", "", save=False)

@@ -324,6 +324,14 @@
       <p class="muted small" style="margin:0 0 10px">Tester handelskontoen, uret, kursdata og nyheder hver for sig. Nøglerne vises aldrig, kun hvor de kommer fra og hvor lange de er.</p>
       <button class="btn go" id="diag-btn" type="button">Test Alpaca-forbindelsen</button>
       <div id="diag" class="small" style="margin-top:12px"></div>
+      <form class="form" id="keys-form" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)" autocomplete="off">
+        <div class="wide"><b>Indsæt nøgler direkte</b><div class="muted small">Virker Railway-variablerne ikke, så indsæt papirnøglerne her. De sendes kun til din egen server, testes hos Alpaca med det samme og vises aldrig igen. Gemte nøgler bruges i stedet for dem i Railway. Bordet kan kun bruge dem på papirkontoen.</div></div>
+        <label>Key (starter med PK)<input name="key" type="password" autocomplete="off" spellcheck="false" autocapitalize="off"></label>
+        <label>Secret<input name="secret" type="password" autocomplete="off" spellcheck="false" autocapitalize="off"></label>
+        <label class="wide">Kode fra godkendelses-appen (kun hvis to-trins-login er slået til)<input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="7"></label>
+        <div class="row wide"><button class="btn" type="button" id="keys-test">Test nøglerne</button><button class="btn go" type="submit">Test og gem</button><button class="btn" type="button" id="keys-forget" hidden>Slet gemte nøgler</button></div>
+        <div class="wide small" id="keys-result"></div>
+      </form>
     </div>
     <div class="bots" id="bots"></div>
     <div class="card" style="margin-top:12px">
@@ -575,6 +583,7 @@ function render(data, fresh) {
   $("s-open").textContent = `${data.today.open} / ${data.today.max_open}`;
   $("s-pnl").textContent = money(data.kpis.pnl, true);
   renderCrew();
+  $("keys-forget").hidden = !data.keys_saved_on_page;
   renderLearning(data.learning || {});
   const count = (data.approvals || []).length;
   $("badge").hidden = !count; $("badge").textContent = count;
@@ -674,6 +683,25 @@ $("diag-btn").onclick = async () => {
     $("diag").innerHTML = `<div class="muted">Key fra <b>${esc(k.key_source)}</b> (starter med ${esc(k.key_start || "–")}, ${k.key_length} tegn) · Secret fra <b>${esc(k.secret_source)}</b> (${k.secret_length} tegn)</div>${hints}<div style="margin-top:8px">${rows}</div><p class="${r.ok ? "up" : "down"}" style="margin:10px 0 0;font-weight:600">${esc(r.text)}</p>`;
   } catch (err) { $("diag").textContent = err.message; }
   btn.disabled = false; refresh();
+};
+
+async function sendKeys(save) {
+  const form = $("keys-form");
+  $("keys-result").textContent = "Spørger Alpaca …";
+  try {
+    const r = await post("/api/desk/keys", { key: form.key.value, secret: form.secret.value, code: form.code.value, save });
+    const info = `Key starter med ${esc(r.key_start)} og er ${r.key_length} tegn · Secret er ${r.secret_length} tegn.`;
+    $("keys-result").innerHTML = `<p class="${r.ok ? "up" : "down"}" style="margin:0 0 4px;font-weight:600">${r.ok ? "✓" : "✕"} ${esc(r.text)}</p><div class="muted">${info}</div>${r.hint ? `<div class="alert warning" style="margin-top:8px">${esc(r.hint)}</div>` : ""}`;
+    if (r.ok && r.saved) { form.key.value = ""; form.secret.value = ""; form.code.value = ""; }
+  } catch (err) { $("keys-result").innerHTML = `<p class="down" style="margin:0">${esc(err.message)}</p>`; }
+  refresh();
+}
+$("keys-form").onsubmit = (e) => { e.preventDefault(); sendKeys(true); };
+$("keys-test").onclick = () => sendKeys(false);
+$("keys-forget").onclick = async () => {
+  if (!confirm("Slet nøglerne gemt på siden og brug dem fra Railway igen?")) return;
+  try { const r = await post("/api/desk/keys", { forget: true }); toast(r.text); } catch (err) { toast(err.message); }
+  refresh();
 };
 
 async function loadCompare() {
