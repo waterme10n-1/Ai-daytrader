@@ -99,9 +99,11 @@
   .brand h1 { margin: 0; font-size: 17px; font-weight: 700; letter-spacing: -0.025em; line-height: 1.15; }
   .status-line { margin: 2px 0 0; display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); flex: none; }
-  .dot.ok { background: var(--up); animation: pulse 2.4s ease-out infinite; }
+  .dot.ok { background: var(--up); box-shadow: 0 0 6px rgba(38,217,143,0.6); }
+  /* Kun statusprikken lever, og kun med opacity, som grafikchippen klarer alene. */
+  #status-dot.ok { animation: breathe 2.4s ease-in-out infinite; will-change: opacity; }
+  @keyframes breathe { 50% { opacity: 0.35; } }
   .dot.warn { background: var(--warn); } .dot.bad { background: var(--down); }
-  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(38,217,143,0.55); } 70% { box-shadow: 0 0 0 7px rgba(38,217,143,0); } 100% { box-shadow: 0 0 0 0 rgba(38,217,143,0); } }
   .pill { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: 999px; background: var(--raised); color: var(--text-2); font-size: 12.5px; font-weight: 650; white-space: nowrap; }
   .pill.mode.paper { background: var(--info-soft); color: var(--info); }
   .pill.mode.live { background: var(--down-soft); color: var(--down); }
@@ -486,10 +488,12 @@
   @media (max-width: 360px) { .appnav a { padding: 6px 10px; } }
 </style>
 <style id="future">
-  /* ---------- Fremtid: neon, glas og et svævende gitter ---------- */
+  /* ---------- Fremtid: neon, glas og et gitter ----------
+     Let at tegne: ingen sløring bag kortene, og kun animationer af transform og opacity,
+     som telefonens grafikchip klarer uden at tegne siden om. */
   :root {
     --bg: #04050b;
-    --surface: rgba(14, 17, 31, 0.8); --surface-2: rgba(255, 255, 255, 0.035);
+    --surface: rgba(13, 16, 30, 0.9); --surface-2: rgba(255, 255, 255, 0.035);
     --raised: rgba(255, 255, 255, 0.065); --raised-2: rgba(255, 255, 255, 0.12);
     --border: rgba(150, 165, 255, 0.13); --border-strong: rgba(150, 165, 255, 0.24);
     --text: #eef2ff; --text-2: #b8c0dc; --muted: #7c86a6;
@@ -515,38 +519,36 @@
     --edge: linear-gradient(140deg, rgba(106, 77, 255, 0.35), rgba(0, 170, 220, 0.18) 40%, rgba(10, 20, 60, 0.06) 70%);
     --glass: rgba(238, 241, 248, 0.84); --glass-nav: rgba(248, 250, 255, 0.95); --seg-on: #fff;
   }
-  body {
+  /* Lysskæret ligger i et fast lag for sig, så det ikke tegnes om, når man scroller. */
+  body { background: var(--bg); }
+  body::before {
+    display: block; inset: 0; height: auto; opacity: 1; transform: none; animation: none;
     background:
       radial-gradient(1100px 700px at 12% -12%, rgba(162, 107, 255, 0.24), transparent 60%),
       radial-gradient(900px 600px at 100% -4%, rgba(34, 225, 255, 0.15), transparent 60%),
-      radial-gradient(800px 600px at 50% 115%, rgba(20, 241, 149, 0.09), transparent 60%),
-      var(--bg);
-    background-attachment: fixed;
+      radial-gradient(800px 600px at 50% 115%, rgba(20, 241, 149, 0.09), transparent 60%);
+    filter: none; z-index: -2;
   }
-  :root[data-theme="light"] body { background: radial-gradient(900px 600px at 10% -10%, rgba(106, 77, 255, 0.12), transparent 60%), radial-gradient(800px 500px at 100% 0%, rgba(0, 170, 220, 0.1), transparent 60%), var(--bg); }
-  body::before { display: none; }
+  :root[data-theme="light"] body::before { opacity: 1; background: radial-gradient(900px 600px at 10% -10%, rgba(106, 77, 255, 0.12), transparent 60%), radial-gradient(800px 500px at 100% 0%, rgba(0, 170, 220, 0.1), transparent 60%); }
   body::after {
     content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
     background-image: linear-gradient(rgba(140, 160, 255, 0.07) 1px, transparent 1px), linear-gradient(90deg, rgba(140, 160, 255, 0.07) 1px, transparent 1px);
     background-size: 44px 44px;
     -webkit-mask-image: radial-gradient(ellipse 85% 60% at 50% 0%, #000 25%, transparent 78%);
     mask-image: radial-gradient(ellipse 85% 60% at 50% 0%, #000 25%, transparent 78%);
-    animation: grid-drift 28s linear infinite;
   }
-  @keyframes grid-drift { to { background-position: 0 44px, 44px 0; } }
   h1, h2, h3, .page-head h2, .brand h1, .sym, .ltitle { font-family: var(--display); }
   .card {
     border: 1px solid transparent;
     background: linear-gradient(180deg, var(--surface), var(--surface)) padding-box, var(--edge) border-box;
-    -webkit-backdrop-filter: blur(14px) saturate(140%); backdrop-filter: blur(14px) saturate(140%);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 26px 60px -38px rgba(70, 90, 255, 0.6);
   }
   :root[data-theme="light"] .card { box-shadow: 0 1px 2px rgba(10, 20, 60, 0.04), 0 18px 40px -28px rgba(40, 60, 160, 0.3); }
   .card-head h2 > .i { color: var(--cyan); filter: drop-shadow(0 0 6px rgba(34, 225, 255, 0.55)); }
   .label, .stats3 span, .mini-stats span, .stat .k { font-family: var(--mono); font-size: 10.5px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; }
   .num, .equity, .kpi .v, .lright b, .pnl-big, .mini-stats b, .stats3 b, .target-big, .ring b, .big { font-family: var(--mono); letter-spacing: -0.03em; }
-  .equity { background: linear-gradient(180deg, #ffffff, #aebcff); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 0 24px rgba(90, 140, 255, 0.4)); }
-  :root[data-theme="light"] .equity { background: none; color: var(--text); filter: none; }
+  .equity { color: #f1f3ff; text-shadow: 0 0 22px rgba(90, 140, 255, 0.45); }
+  :root[data-theme="light"] .equity { color: var(--text); text-shadow: none; }
   .hero {
     background:
       radial-gradient(120% 90% at 0% 0%, rgba(162, 107, 255, 0.24), transparent 55%),
@@ -575,15 +577,19 @@
   .rows.num > div > span:first-child { font-family: var(--font); letter-spacing: 0; }
 
   /* ---------- Ticker ---------- */
-  .ticker { overflow: hidden; border-bottom: 1px solid var(--border); background: rgba(0, 0, 0, 0.22); -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent); mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent); }
+  .ticker { position: relative; overflow: hidden; border-bottom: 1px solid var(--border); background: rgba(0, 0, 0, 0.22); }
+  .ticker::before, .ticker::after { content: ""; position: absolute; top: 0; bottom: 0; z-index: 1; width: 28px; pointer-events: none; }
+  .ticker::before { left: 0; background: linear-gradient(90deg, var(--bg), transparent); }
+  .ticker::after { right: 0; background: linear-gradient(270deg, var(--bg), transparent); }
   :root[data-theme="light"] .ticker { background: rgba(10, 20, 60, 0.03); }
   .ticker[hidden] { display: none; }
-  .ticker-track { display: inline-flex; gap: 30px; padding: 8px 0; white-space: nowrap; font: 600 12px var(--mono); animation: ticker 45s linear infinite; }
+  .ticker-track { display: inline-flex; gap: 30px; padding: 8px 0; white-space: nowrap; font: 600 12px var(--mono); animation: ticker 45s linear infinite; will-change: transform; }
   .ticker:hover .ticker-track { animation-play-state: paused; }
   @keyframes ticker { to { transform: translateX(-50%); } }
   .tick { display: inline-flex; align-items: center; gap: 7px; color: var(--text-2); }
   .tick b { color: var(--text); font-weight: 700; }
-  .tick .dot { width: 6px; height: 6px; }
+  .tick .dot { width: 6px; height: 6px; box-shadow: none; }
+  .ticker.still .ticker-track, .radar-wrap.still .sweep { animation-play-state: paused; }
 
   /* ---------- 4 hovedtal ---------- */
   .stats4 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
@@ -595,18 +601,16 @@
   .stat.down .v { color: var(--down); text-shadow: 0 0 20px rgba(255, 77, 109, 0.35); }
   :root[data-theme="light"] .stat .v { text-shadow: none !important; }
   .live { display: inline-flex; align-items: center; gap: 6px; font: 700 10.5px var(--mono); letter-spacing: 0.16em; color: var(--up); }
-  .live::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--up); box-shadow: 0 0 10px var(--up); animation: pulse 2.2s ease-out infinite; }
+  .live::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--up); box-shadow: 0 0 10px var(--up); }
 
   /* ---------- Live-radar ---------- */
   .radar-wrap { position: relative; width: min(100%, 320px); aspect-ratio: 1; margin: 0 auto; }
   .radar-wrap svg { display: block; width: 100%; height: 100%; overflow: visible; }
-  .sweep { position: absolute; inset: 4%; border-radius: 50%; pointer-events: none; background: conic-gradient(from 0deg, transparent 0deg, transparent 290deg, rgba(34, 225, 255, 0.22) 350deg, rgba(34, 225, 255, 0.55) 360deg); animation: sweep 4.5s linear infinite; mix-blend-mode: screen; }
-  :root[data-theme="light"] .sweep { mix-blend-mode: multiply; opacity: 0.5; }
+  .sweep { position: absolute; inset: 4%; border-radius: 50%; pointer-events: none; background: conic-gradient(from 0deg, transparent 0deg, transparent 290deg, rgba(34, 225, 255, 0.22) 350deg, rgba(34, 225, 255, 0.55) 360deg); animation: sweep 4.5s linear infinite; will-change: transform; }
+  :root[data-theme="light"] .sweep { opacity: 0.45; }
   @keyframes sweep { to { transform: rotate(360deg); } }
   .blip { cursor: pointer; transition: r 0.2s; }
-  .blip.bought { animation: blink 1.6s ease-in-out infinite; }
   .blip.picked { stroke: #fff; stroke-width: 2; }
-  @keyframes blink { 50% { opacity: 0.35; } }
   .radar-caption { min-height: 42px; margin-top: 10px; text-align: center; font-size: 13px; line-height: 1.45; color: var(--text-2); }
   .radar-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 14px; margin-top: 8px; font: 600 11px var(--mono); color: var(--muted); }
   .radar-legend i { display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; vertical-align: 0; }
@@ -640,8 +644,7 @@
   .term .tag { font-weight: 700; }
   .term .tag.buy { color: var(--up); } .term .tag.sell { color: var(--cyan); } .term .tag.warning { color: var(--warn); }
   .term .tag.error { color: var(--down); } .term .tag.info { color: var(--accent); }
-  .term li:first-child .msg::after { content: "\2588"; margin-left: 3px; color: var(--cyan); animation: caret 1s steps(1) infinite; }
-  @keyframes caret { 50% { opacity: 0; } }
+  .term li:first-child .msg::after { content: "\2588"; margin-left: 3px; color: var(--cyan); opacity: 0.8; }
 
   /* ---------- Flere tal ---------- */
   .more-card { padding: 0; }
@@ -2616,10 +2619,13 @@ function countTo(el, value, fmt) {
   if (!el) return;
   const target = Number(value);
   if (!Number.isFinite(target)) { el.textContent = fmt(value); return; }
-  const from = Number(el.dataset.v);
+  const first = el.dataset.v === undefined;
+  const from = first ? 0 : Number(el.dataset.v);
   el.dataset.v = String(target);
-  if (reduceMotion || !Number.isFinite(from) || Math.abs(from - target) < 1e-9) { el.textContent = fmt(target); return; }
-  const t0 = performance.now(), dur = 700;
+  // Små udsving (kurser flytter sig hele tiden) skrives direkte, så telefonen ikke tegner hvert 8. sekund.
+  const small = Math.abs(from - target) < Math.max(0.05, Math.abs(target) * 0.005);
+  if (reduceMotion || document.hidden || !Number.isFinite(from) || (!first && small)) { el.textContent = fmt(target); return; }
+  const t0 = performance.now(), dur = first ? 900 : 600;
   const step = (now) => {
     const k = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - k, 3);
     el.textContent = fmt(from + (target - from) * e);
@@ -2675,7 +2681,8 @@ function renderLiveRadar(data) {
     const age = Math.max(0, (Date.now() - new Date(c.ts).getTime()) / 60000);
     const op = Math.max(0.35, 1 - age / 180).toFixed(2);
     const size = c.stage === "købt" ? 2.6 : 1.8;
-    return `<circle class="blip${c.stage === "købt" ? " bought" : ""}" data-blip="${i}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${size}" fill="${color}" opacity="${op}" style="filter:drop-shadow(0 0 2px ${color})"><title>${esc(c.symbol || short(c.mint))}</title></circle>`;
+    const halo = `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(size * 2).toFixed(1)}" fill="${color}" opacity="${(op * 0.18).toFixed(2)}" pointer-events="none"/>`;
+    return `${halo}<circle class="blip${c.stage === "købt" ? " bought" : ""}" data-blip="${i}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${size}" fill="${color}" opacity="${op}"><title>${esc(c.symbol || short(c.mint))}</title></circle>`;
   }).join("");
   put("live-radar", `<svg viewBox="0 0 100 100" role="img" aria-label="Radar over de seneste ${rows.length} coins">
     <defs><radialGradient id="rg" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="rgba(34,225,255,0.10)"/><stop offset="1" stop-color="rgba(34,225,255,0)"/></radialGradient></defs>
@@ -2733,6 +2740,13 @@ function renderTicker(data) {
   const one = items.join("");
   put("ticker-track", one + one);  // to gange, så rullen er sømløs
 }
+
+/* Bånd og radar står stille, når de ikke kan ses, så de ikke bruger strøm. */
+(() => {
+  if (!("IntersectionObserver" in window)) return;
+  const io = new IntersectionObserver((entries) => entries.forEach((e) => e.target.classList.toggle("still", !e.isIntersecting)));
+  document.querySelectorAll("#ticker, .radar-wrap").forEach((el) => io.observe(el));
+})();
 
 /* ---------- Pop-op-ark (i stedet for browserens grå bokse) ---------- */
 let sheetSeq = 0;

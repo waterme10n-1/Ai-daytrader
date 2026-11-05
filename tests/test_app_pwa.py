@@ -73,3 +73,18 @@ def test_memebot_and_desk_link_to_each_other(tmp_path):
             nav = nav[: nav.index("</nav>")]
             assert 'href="/meme"' in nav and 'href="/desk"' in nav, path
             assert nav.count('aria-current="page"') == 1, path
+
+
+def test_dashboard_effects_stay_light_on_phones(tmp_path):
+    """De tunge effekter, der fik siden til at hakke på iPhone, må ikke komme tilbage."""
+    with _client(tmp_path) as client:
+        assert _login(client).status_code == 303
+        page = client.get("/meme").text
+        future = page[page.index('<style id="future">'):]
+        future = future[: future.index("</style>")]
+        assert "backdrop-filter" not in future  # sløring bag hvert kort
+        assert "mix-blend-mode" not in future
+        assert "background-attachment: fixed" not in future
+        assert "grid-drift" not in future and "@keyframes pulse" not in page  # animeret gitter, box-shadow-puls
+        assert "drop-shadow(0 0 2px ${color})" not in page  # filter på hver radarprik
+        assert "IntersectionObserver" in page  # bånd og radar står stille uden for skærmen
