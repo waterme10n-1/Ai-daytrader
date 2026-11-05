@@ -2194,9 +2194,14 @@ function renderTop(data) {
   document.getElementById("top-switch").setAttribute("aria-checked", tt.enabled ? "true" : "false");
   const n = tt.settings.count;
   const period = tt.settings.days === 1 ? "dagens" : "ugens";
-  document.getElementById("top-state").textContent = tt.enabled
-    ? `Følger ${period} ${n} mest profitable traders (${tt.source}). Køber lige efter dem og sælger, når de sælger. Kigger efter nye handler hvert ${tt.poll_seconds}. sekund.`
-    : `Slået fra. Tænd for at købe lige efter ${period} ${n} mest profitable traders og sælge, når de sælger.`;
+  const nobody = tt.enabled && !(tt.leaders || []).length;
+  document.getElementById("top-state").textContent = nobody
+    ? (tt.api
+        ? "Tændt, men listen over top-traders er ikke hentet endnu. Tryk Test forbindelser under Mere → Indstillinger, hvis det varer mere end et minut."
+        : "Tændt, men der er ingen traders at følge endnu. Sæt SOLANATRACKER_API_KEY i Railway, eller tilføj traders under Wallet → Fulgte wallets.")
+    : tt.enabled
+      ? `Følger ${tt.api ? `${period} ${n} mest profitable traders (Solana Tracker)` : `${(tt.leaders || []).length} af dine fulgte wallets`}. Køber lige efter dem og sælger, når de sælger. Kigger efter nye handler hvert ${tt.poll_seconds}. sekund.`
+      : `Slået fra. Tænd for at købe lige efter ${period} ${n} mest profitable traders og sælge, når de sælger.`;
   document.getElementById("top-when").textContent = tt.last && tt.last.at ? "seneste kig " + ago(tt.last.at) : "";
   const st = tt.stats;
   put("top-stats", [
@@ -2209,6 +2214,7 @@ function renderTop(data) {
   ].map(([l, v]) => `<div><span>${esc(l)}</span><b>${v}</b></div>`).join(""));
   const chips = [];
   if (!tt.api) chips.push(`<span class="chip warn">${icon("alert", "sm")}Ingen SOLANATRACKER_API_KEY: bruger dine fulgte wallets i stedet</span>`);
+  if (!tt.api && !(tt.leaders || []).length) chips.push(`<button class="chip accent" type="button" data-goto="wallets" style="cursor:pointer">${icon("plus", "sm")}Tilføj traders under Wallet</button>`);
   if (tt.last && tt.last.error) chips.push(`<span class="chip warn" title="${esc(tt.last.error)}">${icon("alert", "sm")}${esc(tt.last.error.slice(0, 90))}</span>`);
   if (tt.enabled && tt.last && tt.last.watching != null) chips.push(`<span class="chip">Følger <b class="num">${esc(tt.last.watching)}</b> wallets</span>`);
   put("top-chips", chips.join("") + `<p class="note" style="flex-basis:100%;margin-top:${chips.length ? 4 : 0}px">Dagens vindere er ofte heldige eller bots, og du køber altid lidt efter dem til en højere kurs. Følg resultatet her på papir, før du bruger rigtige penge.</p>`);
