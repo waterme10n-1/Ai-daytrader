@@ -453,3 +453,29 @@ def test_keys_are_cleaned_and_wrong_keys_are_explained():
     assert "live-nøgle" in key_problem("AKLIVE")
     assert "byttet om" in key_problem("abc123secret")
     assert key_problem("PKFINE") == ""
+
+
+def test_diagnose_reports_each_part_and_key_hints(tmp_path):
+    broker = FakeBroker({"SPY": ramp_bars(end=100.3, ramp_volume=1000)})
+    desk, _ = make_desk(tmp_path, broker)
+    result = desk.diagnose()
+    assert result["ok"] and [c["name"] for c in result["checks"]] == ["Handelskontoen", "Markedets ur", "Kursdata", "Nyheder"]
+
+    def boom():
+        raise RuntimeError("Alpaca afviser nøglerne ved handelskontoen (401: unauthorized)")
+
+    broker.get_account = boom
+    bad = desk.diagnose()
+    assert not bad["ok"] and not bad["checks"][0]["ok"] and "afviser" in bad["text"]
+
+    swapped = make_desk(tmp_path / "b", FakeBroker({}), alpaca_api_key="x" * 40, alpaca_secret_key="PKSHORTKEY12345678", key_source="DESK_ALPACA_API_KEY", secret_source="ALPACA_SECRET_KEY")[0]
+    hints = " ".join(swapped.diagnose()["keys"]["hints"])
+    assert "byttet om" in hints and "samme sted" in hints
+
+
+def test_401_message_names_the_service():
+    from trader.desk.alpaca import DATA_URL, PAPER_URL, service_name, short_body
+
+    assert "handelskontoen" in service_name(PAPER_URL + "/v2/account")
+    assert "kursdata" in service_name(DATA_URL + "/v2/stocks/bars")
+    assert short_body("<html><h1>401 Authorization Required</h1></html>") == "401 Authorization Required"

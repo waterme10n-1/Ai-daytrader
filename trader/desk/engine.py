@@ -846,6 +846,57 @@ class DeskEngine:
         notify(self.main_settings, "Handelsbordet: " + text)
         return text
 
+    def diagnose(self) -> dict:
+        """Knappen 'Test Alpaca-forbindelsen': hver del for sig, så man kan se præcis, hvad der fejler."""
+        key, secret = self.base.alpaca_api_key, self.base.alpaca_secret_key
+        keys = {
+            "key_source": self.base.key_source or ("testmægler" if self._injected_broker else "mangler"),
+            "secret_source": self.base.secret_source or ("testmægler" if self._injected_broker else "mangler"),
+            "key_start": key[:2] if key else "",
+            "key_length": len(key),
+            "secret_length": len(secret),
+            "hints": [],
+        }
+        if self.base.key_source and self.base.secret_source and self.base.key_source.startswith("DESK") != self.base.secret_source.startswith("DESK"):
+            keys["hints"].append(f"Key kommer fra {self.base.key_source}, men Secret fra {self.base.secret_source}. De skal være et par fra samme sted.")
+        problem = key_problem(key)
+        if problem:
+            keys["hints"].append(problem)
+        if key and len(key) < 16:
+            keys["hints"].append(f"Key er kun {len(key)} tegn. Alpaca-nøgler er normalt omkring 20 tegn, så den er måske ikke kopieret helt.")
+        if secret and len(secret) < 30:
+            keys["hints"].append(f"Secret er kun {len(secret)} tegn. Den er normalt omkring 40 tegn, så den er måske ikke kopieret helt.")
+        if secret.upper().startswith(("PK", "AK")) and not key.upper().startswith(("PK", "AK")):
+            keys["hints"].append("Secret starter med PK eller AK. Key og Secret er nok byttet om.")
+        if not self.keys_present:
+            return {"ok": False, "keys": keys, "checks": [], "text": "Ingen nøgler fundet. Sæt DESK_ALPACA_API_KEY og DESK_ALPACA_SECRET_KEY i Railway og genstart."}
+        try:
+            broker = self.broker()
+        except BrokerError as exc:
+            return {"ok": False, "keys": keys, "checks": [], "text": str(exc)}
+        now = self._now().astimezone(ET)
+        tests = [
+            ("Handelskontoen", lambda: f"Saldo {broker.get_account().equity:,.2f} USD"),
+            ("Markedets ur", lambda: "Åbent" if broker.get_clock().is_open else "Lukket lige nu (det er i orden)"),
+            ("Kursdata", lambda: f"{len(broker.get_daily(['SPY'], 5, now).get('SPY') or [])} dagsbarer for SPY"),
+            ("Nyheder", lambda: f"{len(broker.get_news(['SPY'], now))} overskrifter"),
+        ]
+        checks = []
+        for name, run in tests:
+            try:
+                checks.append({"name": name, "ok": True, "detail": run()})
+            except Exception as exc:
+                checks.append({"name": name, "ok": False, "detail": str(exc)})
+        ok = all(item["ok"] for item in checks)
+        if ok:
+            self.last_error = ""
+            text = "Alt virker. Bordet kan handle på papirkontoen."
+        elif not checks[0]["ok"]:
+            text = "Handelskontoen afviser nøglerne. Se tipsene ovenfor, eller lav et nyt nøglesæt på Paper-kontoen."
+        else:
+            text = "Handelskontoen virker, men en af de andre dele fejler. Se detaljerne."
+        return {"ok": ok, "keys": keys, "checks": checks, "text": text}
+
     def compare(self) -> dict:
         """Bordet mod at holde S&P 500 (SPY) siden papirmånedens første dag."""
         start = self.store.get_json("desk_start")

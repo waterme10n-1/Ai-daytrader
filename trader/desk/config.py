@@ -89,6 +89,8 @@ class DeskSettings:
     alpaca_api_key: str = ""
     alpaca_secret_key: str = ""
     anthropic_api_key: str = ""
+    key_source: str = ""
+    secret_source: str = ""
     ai_daily_budget_usd: float = 1.0
     ai_model: str = "claude-opus-5-5"
     ai_effort: str = "high"
@@ -128,6 +130,8 @@ class DeskSettings:
             alpaca_api_key=clean_key(os.getenv("DESK_ALPACA_API_KEY") or os.getenv("ALPACA_API_KEY")),
             alpaca_secret_key=clean_key(os.getenv("DESK_ALPACA_SECRET_KEY") or os.getenv("ALPACA_SECRET_KEY")),
             anthropic_api_key=os.getenv("ANTHROPIC_API_KEY", "").strip(),
+            key_source="DESK_ALPACA_API_KEY" if clean_key(os.getenv("DESK_ALPACA_API_KEY")) else ("ALPACA_API_KEY" if clean_key(os.getenv("ALPACA_API_KEY")) else ""),
+            secret_source="DESK_ALPACA_SECRET_KEY" if clean_key(os.getenv("DESK_ALPACA_SECRET_KEY")) else ("ALPACA_SECRET_KEY" if clean_key(os.getenv("ALPACA_SECRET_KEY")) else ""),
             ai_daily_budget_usd=max(0.0, _float(os.getenv("DESK_AI_DAILY_BUDGET_USD"), 1.0)),
             ai_model=(os.getenv("DESK_ANTHROPIC_MODEL") or os.getenv("ANTHROPIC_MODEL") or "claude-opus-5-5").strip(),
             ai_effort=(os.getenv("DESK_ANTHROPIC_EFFORT") or "high").strip(),

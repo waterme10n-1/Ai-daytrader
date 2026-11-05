@@ -320,6 +320,12 @@
       <h3>SKEPTIC's regnskab</h3>
       <div id="skeptic-card" class="small"></div>
     </div>
+    <div class="card" style="margin-bottom:12px">
+      <h3>Forbindelsen til Alpaca</h3>
+      <p class="muted small" style="margin:0 0 10px">Tester handelskontoen, uret, kursdata og nyheder hver for sig. Nøglerne vises aldrig, kun hvor de kommer fra og hvor lange de er.</p>
+      <button class="btn go" id="diag-btn" type="button">Test Alpaca-forbindelsen</button>
+      <div id="diag" class="small" style="margin-top:12px"></div>
+    </div>
     <div class="bots" id="bots"></div>
     <div class="card" style="margin-top:12px">
       <h3>Indstillinger</h3>
@@ -660,6 +666,18 @@ async function action(url, done) {
 $("scan-btn").onclick = () => action("/api/desk/scan", () => "SCOUT kigger nu. Svarene kommer i gruppen.");
 $("log-btn").onclick = () => action("/api/desk/log", () => "Dagsloggen er skrevet i gruppen.");
 $("close-btn").onclick = () => { if (confirm("Luk alle bordets positioner nu?")) action("/api/desk/close-all", (r) => `${r.closed} position(er) lukket.`); };
+
+$("diag-btn").onclick = async () => {
+  const btn = $("diag-btn"); btn.disabled = true; $("diag").textContent = "Tester …";
+  try {
+    const r = await post("/api/desk/diagnose");
+    const k = r.keys || {};
+    const rows = (r.checks || []).map((c) => `<div class="row" style="padding:7px 0;border-bottom:1px solid var(--border);align-items:flex-start;flex-wrap:nowrap"><b class="${c.ok ? "up" : "down"}" style="flex:none;width:18px">${c.ok ? "✓" : "✕"}</b><div><b>${esc(c.name)}</b><div class="muted">${esc(c.detail)}</div></div></div>`).join("");
+    const hints = (k.hints || []).map((h) => `<div class="alert warning" style="margin-top:8px">${esc(h)}</div>`).join("");
+    $("diag").innerHTML = `<div class="muted">Key fra <b>${esc(k.key_source)}</b> (starter med ${esc(k.key_start || "–")}, ${k.key_length} tegn) · Secret fra <b>${esc(k.secret_source)}</b> (${k.secret_length} tegn)</div>${hints}<div style="margin-top:8px">${rows}</div><p class="${r.ok ? "up" : "down"}" style="margin:10px 0 0;font-weight:600">${esc(r.text)}</p>`;
+  } catch (err) { $("diag").textContent = err.message; }
+  btn.disabled = false; refresh();
+};
 
 async function loadCompare() {
   try {
