@@ -187,8 +187,18 @@
     .step { grid-template-columns: 74px 1fr; }
   }
 </style>
+<style>
+  .appnav { display: flex; justify-content: center; padding: 8px 12px 0; padding-top: max(8px, env(safe-area-inset-top)); }
+  .appnav-in { display: inline-flex; gap: 2px; padding: 3px; border-radius: 999px; background: rgba(127, 127, 127, 0.14); max-width: 100%; }
+  .appnav a { padding: 6px 14px; border-radius: 999px; font: 600 13px/1.2 Inter, system-ui, sans-serif; color: inherit; opacity: 0.72; text-decoration: none; white-space: nowrap; }
+  .appnav a:hover { opacity: 1; }
+  .appnav a[aria-current="page"] { opacity: 1; background: rgba(127, 127, 127, 0.28); }
+  @media (max-width: 360px) { .appnav a { padding: 6px 10px; } }
+</style>
 </head>
 <body class="chatting">
+<nav class="appnav" aria-label="Skift side"><div class="appnav-in"><a href="/meme">Memebot</a><a href="/desk" aria-current="page">Handelsbordet</a><a href="/">Aktier</a></div></nav>
+
 <header class="top">
   <div class="wrap">
     <div class="bar">
@@ -202,8 +212,6 @@
       <span class="pill hide-sm">PAPIRPENGE</span>
       <span class="pill closed hide-sm" id="market">Marked …</span>
       <button class="btn stop" id="pause-btn" type="button">Stop nu</button>
-      <a class="icon-btn hide-sm" href="/meme" title="Memebot" aria-label="Memebot">M</a>
-      <a class="icon-btn hide-sm" href="/" title="Aktie-daytrader" aria-label="Aktie-daytrader">A</a>
       <button class="icon-btn" id="theme" type="button" title="Skift tema" aria-label="Skift tema"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.5a6.5 6.5 0 0 1 0 13z" fill="currentColor"/></svg></button>
     </div>
     <nav class="tabs" role="tablist">

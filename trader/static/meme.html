@@ -382,8 +382,18 @@
     .mini-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   }
 </style>
+<style>
+  .appnav { display: flex; justify-content: center; padding: 8px 12px 0; padding-top: max(8px, env(safe-area-inset-top)); }
+  .appnav-in { display: inline-flex; gap: 2px; padding: 3px; border-radius: 999px; background: rgba(127, 127, 127, 0.14); max-width: 100%; }
+  .appnav a { padding: 6px 14px; border-radius: 999px; font: 600 13px/1.2 Inter, system-ui, sans-serif; color: inherit; opacity: 0.72; text-decoration: none; white-space: nowrap; }
+  .appnav a:hover { opacity: 1; }
+  .appnav a[aria-current="page"] { opacity: 1; background: rgba(127, 127, 127, 0.28); }
+  @media (max-width: 360px) { .appnav a { padding: 6px 10px; } }
+</style>
 </head>
 <body>
+<nav class="appnav" aria-label="Skift side"><div class="appnav-in"><a href="/meme" aria-current="page">Memebot</a><a href="/desk">Handelsbordet</a><a href="/">Aktier</a></div></nav>
+
 <header class="topbar">
   <div class="wrap">
     <div class="brand">
@@ -398,7 +408,6 @@
     <span class="pill num hide-sm" id="sol-pill">SOL —</span>
     <button class="icon-btn" id="notify" type="button" aria-pressed="false" title="Notifikationer i browseren" aria-label="Notifikationer"></button>
     <button class="icon-btn" id="theme" type="button" title="Skift tema" aria-label="Skift tema"></button>
-    <a class="icon-btn" href="/desk" title="Handelsbordet (seks bots)" aria-label="Handelsbordet" style="text-decoration:none;font-weight:700">6</a>
     <a class="icon-btn" href="/" title="Aktie-daytrader" aria-label="Aktie-daytrader" id="stocks-link"></a>
     <button class="icon-btn" id="logout" type="button" title="Log ud" aria-label="Log ud" hidden></button>
   </div>
