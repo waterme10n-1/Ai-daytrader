@@ -643,6 +643,11 @@
       <div class="card">
         <div class="card-head"><h2 id="top-leaders-title"></h2><span class="muted small-txt" id="top-leaders-note"></span></div>
         <div id="top-leaders"></div>
+        <form class="addform" id="top-add" style="margin:14px 0 0">
+          <textarea id="top-add-input" rows="3" placeholder="Én trader pr. linje: adresse og gerne et navn" autocapitalize="none" autocorrect="off" spellcheck="false" aria-label="Traders at følge"></textarea>
+          <button class="btn primary" type="submit">Tilføj traders</button>
+        </form>
+        <p class="note" id="top-add-note"></p>
       </div>
     </div>
     <div class="card">
@@ -2214,9 +2219,9 @@ function renderTop(data) {
   document.getElementById("top-state").textContent = nobody
     ? (tt.api
         ? "Tændt, men listen over top-traders er ikke hentet endnu. Tryk Test forbindelser under Mere → Indstillinger, hvis det varer mere end et minut."
-        : "Tændt, men der er ingen traders at følge endnu. Sæt SOLANATRACKER_API_KEY i Railway, eller tilføj traders under Wallet → Fulgte wallets.")
+        : "Tændt, men der er ingen traders at følge endnu. Tilføj dine traders nedenfor under «Dine traders».")
     : tt.enabled
-      ? `Følger ${tt.api ? `${period} ${n} mest profitable traders (Solana Tracker)` : `${(tt.leaders || []).length} af dine fulgte wallets`}. Køber lige efter dem og sælger, når de sælger. Kigger efter nye handler hvert ${tt.poll_seconds}. sekund.`
+      ? `Følger ${tt.source_kind === "own" ? `dine ${(tt.leaders || []).length} traders` : tt.api ? `${period} ${n} mest profitable traders (Solana Tracker)` : `${(tt.leaders || []).length} af dine fulgte wallets`}. Køber lige efter dem og sælger, når de sælger. Kigger efter nye handler hvert ${tt.poll_seconds}. sekund.`
       : `Slået fra. Tænd for at købe lige efter ${period} ${n} mest profitable traders og sælge, når de sælger.`;
   document.getElementById("top-when").textContent = tt.last && tt.last.at ? "seneste kig " + ago(tt.last.at) : "";
   const st = tt.stats;
@@ -2229,14 +2234,17 @@ function renderTop(data) {
     ["Solgt med traderen", fmtInt.format(st.followed_exits)],
   ].map(([l, v]) => `<div><span>${esc(l)}</span><b>${v}</b></div>`).join(""));
   const chips = [];
-  if (!tt.api) chips.push(`<span class="chip warn">${icon("alert", "sm")}Ingen SOLANATRACKER_API_KEY: bruger dine fulgte wallets i stedet</span>`);
-  if (!tt.api && !(tt.leaders || []).length) chips.push(`<button class="chip accent" type="button" data-goto="wallets" style="cursor:pointer">${icon("plus", "sm")}Tilføj traders under Wallet</button>`);
+  if (tt.source_kind === "own") chips.push(`<span class="chip up">${icon("check", "sm")}Bruger din egen liste</span>`);
   if (tt.last && tt.last.error) chips.push(`<span class="chip warn" title="${esc(tt.last.error)}">${icon("alert", "sm")}${esc(tt.last.error.slice(0, 90))}</span>`);
   if (tt.enabled && tt.last && tt.last.watching != null) chips.push(`<span class="chip">Følger <b class="num">${esc(tt.last.watching)}</b> wallets</span>`);
   put("top-chips", chips.join("") + `<p class="note" style="flex-basis:100%;margin-top:${chips.length ? 4 : 0}px">Dagens vindere er ofte heldige eller bots, og du køber altid lidt efter dem til en højere kurs. Følg resultatet her på papir, før du bruger rigtige penge.</p>`);
 
-  document.getElementById("top-leaders-title").innerHTML = icon("trophy") + (tt.settings.days === 1 ? "Dagens top-traders" : "Ugens top-traders");
-  document.getElementById("top-leaders-note").textContent = tt.api ? (tt.refreshed_at ? "opdateret " + ago(tt.refreshed_at) : "hentes, når du tænder") : "fra Wallet-fanen";
+  const ownList = tt.source_kind === "own";
+  document.getElementById("top-leaders-title").innerHTML = icon("trophy") + (ownList ? "Dine traders" : tt.settings.days === 1 ? "Dagens top-traders" : "Ugens top-traders");
+  document.getElementById("top-leaders-note").textContent = ownList ? `${(tt.own || []).length} af højst ${tt.own_max}` : tt.api ? (tt.refreshed_at ? "opdateret " + ago(tt.refreshed_at) : "hentes, når du tænder") : "fra Wallet-fanen";
+  document.getElementById("top-add-note").textContent = ownList
+    ? "Botten følger kun din liste. Fjern alle, hvis den skal bruge den automatiske liste igen."
+    : "Tilføj dine egne traders, fx fra kolscan.io eller gmgn.ai. Så følger botten kun dem i stedet for listen herover.";
   const leaders = tt.leaders || [];
   const usd0 = (v) => (Math.abs(v) >= 100 ? (v > 0 ? "+" : v < 0 ? "-" : "") + fmtInt.format(Math.abs(v)) + " $" : signed(v));
   put("top-leaders", leaders.length ? leaders.map((r) => {
@@ -2245,12 +2253,16 @@ function renderTop(data) {
     if (r.trades != null) bits.push(`${esc(fmtInt.format(r.trades))} handler`);
     if (r.copied) bits.push(`kopieret ${esc(r.copied)}× <span class="${tone(r.copied_pnl)}">${esc(signed(r.copied_pnl))}</span>`);
     bits.push(`<a href="https://gmgn.ai/sol/address/${esc(safeMint(r.wallet))}" target="_blank" rel="noopener noreferrer">GMGN</a>`);
-    return `<div class="lrow">${avatar(r.wallet.slice(0, 2), r.wallet)}<div class="lmain">
-      <div class="ltitle"><span class="muted num">#${esc(r.rank)}</span><span class="addr">${esc(short(r.wallet))}</span>${r.holding ? '<span class="stage-tag ok">ejer</span>' : ""}${r.muted ? '<span class="stage-tag rug">slået fra</span>' : ""}</div>
+    const own = tt.source_kind === "own";
+    const right = own
+      ? `<button class="btn small" type="button" data-top-remove="${esc(r.wallet)}" aria-label="Fjern fra listen">${icon("x", "sm")}Fjern</button>`
+      : `<b class="${tone(r.pnl_usd)}">${r.pnl_usd == null ? "—" : esc(usd0(r.pnl_usd))}</b><span class="muted">${tt.settings.days === 1 ? "i dag" : "7 dage"}</span>`;
+    return `<div class="lrow">${avatar((r.name || r.wallet).slice(0, 2), r.wallet)}<div class="lmain">
+      <div class="ltitle"><span class="muted num">#${esc(r.rank)}</span>${r.name ? `<span>${esc(r.name)}</span>` : ""}<span class="addr${r.name ? " muted" : ""}">${esc(short(r.wallet))}</span>${r.holding ? '<span class="stage-tag ok">ejer</span>' : ""}${r.muted ? '<span class="stage-tag rug">slået fra</span>' : ""}</div>
       <div class="lsub">${bits.join(" · ")}</div>
-    </div><div class="lright"><b class="${tone(r.pnl_usd)}">${r.pnl_usd == null ? "—" : esc(usd0(r.pnl_usd))}</b><span class="muted">${tt.settings.days === 1 ? "i dag" : "7 dage"}</span></div></div>`;
+    </div><div class="lright">${right}</div></div>`;
   }).join("")
-    : empty(tt.api ? (tt.enabled ? "Listen hentes. Det tager et øjeblik." : "Tænd for funktionen, så hentes dagens top-traders.") : "Ingen wallets endnu. Tilføj traders under Wallet → Fulgte wallets, eller sæt SOLANATRACKER_API_KEY for at få listen automatisk.", "trophy"));
+    : empty(tt.api ? (tt.enabled ? "Listen hentes. Det tager et øjeblik." : "Tænd for funktionen, så hentes dagens top-traders.") : "Ingen traders endnu. Indsæt deres wallet-adresser herunder, én pr. linje.", "trophy"));
 
   document.getElementById("top-signals-title").innerHTML = icon("activity") + "Seneste signaler";
   const sigs = tt.signals || [];
@@ -2368,6 +2380,28 @@ document.getElementById("strat-card").addEventListener("click", (ev) => {
 document.getElementById("auto-targets").addEventListener("click", () => {
   const on = !(state && state.auto_targets);
   act(() => post("/api/meme/strategies", { auto_targets: on }), on ? "Sniperen lærer selv sit mål" : "Sniperens mål ændres kun af dig");
+});
+
+document.getElementById("top-add").addEventListener("submit", (ev) => {
+  ev.preventDefault();
+  const input = document.getElementById("top-add-input");
+  const lines = input.value.split(/\n+/).map((x) => x.trim()).filter(Boolean);
+  if (!lines.length) return;
+  act(async () => {
+    const before = state && state.toptraders ? (state.toptraders.own || []).length : 0;
+    const b = await post("/api/meme/toptraders", { add_traders: lines });
+    input.value = "";
+    const added = (b.toptraders.own || []).length - before;
+    toast(added ? "up" : "down", `${added} ${added === 1 ? "trader" : "traders"} tilføjet`, added < lines.length ? `${lines.length - added} sprunget over (forkert adresse eller allerede på listen)` : "");
+    return b;
+  });
+});
+document.getElementById("top-leaders").addEventListener("click", (ev) => {
+  const b = ev.target.closest("[data-top-remove]");
+  if (!b) return;
+  const wallet = b.dataset.topRemove;
+  ask("Fjern traderen fra listen?", short(wallet), { confirm: "Fjern", danger: true })
+    .then((ok) => ok && act(() => post("/api/meme/toptraders", { remove_trader: wallet }), "Traderen er fjernet"));
 });
 
 /* ---------- Pop-op-ark (i stedet for browserens grå bokse) ---------- */

@@ -122,6 +122,8 @@ SNIPER_LOOP_SECONDS = 5
 TOP_POLL_SECONDS = 8
 TOP_REFRESH_SECONDS = 1800
 TOP_SIGNALS_KEPT = 40
+# Din egen Top 10-liste: højst så mange traders.
+TOP_OWN_MAX = 25
 # Strategi-vagt: taber en strategi på de seneste handler, sættes den på hold, mens den lærer videre som skygge.
 STRATEGY_LABELS = {"momentum": "Almindelig", "sniper": "Sniper", "toptrader": "Top 10"}
 GUARD_WINDOW = 12
@@ -1758,14 +1760,30 @@ class MemeEngine:
             self.clients.rpc = SolanaRPC(self.settings.rpc_url)
         return self.clients.rpc
 
+    def _own_traders(self) -> list[dict]:
+        return list(self.store.get_json("top_own", []) or [])
+
+    def _own_leaders(self) -> list[dict]:
+        return [
+            {"wallet": row["wallet"], "name": row.get("name", ""), "rank": i + 1, "pnl_usd": None, "win_rate": None, "trades": None}
+            for i, row in enumerate(self._own_traders()[:TOP_OWN_MAX])
+        ]
+
     def _manual_leaders(self) -> list[dict]:
+        if self._own_traders():
+            return self._own_leaders()
         wallets = list(self._all_wallets())[: self.top_cfg.count]
         return [{"wallet": w, "rank": i + 1, "pnl_usd": None, "win_rate": None, "trades": None} for i, w in enumerate(wallets)]
+
+    def _top_source(self) -> str:
+        if self._own_traders():
+            return "own"
+        return "api" if self.clients.top is not None else "followed"
 
     def _top_leaders(self) -> list[dict]:
         """Dagens top-traders fra Solana Tracker. Uden nøgle: de wallets, du selv følger."""
         cfg = self.top_cfg
-        if self.clients.top is None:
+        if self.clients.top is None or self._own_traders():
             return self._manual_leaders()
         cached = self.store.get_json("top_traders", None) or {}
         fresh = cached.get("days") == cfg.days and time.time() - float(cached.get("ts") or 0) < TOP_REFRESH_SECONDS
@@ -1790,7 +1808,7 @@ class MemeEngine:
         """Hvem top-trader-kopieringen følger lige nu, uden at kalde API'et."""
         if not self.top_cfg.enabled:
             return set()
-        if self.clients.top is None:
+        if self.clients.top is None or self._own_traders():
             return {row["wallet"] for row in self._manual_leaders()}
         cached = self.store.get_json("top_traders", None) or {}
         return {row["wallet"] for row in (cached.get("traders") or [])[: self.top_cfg.count]}
@@ -1924,9 +1942,52 @@ class MemeEngine:
         self._note_top(signal, "sprunget over", why, pair.symbol)
         return False
 
+    def add_top_traders(self, lines) -> dict:
+        """Din egen liste. Én trader pr. linje: adressen, gerne efterfulgt af et navn (fx «7xKX… Ansem»)."""
+        if isinstance(lines, str):
+            lines = lines.splitlines()
+        own = self._own_traders()
+        known = {row["wallet"] for row in own}
+        added, errors = 0, []
+        for raw in lines or []:
+            parts = str(raw).replace(",", " ").split(None, 1)
+            if not parts:
+                continue
+            wallet, name = parts[0].strip(), (parts[1].strip()[:40] if len(parts) > 1 else "")
+            if not _valid_address(wallet):
+                errors.append(f"{wallet[:8]}…: ikke en Solana-adresse")
+                continue
+            if wallet in known:
+                errors.append(f"{wallet[:4]}…{wallet[-4:]}: er allerede på listen")
+                continue
+            if len(own) >= TOP_OWN_MAX:
+                errors.append(f"Listen er fuld ({TOP_OWN_MAX} traders).")
+                break
+            own.append({"wallet": wallet, "name": name, "added": now_iso()})
+            known.add(wallet)
+            added += 1
+        if added:
+            self.store.set_json("top_own", own)
+            self.store.add_event("info", f"{added} {'trader' if added == 1 else 'traders'} tilføjet til din Top 10-liste.")
+        if not added and errors:
+            raise ValueError("; ".join(errors[:3]))
+        return {"added": added, "errors": errors}
+
+    def remove_top_trader(self, wallet: str) -> None:
+        own = self._own_traders()
+        rest = [row for row in own if row["wallet"] != str(wallet).strip()]
+        if len(rest) == len(own):
+            raise ValueError("Den trader er ikke på din liste.")
+        self.store.set_json("top_own", rest)
+        self.store.add_event("info", f"{str(wallet)[:4]}…{str(wallet)[-4:]} er fjernet fra din Top 10-liste. Åbne kopier sælges stadig, når den sælger.")
+
     def update_toptraders(self, changes: dict) -> None:
         if not isinstance(changes, dict):
             raise ValueError("Ugyldige indstillinger.")
+        if "add_traders" in changes:
+            self.add_top_traders(changes["add_traders"])
+        if "remove_trader" in changes:
+            self.remove_top_trader(str(changes["remove_trader"]))
         updated = dataclasses.replace(self.top_cfg)
         for key, value in changes.items():
             if key in TOP_BOOLS:
@@ -1969,8 +2030,9 @@ class MemeEngine:
         for name in ("follow_sells", "stop_loss_on", "daily_loss_stop"):
             fields.append({"name": name, "label": TOP_LABELS[name], "value": getattr(cfg, name), "default": getattr(defaults, name), "kind": "bool"})
         api = self.clients.top is not None
-        cached = (self.store.get_json("top_traders", None) or {}) if api else {}
-        leaders = (cached.get("traders") or [])[: cfg.count] if api else self._manual_leaders()
+        source = self._top_source()
+        cached = (self.store.get_json("top_traders", None) or {}) if source == "api" else {}
+        leaders = (cached.get("traders") or [])[: cfg.count] if source == "api" else self._manual_leaders()
         stats = source_stats(closed)
         held = {str(row["source"])[5:] for row in open_rows if row.get("strategy") == "toptrader"}
         view = []
@@ -1982,7 +2044,10 @@ class MemeEngine:
             "settings": cfg.to_dict(),
             "fields": fields,
             "api": api,
-            "source": "Solana Tracker" if api else "dine fulgte wallets",
+            "source": {"own": "din egen liste", "api": "Solana Tracker", "followed": "dine fulgte wallets"}[source],
+            "source_kind": source,
+            "own": self._own_traders(),
+            "own_max": TOP_OWN_MAX,
             "refreshed_at": cached.get("at"),
             "leaders": view,
             "signals": list(self.top_signals)[:25],
@@ -2747,8 +2812,12 @@ class MemeEngine:
         dex = self._usage_of(self.clients.dex)
         if dex and dex.get("limited_seconds_ago") is not None and dex["limited_seconds_ago"] < JUPITER_ALERT_SECONDS:
             alerts.append({"level": "info", "text": "DexScreener har sagt stop til for mange kald (429). Botten holder pause, bruger Jupiters kurser imens og prøver igen."})
-        if self.settings.rpc_url.startswith("https://api.mainnet-beta.solana.com") and (self._all_wallets() or self.mode == "live"):
-            alerts.append({"level": "warning", "text": "Offentlig Solana RPC er langsom og rate-limited. Brug en gratis Helius-nøgle i SOLANA_RPC_URL."})
+        if self.settings.rpc_url.startswith("https://api.mainnet-beta.solana.com") and (self._all_wallets() or self.mode == "live" or self.top_cfg.enabled):
+            alerts.append({
+                "level": "warning",
+                "text": "Den offentlige Solana-forbindelse er langsom og har en lav grænse, så botten kan misse traders' handler. "
+                "Lav en gratis nøgle på helius.dev og sæt SOLANA_RPC_URL i Railway, så forsvinder beskeden.",
+            })
         diagnostics = self.store.get_json("diagnostics", None)
         if diagnostics and not diagnostics.get("required_ok"):
             failed = [item["label"] for item in diagnostics.get("checks", []) if not item["ok"] and not item.get("optional")]
