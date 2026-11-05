@@ -534,6 +534,11 @@
           <div class="card-head"><h2 id="open-title"></h2><button class="btn small" type="button" data-goto="positioner">Se alle</button></div>
           <div id="open-mini"></div>
         </div>
+        <div class="card" id="strat-card">
+          <div class="card-head"><h2 id="strat-title"></h2><div class="sn-head"><span class="muted small-txt">Strategi-vagt</span><button class="switch" id="strat-guard" type="button" role="switch" aria-checked="false" aria-label="Strategi-vagt til eller fra"></button></div></div>
+          <div id="strats"></div>
+          <p class="note" id="strat-note"></p>
+        </div>
         <div class="card">
           <div class="card-head"><h2 id="funnel-title"></h2><span class="muted small-txt" id="funnel-when"></span></div>
           <div class="funnel" id="funnel"></div>
@@ -602,6 +607,7 @@
     </div>
     <div class="card">
       <div class="card-head"><h2 id="opt-title"></h2><span class="muted small-txt" id="opt-note"></span></div>
+      <div class="field" style="padding-top:0"><div class="field-top"><span>Brug det bedste mål automatisk</span><button class="switch" id="auto-targets" type="button" role="switch" aria-checked="false" aria-label="Brug det bedste mål automatisk"></button></div><span class="muted small-txt">Når botten har mindst 40 kursforløb, og et andet mål og stop klart har virket bedre og givet overskud, skifter den selv. Højst én gang i døgnet, og du kan se det under Læring.</span></div>
       <div id="opt"></div>
     </div>
     <div class="card">
@@ -1857,6 +1863,7 @@ function render(data) {
   renderSniper(data);
   renderTop(data);
   renderLimits(data);
+  renderStrategies(data);
   renderRadar(data);
   renderJournal(data);
   renderLearning(data);
@@ -2308,6 +2315,57 @@ document.getElementById("limits").addEventListener("click", (ev) => {
   const key = sw.dataset.limit;
   const on = !state.loss_limits[key];
   act(() => post("/api/meme/limits", { [key]: on }), `${key === "daily" ? "Dagligt" : "Samlet"} tabsstop er slået ${on ? "til" : "fra"}`);
+});
+
+/* ---------- Hvad tjener penge? (strategi-vagt) ---------- */
+const STRAT_ICON = { momentum: "activity", sniper: "target", toptrader: "trophy" };
+function renderStrategies(data) {
+  const list = data.strategies || [];
+  document.getElementById("strat-title").innerHTML = icon("bars") + "Hvad tjener penge?";
+  document.getElementById("strat-guard").setAttribute("aria-checked", data.strategy_guard ? "true" : "false");
+  document.getElementById("auto-targets").setAttribute("aria-checked", data.auto_targets ? "true" : "false");
+  put("strats", list.map((st) => {
+    let tag = "", action = "";
+    if (st.hold) {
+      tag = `<span class="stage-tag risiko">på hold${st.hold.hours_left != null ? ` ${esc(fmtNum.format(Math.max(0.1, st.hold.hours_left)))} t.` : ""}</span>`;
+      action = `<button class="btn small" type="button" data-sresume="${esc(st.id)}">${icon("play", "sm")}Genoptag</button>`;
+    } else if (!st.enabled) {
+      tag = '<span class="stage-tag">slået fra</span>';
+    } else {
+      tag = '<span class="stage-tag ok">kører</span>';
+      action = `<button class="btn small" type="button" data-shold="${esc(st.id)}">${icon("pause", "sm")}Hold pause</button>`;
+    }
+    const recent = st.recent && st.recent.n ? ` · seneste ${esc(st.recent.n)}: <span class="${tone(st.recent.pnl)}">${esc(signed(st.recent.pnl))}</span>` : "";
+    return `<div class="lrow"><span class="avatar" style="--h:${st.id === "sniper" ? 280 : st.id === "toptrader" ? 150 : 210}" aria-hidden="true">${icon(STRAT_ICON[st.id] || "activity")}</span>
+      <div class="lmain"><div class="ltitle">${esc(st.label)}${tag}</div>
+        <div class="lsub">${esc(fmtInt.format(st.trades))} handler${st.win_rate == null ? "" : ` · ${esc(pct(st.win_rate))} vinder`}${recent}${st.open ? ` · ${esc(st.open)} åbne` : ""}</div>
+        ${st.hold ? `<div class="lsub" style="-webkit-line-clamp:3">${esc(st.hold.reason)}</div>` : ""}
+      </div>
+      <div class="lright"><b class="${tone(st.pnl)}">${esc(signed(st.pnl))}</b><span>${action}</span></div></div>`;
+  }).join(""));
+  document.getElementById("strat-note").textContent = data.strategy_guard
+    ? "Strategi-vagten sætter en strategi på hold i 24 timer (længere, hvis det sker igen), når dens seneste 8–12 handler taber penge. Imens følger den tokens som skyggehandler og lærer videre."
+    : "Strategi-vagten er slået fra. Tabende strategier bliver ved med at handle.";
+}
+document.getElementById("strat-card").addEventListener("click", (ev) => {
+  const hold = ev.target.closest("[data-shold]");
+  const resume = ev.target.closest("[data-sresume]");
+  const label = (id) => ((state && state.strategies) || []).find((x) => x.id === id)?.label || id;
+  if (hold) {
+    const id = hold.dataset.shold;
+    ask(`Sæt ${label(id)} på hold?`, "Den køber ikke mere, før du genoptager den. Åbne positioner passes stadig.", { confirm: "Hold pause" })
+      .then((ok) => ok && act(() => post("/api/meme/strategies", { hold: id }), `${label(id)} er sat på hold`));
+  } else if (resume) {
+    const id = resume.dataset.sresume;
+    act(() => post("/api/meme/strategies", { resume: id }), `${label(id)} kører igen`);
+  } else if (ev.target.closest("#strat-guard")) {
+    const on = !(state && state.strategy_guard);
+    act(() => post("/api/meme/strategies", { guard: on }), on ? "Strategi-vagten er slået til" : "Strategi-vagten er slået fra");
+  }
+});
+document.getElementById("auto-targets").addEventListener("click", () => {
+  const on = !(state && state.auto_targets);
+  act(() => post("/api/meme/strategies", { auto_targets: on }), on ? "Sniperen lærer selv sit mål" : "Sniperens mål ændres kun af dig");
 });
 
 /* ---------- Pop-op-ark (i stedet for browserens grå bokse) ---------- */

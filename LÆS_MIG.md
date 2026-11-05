@@ -159,6 +159,13 @@ Under Top 10 ser du dagens traders med deres resultat, hvad botten har tjent på
 
 Vær ærlig over for dig selv: dagens vindere er ofte heldige eller bots, og du køber altid lidt efter dem til en højere kurs. Kør det på papir og se resultatet, før du bruger rigtige penge. Funktionen kigger ofte på Solana, så brug en egen RPC (fx en gratis Helius-nøgle i `SOLANA_RPC_URL`).
 
+## Tab mindre: strategi-vagt, automatisk mål og billigere handler
+
+- **Hvad tjener penge?** På Hjem står hver strategi (Almindelig, Sniper, Top 10) med antal handler, gevinstprocent, resultat og de seneste handler. Tryk **Hold pause** for at stoppe en strategi, og **Genoptag** for at starte den igen.
+- **Strategi-vagt** (slået til som standard, `MEME_STRATEGY_GUARD`): taber en strategi på sine seneste 8–12 handler (profitfaktor under 0,8), sættes den på hold i 24 timer, næste gang 48, op til 4 døgn. Imens bliver tokens skrevet ned og fulgt som skyggehandler, så botten lærer videre. Efter pausen bedømmes strategien kun på nye handler, og tjener den igen, bliver næste pause kort.
+- **Det bedste mål automatisk** (slået til som standard, `MEME_AUTO_TARGETS`): når skyggehandlerne har mindst 40 kursforløb, og et andet gevinstmål og stop klart har virket bedre (mindst 2 procentpoint pr. snipe) og givet overskud, skifter sniperen selv, højst én gang i døgnet. Ændringen står under Læring. Slå det fra under Strategi → Sniper.
+- **Billigere handler**: køb plus salg må højst koste 4 % (før 8 %, læringen kan højst flytte grænsen til 6 %). Tynde pools, hvor gebyrer og prisudsving æder gevinsten, springes over.
+
 ## Sådan lærer den
 
 - Efter hver lukket handel flyttes vægtene på de signaler, der bar handlen (op ved gevinst, ned ved tab). Dashboardet viser vægtene og en lektion pr. handel.

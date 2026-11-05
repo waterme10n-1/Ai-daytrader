@@ -89,6 +89,8 @@ class MemeSettings:
     max_drawdown_pct: float
     daily_loss_limit: bool
     drawdown_limit: bool
+    strategy_guard: bool
+    auto_targets: bool
     sol_reserve: float
     slippage_bps: int
     priority_fee_lamports: int
@@ -169,6 +171,9 @@ class MemeSettings:
             # Ingen daglig tabsgrænse som standard. Den samlede tabsgrænse er slået til.
             daily_loss_limit=_flag(os.getenv("MEME_DAILY_LOSS_LIMIT"), False),
             drawdown_limit=_flag(os.getenv("MEME_DRAWDOWN_LIMIT"), True),
+            # Sæt en strategi på hold, når den taber igen og igen. Lær sniperens bedste mål af skyggehandlerne.
+            strategy_guard=_flag(os.getenv("MEME_STRATEGY_GUARD"), True),
+            auto_targets=_flag(os.getenv("MEME_AUTO_TARGETS"), True),
             sol_reserve=max(0.005, _float(os.getenv("MEME_SOL_RESERVE"), 0.02)),
             slippage_bps=max(50, min(1500, _int(os.getenv("MEME_SLIPPAGE_BPS"), 300))),
             priority_fee_lamports=max(0, min(5_000_000, _int(os.getenv("MEME_PRIORITY_FEE_LAMPORTS"), 100_000))),
@@ -226,7 +231,8 @@ class StrategyParams:
     min_buy_ratio_h1: float = 0.48
     max_top10_pct: float = 35.0
     max_rug_score: float = 0.55
-    max_roundtrip_loss_pct: float = 8.0
+    # Køb og salg må højst koste 4 % tilsammen. Ellers æder gebyrer og tynde pools gevinsten.
+    max_roundtrip_loss_pct: float = 4.0
     min_score: float = 0.55
     stop_loss_pct: float = 0.25
     take_profit_pct: float = 0.6
@@ -266,7 +272,7 @@ PARAM_BOUNDS: dict[str, tuple[float, float]] = {
     "min_buy_ratio_h1": (0.35, 0.75),
     "max_top10_pct": (10.0, 50.0),
     "max_rug_score": (0.2, 0.7),
-    "max_roundtrip_loss_pct": (2.0, 15.0),
+    "max_roundtrip_loss_pct": (2.0, 6.0),
     "min_score": (0.45, 0.85),
     "stop_loss_pct": (0.1, 0.4),
     "take_profit_pct": (0.2, 3.0),

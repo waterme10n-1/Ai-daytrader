@@ -122,6 +122,19 @@ SNIPER_LOOP_SECONDS = 5
 TOP_POLL_SECONDS = 8
 TOP_REFRESH_SECONDS = 1800
 TOP_SIGNALS_KEPT = 40
+# Strategi-vagt: taber en strategi på de seneste handler, sættes den på hold, mens den lærer videre som skygge.
+STRATEGY_LABELS = {"momentum": "Almindelig", "sniper": "Sniper", "toptrader": "Top 10"}
+GUARD_WINDOW = 12
+GUARD_MIN_TRADES = 8
+GUARD_MAX_PF = 0.8
+GUARD_HOLD_HOURS = 24
+GUARD_MAX_HOURS = 96
+GUARD_SKIP_EXITS = {"kill", "manual"}
+# Automatisk mål for sniperen: kun med mange kursforløb, kun hvis det klart er bedre og giver overskud.
+AUTO_TARGET_MIN_PATHS = 40
+AUTO_TARGET_GAIN = 0.02
+AUTO_TARGET_EVERY_SECONDS = 24 * 3600
+AUTO_TARGET_CHECK_SECONDS = 3600
 SNIPER_DEEP_CHECKS = 4
 SNIPER_SEEN_HOURS = 6
 
@@ -258,6 +271,10 @@ class MemeEngine:
         self._last_top_poll = 0.0
         self.top_signals: deque = deque(self.store.get_json("top_signals", []) or [], maxlen=TOP_SIGNALS_KEPT)
         self.top_last: dict[str, Any] = {}
+        self.guard_on = (self.store.get_state("strategy_guard") or ("1" if self.settings.strategy_guard else "0")) == "1"
+        self.auto_targets = (self.store.get_state("auto_targets") or ("1" if self.settings.auto_targets else "0")) == "1"
+        self._guard_seen = -1
+        self._last_auto_target_check = 0.0
         self._paper = PaperWallet(self.settings, self.store, self.clients.jup)
         self._live: SolanaWallet | None = None
         self._pubkey_cache: tuple[str, str] | None = None
@@ -578,6 +595,8 @@ class MemeEngine:
                     self._maybe_sweep(wallet, sol_usd)
                 self._monitor(wallet, sol_usd)
                 self._learn()
+                self._check_guard()
+                self._maybe_auto_targets()
                 self._watch_insiders(wallet, sol_usd)
                 self._track_shadows()
                 self._learn_shadows()
@@ -817,8 +836,10 @@ class MemeEngine:
                     notes = adapt_sniper(self.sniper, same)
                     if notes:
                         self._save_sniper()
-                else:
+                elif strategy == "momentum":
                     notes = adapt_params(self.params, same)
+                else:
+                    notes = []  # Top 10 følger traderne, ikke de almindelige parametre
                 for note in notes:
                     self.store.add_lesson("parameter", note, int(pos["id"]))
         if changed:
@@ -1566,6 +1587,171 @@ class MemeEngine:
                 seen.pop(mint, None)
             self.store.set_json("sniper_seen", seen)
 
+    # ------------------------------------------------------------------ strategi-vagt og automatisk mål
+    def _holds(self) -> dict:
+        return dict(self.store.get_json(f"strategy_holds:{self.mode}", {}) or {})
+
+    def _on_hold(self, strategy: str) -> bool:
+        hold = self._holds().get(strategy)
+        if not hold:
+            return False
+        until = hold.get("until")
+        return until is None or time.time() < float(until)
+
+    def _hold_text(self, strategy: str) -> str:
+        hold = self._holds().get(strategy) or {}
+        label = STRATEGY_LABELS.get(strategy, strategy)
+        until = hold.get("until")
+        when = f" i {max(0.1, (float(until) - time.time()) / 3600):.0f} t. mere" if until else ", til du genoptager den"
+        return f"{label} er på hold{when}. {hold.get('reason', '')}".strip()
+
+    def _strategy_window(self, strategy: str, closed: list[dict]) -> dict:
+        since = self.store.get_state(f"guard_since:{self.mode}:{strategy}", "") or ""
+        rows = [
+            row for row in closed
+            if (row.get("strategy") or "momentum") == strategy
+            and row.get("exit_reason") not in GUARD_SKIP_EXITS
+            and str(row.get("closed_at") or "") >= since
+        ]
+        rows.sort(key=lambda row: str(row.get("closed_at") or ""))
+        window = rows[-GUARD_WINDOW:]
+        pnl = [float(row.get("pnl_usd") or 0.0) for row in window]
+        gross_win = sum(value for value in pnl if value > 0)
+        gross_loss = -sum(value for value in pnl if value < 0)
+        return {
+            "n": len(window),
+            "pnl": sum(pnl),
+            "wins": sum(1 for value in pnl if value > 0),
+            "pf": gross_win / gross_loss if gross_loss > 0 else (99.0 if gross_win > 0 else 0.0),
+        }
+
+    def _save_holds(self, holds: dict) -> None:
+        self.store.set_json(f"strategy_holds:{self.mode}", holds)
+
+    def _check_guard(self) -> None:
+        """Sæt en strategi på hold, når dens seneste handler taber. Start den igen efter pausen."""
+        holds = self._holds()
+        now = time.time()
+        changed = False
+        for strategy, hold in list(holds.items()):
+            until = hold.get("until")
+            if until is not None and now >= float(until):
+                holds.pop(strategy)
+                changed = True
+                # Efter pausen bedømmes strategien kun på nye handler.
+                self.store.set_state(f"guard_since:{self.mode}:{strategy}", now_iso())
+                self.store.add_event("info", f"{STRATEGY_LABELS.get(strategy, strategy)} kører igen efter strategi-vagtens pause.")
+        closed = self.store.closed_positions(self.mode)
+        if len(closed) != self._guard_seen:
+            self._guard_seen = len(closed)
+            for strategy, label in STRATEGY_LABELS.items():
+                window = self._strategy_window(strategy, closed)
+                strikes_key = f"guard_strikes:{self.mode}:{strategy}"
+                if window["n"] >= GUARD_MIN_TRADES and window["pnl"] > 0:
+                    self.store.set_state(strikes_key, "0")  # den tjener igen: næste pause bliver kort
+                if not self.guard_on or strategy in holds:
+                    continue
+                if window["n"] >= GUARD_MIN_TRADES and window["pnl"] < 0 and window["pf"] < GUARD_MAX_PF:
+                    strikes = int(self.store.get_state(strikes_key, "0") or 0) + 1
+                    hours = min(GUARD_MAX_HOURS, GUARD_HOLD_HOURS * 2 ** (strikes - 1))
+                    reason = (
+                        f"De seneste {window['n']} handler gav {_dk(window['pnl'])} USD "
+                        f"({window['wins']} vindere, profitfaktor {_dk(window['pf'])})."
+                    )
+                    holds[strategy] = {"until": now + hours * 3600, "since": now_iso(), "reason": reason, "hours": hours, "auto": True}
+                    self.store.set_state(strikes_key, str(strikes))
+                    changed = True
+                    message = f"Strategi-vagt: {label} er sat på hold i {hours} timer. {reason}"
+                    self.store.add_event("warning", message)
+                    self.store.add_lesson("parameter", message + " Den følger stadig tokens som skyggehandler.")
+                    self._notify(message)
+        if changed:
+            self._save_holds(holds)
+
+    def set_strategy(self, changes: dict) -> None:
+        """Fra dashboardet: hold en strategi, genoptag den, eller slå vagten og det automatiske mål til og fra."""
+        if not isinstance(changes, dict):
+            raise ValueError("Ugyldige indstillinger.")
+        holds = self._holds()
+        for key in ("hold", "resume"):
+            strategy = changes.get(key)
+            if strategy is None:
+                continue
+            if strategy not in STRATEGY_LABELS:
+                raise ValueError("Ukendt strategi.")
+            label = STRATEGY_LABELS[strategy]
+            if key == "hold":
+                holds[strategy] = {"until": None, "since": now_iso(), "reason": "Sat på hold af dig.", "auto": False}
+                self.store.add_event("info", f"{label} er sat på hold.")
+            else:
+                holds.pop(strategy, None)
+                self.store.set_state(f"guard_since:{self.mode}:{strategy}", now_iso())
+                self.store.add_event("info", f"{label} er genoptaget. Strategi-vagten bedømmer den kun på nye handler.")
+        self._save_holds(holds)
+        if "guard" in changes:
+            self.guard_on = bool(changes["guard"])
+            self.store.set_state("strategy_guard", "1" if self.guard_on else "0")
+        if "auto_targets" in changes:
+            self.auto_targets = bool(changes["auto_targets"])
+            self.store.set_state("auto_targets", "1" if self.auto_targets else "0")
+        self._guard_seen = -1
+
+    def _maybe_auto_targets(self) -> None:
+        """Skift sniperens mål og stop, når skyggehandlerne klart viser et bedre sæt, der giver overskud."""
+        if not self.auto_targets or not self.settings.shadows:
+            return
+        now = time.time()
+        if now - self._last_auto_target_check < AUTO_TARGET_CHECK_SECONDS:
+            return
+        self._last_auto_target_check = now
+        if now - float(self.store.get_state("auto_target_at", "0") or 0) < AUTO_TARGET_EVERY_SECONDS:
+            return
+        opt = self._optimizer()
+        best, current = opt.get("best") or {}, opt.get("current") or {}
+        if opt.get("n", 0) < AUTO_TARGET_MIN_PATHS or best.get("avg") is None or current.get("avg") is None:
+            return
+        if best["avg"] <= 0 or best["avg"] < current["avg"] + AUTO_TARGET_GAIN:
+            return
+        if abs(best["tp"] - current["tp"]) < 1e-9 and abs(best["sl"] - current["sl"]) < 1e-9:
+            return
+        old_tp, old_sl = self.sniper.take_profit_pct, self.sniper.stop_loss_pct
+        self.update_sniper({"take_profit_pct": best["tp"], "stop_loss_pct": best["sl"]})
+        self.store.set_state("auto_target_at", repr(now))
+        message = (
+            f"Sniperens mål er ændret fra +{old_tp * 100:.0f} % / -{old_sl * 100:.0f} % til "
+            f"+{self.sniper.take_profit_pct * 100:.0f} % / -{self.sniper.stop_loss_pct * 100:.0f} %. "
+            f"På de seneste {opt['n']} kursforløb gav det {best['avg'] * 100:+.1f} % pr. snipe i stedet for {current['avg'] * 100:+.1f} %."
+        )
+        self.store.add_event("info", message)
+        self.store.add_lesson("parameter", message)
+
+    def _strategies_status(self, closed: list[dict], open_rows: list[dict]) -> list[dict]:
+        holds = self._holds()
+        now = time.time()
+        enabled = {"momentum": True, "sniper": self.sniper.enabled, "toptrader": self.top_cfg.enabled}
+        out = []
+        for strategy, label in STRATEGY_LABELS.items():
+            rows = [row for row in closed if (row.get("strategy") or "momentum") == strategy]
+            pnl = [float(row.get("pnl_usd") or 0.0) for row in rows]
+            window = self._strategy_window(strategy, closed)
+            hold = holds.get(strategy) if self._on_hold(strategy) else None
+            out.append({
+                "id": strategy,
+                "label": label,
+                "enabled": enabled[strategy],
+                "trades": len(rows),
+                "win_rate": (sum(1 for value in pnl if value > 0) / len(rows)) if rows else None,
+                "pnl": sum(pnl),
+                "open": sum(1 for row in open_rows if (row.get("strategy") or "momentum") == strategy),
+                "recent": {"n": window["n"], "pnl": window["pnl"], "pf": window["pf"] if window["pf"] < 99 else None},
+                "hold": None if hold is None else {
+                    "reason": hold.get("reason", ""),
+                    "auto": bool(hold.get("auto")),
+                    "hours_left": round((float(hold["until"]) - now) / 3600, 1) if hold.get("until") else None,
+                },
+            })
+        return out
+
     # ------------------------------------------------------------------ top-traders
     def _ensure_rpc(self):
         if self.clients.rpc is None:
@@ -1900,6 +2086,10 @@ class MemeEngine:
 
     def _try_buy(self, cand: dict, wallet, sol_usd: float, day: str, strategy: str = "momentum") -> bool:
         pair: PairInfo = cand["pair"]
+        if self._on_hold(strategy):
+            # Ingen køb, men kandidaten skrives ned, så skyggehandlerne lærer videre af den.
+            self._record(cand, "risiko", False, self._hold_text(strategy), cand.get("score"), cand.get("features"))
+            return False
         totals = self._totals()
         open_rows = self.store.open_positions(self.mode)
         sniping = strategy == "sniper"
@@ -2469,6 +2659,9 @@ class MemeEngine:
             "blacklist": list(reversed(self._blacklist())),
             "sniper": self._sniper_status(closed, self.store.open_positions(mode), today),
             "toptraders": self._top_status(closed, self.store.open_positions(mode), today),
+            "strategies": self._strategies_status(closed, self.store.open_positions(mode)),
+            "strategy_guard": self.guard_on,
+            "auto_targets": self.auto_targets,
             "wallet": self.wallet_info(),
             "unlock": unlock,
             "events": self.store.recent_events(150),
@@ -2535,6 +2728,9 @@ class MemeEngine:
         if not self.settings.x_configured and self.settings.anthropic_api_key:
             # Uden Claude dækker beskeden ovenfor allerede X; to beskeder om det samme forvirrer.
             alerts.append({"level": "info", "text": "Ingen X_BEARER_TOKEN: X-omtale tjekkes kun gennem Claudes websøgning."})
+        for strategy, hold in self._holds().items():
+            if self._on_hold(strategy):
+                alerts.append({"level": "warning", "text": self._hold_text(strategy) + " Den følger stadig tokens som skyggehandler og lærer videre."})
         jupiter = self._jupiter_usage()
         if jupiter and jupiter.get("limited_seconds_ago") is not None and jupiter["limited_seconds_ago"] < JUPITER_ALERT_SECONDS:
             if jupiter.get("keyed"):
