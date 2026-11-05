@@ -140,7 +140,7 @@ def test_buys_right_after_a_top_trader_and_sells_when_they_sell():
     assert status["signals"][0]["action"] == "købt"
     assert status["leaders"][0]["holding"] is True
     view = [p for p in engine.status()["positions"] if p["id"] == pos["id"]][0]
-    assert view["tp_pct"] is None and view["stop_pct"] == pytest.approx(-0.3)
+    assert view["tp_pct"] is None and view["stop_pct"] is None  # ingen stop-loss som standard
 
     rpc.sell(A, "a-sell-1")
     _poll(engine)  # salget ses og udføres i samme runde
@@ -248,8 +248,10 @@ def test_settings_are_clamped_saved_and_reachable_over_http(tmp_path):
 
 
 def test_exit_rules_for_copies():
-    cfg = TopTraderSettings(stop_loss_pct=0.3, max_hold_minutes=60)
     common = dict(partial_taken=False, liquidity_entry=50_000, liquidity_now=50_000)
+    off = TopTraderSettings(stop_loss_pct=0.3, max_hold_minutes=60)
+    assert not top_exit_decision(ratio=0.1, peak_ratio=1.0, minutes_held=5, cfg=off, **common).sell  # ingen stop-loss som standard
+    cfg = TopTraderSettings(stop_loss_pct=0.3, max_hold_minutes=60, stop_loss_on=True)
     assert top_exit_decision(ratio=0.65, peak_ratio=1.0, minutes_held=5, cfg=cfg, **common).kind == "stop_loss"
     assert not top_exit_decision(ratio=1.8, peak_ratio=1.9, minutes_held=5, cfg=cfg, **common).sell  # ingen fast gevinstgrænse
     assert top_exit_decision(ratio=1.9, peak_ratio=3.0, minutes_held=5, cfg=cfg, **common).kind == "trailing"

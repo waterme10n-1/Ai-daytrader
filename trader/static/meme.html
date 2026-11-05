@@ -723,6 +723,10 @@
       <div id="app-body"></div>
     </div>
     <div class="card">
+      <div class="card-head"><h2 id="limits-title"></h2></div>
+      <div id="limits"></div>
+    </div>
+    <div class="card">
       <div class="card-head"><h2 id="unlock-title"></h2><span class="chip" id="unlock-progress"></span></div>
       <p class="muted" style="margin:0;font-size:13.5px">Botten må først handle med rigtige penge, når papirhandel med rigtige kurser har vist overskud. Alle krav tjekkes i koden, ikke kun her.</p>
       <div class="meter"><i id="unlock-meter" style="width:0%"></i></div>
@@ -1268,18 +1272,16 @@ function placeLabels(marks, pos) {
 }
 function rangeMeter(p) {
   const stop = p.stop_pct, tp = p.tp_pct, trail = p.trail_pct;
-  const lo = Math.min(stop - 0.08, p.change_pct - 0.05);
+  const lo = Math.min(stop == null ? -0.5 : stop - 0.08, p.change_pct - 0.05);
   const hi = Math.max(tp == null ? 0.5 : tp + 0.12, p.peak_pct + 0.1, p.change_pct + 0.1);
   const pos = (v) => Math.max(0, Math.min(100, ((v - lo) / (hi - lo)) * 100));
   const now = p.change_pct;
   const color = now >= 0 ? "var(--up)" : "var(--down)";
-  const marks = [
-    [`stop`, stop, `Stop ${spct(stop)}`],
-    [`entry`, 0, "Købt"],
-  ];
+  const marks = [[`entry`, 0, "Købt"]];
+  if (stop != null) marks.unshift([`stop`, stop, `Stop ${spct(stop)}`]);
   if (tp != null) marks.push(["tp", tp, `${p.strategy === "sniper" ? "Mål" : "Delsalg"} ${spct(tp)}`]);
   if (trail != null) marks.push(["trail", trail, `Trail ${spct(trail)}`]);
-  return `<div class="range" aria-label="Kurs ${esc(spct(now))} mellem stop ${esc(spct(stop))} og mål">
+  return `<div class="range" aria-label="Kurs ${esc(spct(now))}${stop != null ? ` mellem stop ${esc(spct(stop))} og mål` : ""}">
     <div class="track"></div>
     ${marks.map(([cls, v, l]) => `<span class="mk ${cls}" style="left:${pos(v).toFixed(1)}%" title="${esc(l)}"></span>`).join("")}
     ${placeLabels(marks, pos).map(([v, l]) => `<span class="mk-l" style="left:${pos(v).toFixed(1)}%">${esc(l)}</span>`).join("")}
@@ -1548,8 +1550,8 @@ function renderKrav(data) {
     ["Bankroll (hårdt loft)", money(s.bankroll_usd)],
     ["Pr. handel", money(s.position_usd)],
     ["Maks. åbne / køb pr. dag", `${s.max_open} / ${s.max_trades_per_day}`],
-    ["Dagligt tabsstop", `${pct(s.daily_loss_pct)} af bankroll`],
-    ["Samlet tabsstop", `${pct(s.max_drawdown_pct)} af bankroll`],
+    ["Dagligt tabsstop", data.loss_limits && !data.loss_limits.daily ? "fra" : `${pct(s.daily_loss_pct)} af bankroll`],
+    ["Samlet tabsstop", data.loss_limits && !data.loss_limits.drawdown ? "fra" : `${pct(s.max_drawdown_pct)} af bankroll`],
     ["SOL-reserve til gebyrer", `${s.sol_reserve} SOL`],
     ["Slippage / prioritetsgebyr", `${s.slippage_bps / 100} % / ${fmtInt.format(s.priority_fee_lamports)} lamports`],
     ["Scanning / overvågning", `hvert ${s.scan_seconds}. / ${s.monitor_seconds}. sekund`],
@@ -1854,6 +1856,7 @@ function render(data) {
   renderPositions(data);
   renderSniper(data);
   renderTop(data);
+  renderLimits(data);
   renderRadar(data);
   renderJournal(data);
   renderLearning(data);
@@ -2160,6 +2163,7 @@ function topFromUi(f, v) { return f.kind === "pct" ? v / 100 : f.kind === "min" 
 function topField(f) {
   const BOOL_HELP = {
     follow_sells: "Botten sælger hele positionen, så snart traderen sælger tokenet. Stop-loss og tidsgrænse gælder stadig.",
+    stop_loss_on: "Fra: Top 10 sælger kun, når traderen sælger (eller ved rug-alarm og tidsgrænse), ikke ved et fast tab.",
     daily_loss_stop: "Fra: Top 10 bliver ved med at kopiere, også når resten af botten har ramt dagens tabsgrænse. Nødstop, pause, bankroll-loftet og den samlede tabsgrænse gælder altid.",
   };
   if (f.kind === "bool") return `<div class="field"><div class="field-top"><span>${esc(f.label)}</span><button class="switch" type="button" role="switch" aria-checked="${topDraft[f.name] ? "true" : "false"}" data-tb="${f.name}" aria-label="${esc(f.label)}"></button></div><span class="muted small-txt">${esc(BOOL_HELP[f.name] || "")}</span></div>`;
@@ -2171,7 +2175,7 @@ function topField(f) {
 }
 function renderTopForm(data) {
   const fields = data.toptraders.fields;
-  const order = ["count", "days", "position_usd", "max_open", "max_per_day", "follow_sells", "daily_loss_stop", "stop_loss_pct", "max_hold_minutes", "min_liquidity_usd", "max_signal_age_seconds", "min_leader_sol"];
+  const order = ["count", "days", "position_usd", "max_open", "max_per_day", "follow_sells", "stop_loss_on", "stop_loss_pct", "daily_loss_stop", "max_hold_minutes", "min_liquidity_usd", "max_signal_age_seconds", "min_leader_sol"];
   const byName = {}; for (const f of fields) byName[f.name] = f;
   put("top-form", `<div class="sn-grid" style="gap:0 24px">${order.filter((n) => byName[n]).map((n) => topField(byName[n])).join("")}</div>`);
 }
@@ -2280,6 +2284,24 @@ document.getElementById("top-save").addEventListener("click", () => {
     document.getElementById("top-dirty").hidden = true;
     return b;
   }, "Indstillingerne for top-traders er gemt");
+});
+
+/* ---------- Tabsgrænser ---------- */
+function renderLimits(data) {
+  const l = data.loss_limits;
+  if (!l) return;
+  document.getElementById("limits-title").innerHTML = icon("shield") + "Tabsgrænser";
+  const row = (key, label, help) => `<div class="field"><div class="field-top"><span>${esc(label)}</span><button class="switch" type="button" role="switch" aria-checked="${l[key] ? "true" : "false"}" data-limit="${key}" aria-label="${esc(label)}"></button></div><span class="muted small-txt">${esc(help)}</span></div>`;
+  put("limits", `<p class="muted" style="margin:0 0 4px;font-size:13.5px">Uanset hvad bruger botten aldrig mere end din bankroll på <b>${esc(money(l.bankroll_usd))}</b>. Det er det mest, den kan tabe. Grænserne herunder stopper den tidligere.</p>`
+    + row("daily", "Dagligt tabsstop", `Ingen nye køb resten af dagen, når dagens tab når ${money(l.daily_usd)}.`)
+    + row("drawdown", "Samlet tabsstop", `Sælger alt og stopper, når det samlede tab når ${money(l.drawdown_usd)}, indtil du trykker Genoptag.`));
+}
+document.getElementById("limits").addEventListener("click", (ev) => {
+  const sw = ev.target.closest("[data-limit]");
+  if (!sw || !state || !state.loss_limits) return;
+  const key = sw.dataset.limit;
+  const on = !state.loss_limits[key];
+  act(() => post("/api/meme/limits", { [key]: on }), `${key === "daily" ? "Dagligt" : "Samlet"} tabsstop er slået ${on ? "til" : "fra"}`);
 });
 
 /* ---------- Pop-op-ark (i stedet for browserens grå bokse) ---------- */

@@ -152,7 +152,7 @@ Under **Strategi → Top 10** kan du slå en funktion til, der køber lige efter
 
 1. **Listen**: med `SOLANATRACKER_API_KEY` (fra solanatracker.io) henter botten hver halve time de 10 mest profitable Solana-traders i dag eller den seneste uge. Uden nøgle bruger den de wallets, du selv følger under Wallet.
 2. **Køb**: hvert 8. sekund kigger botten efter nye handler fra dem. Køber en af dem et token for mindst 0,1 SOL, og er købet højst 2 minutter gammelt, tjekker botten tokenet (likviditet, RugCheck og at det kan sælges igen) og køber for dit beløb pr. handel. Claude springes over her, fordi det skal gå hurtigt.
-3. **Salg**: sælger traderen tokenet, sælger botten hele positionen med det samme. Det gælder også, hvis traderen er røget af listen, eller funktionen er slået fra. Som sikkerhedsnet er der stop-loss (standard 30 %), en gevinstsikring hvis kursen er fordoblet og falder 35 % fra toppen, og en tidsgrænse (standard 12 timer), hvis traderen aldrig sælger.
+3. **Salg**: sælger traderen tokenet, sælger botten hele positionen med det samme. Det gælder også, hvis traderen er røget af listen, eller funktionen er slået fra. Der er ingen stop-loss som standard (slå **Brug stop-loss** til under Top 10, hvis du vil have en). Som sikkerhedsnet sælger botten ved rug-alarm (likviditeten trækkes), sikrer gevinsten hvis kursen er fordoblet og falder 35 % fra toppen, og sælger efter tidsgrænsen (standard 12 timer), hvis traderen aldrig sælger.
 4. **Grænser**: maks. åbne kopier (standard 3) og køb pr. dag (standard 10). Top 10 har ingen daglig tabsgrænse: den bliver ved med at kopiere, også når resten af botten har ramt dagens tabsgrænse. Vil du have, at den stopper dér, så slå **Stop ved dagens tabsgrænse** til under Top 10. Bankroll-loftet, den samlede tabsgrænse, pause og nødstop gælder altid. Traders, der giver tab over tid, slås automatisk fra.
 
 Under Top 10 ser du dagens traders med deres resultat, hvad botten har tjent på at kopiere hver af dem, og de seneste signaler: hvad traderen gjorde, og hvad botten gjorde (købt, solgt eller sprunget over og hvorfor).
@@ -169,9 +169,14 @@ Vær ærlig over for dig selv: dagens vindere er ofte heldige eller bots, og du 
 
 ## Tabsgrænser
 
-- Dagligt tab på `MEME_DAILY_LOSS_PCT` af bankroll (standard 25 %): ingen nye køb resten af døgnet (UTC). Åbne positioner beholder deres stop.
-- Samlet tab på `MEME_MAX_DRAWDOWN_PCT` (standard 50 %): alt sælges, og botten står stille, indtil du trykker **Genoptag**.
-- **Nødstop** sælger alt med det samme.
+Botten bruger aldrig mere end din bankroll (`MEME_BANKROLL_USD`). Det er det mest, den kan tabe, og det loft kan ikke slås fra.
+
+De to tabsgrænser herunder er **slået fra som standard**. Slå dem til under **Mere → Indstillinger → Tabsgrænser** (eller med `MEME_DAILY_LOSS_LIMIT=true` og `MEME_DRAWDOWN_LIMIT=true`):
+
+- **Dagligt tabsstop**: når dagens tab når `MEME_DAILY_LOSS_PCT` af bankroll (standard 25 %), køber botten ikke mere resten af døgnet (UTC). Åbne positioner beholder deres stop.
+- **Samlet tabsstop**: når det samlede tab når `MEME_MAX_DRAWDOWN_PCT` (standard 50 %), sælges alt, og botten står stille, indtil du trykker **Genoptag**.
+
+**Nødstop** sælger alt med det samme og virker altid. Sniperen og den almindelige strategi har stadig deres egne stop-loss pr. position.
 
 ## Fra papir til rigtige penge
 

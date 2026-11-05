@@ -188,7 +188,7 @@ def top_exit_decision(
             "rug_liquidity",
             f"Likviditeten faldt fra ${liquidity_entry:,.0f} til ${liquidity_now:,.0f}. Sælger alt (rug-alarm).",
         )
-    if ratio <= 1.0 - cfg.stop_loss_pct:
+    if getattr(cfg, "stop_loss_on", True) and ratio <= 1.0 - cfg.stop_loss_pct:
         return ExitDecision(True, 1.0, "stop_loss", f"Stop-loss: {(ratio - 1) * 100:.0f} %.")
     if peak_ratio >= 1.0 + TOP_TRAIL_ACTIVATION and ratio <= peak_ratio * (1.0 - TOP_TRAIL):
         return ExitDecision(True, 1.0, "trailing", f"Gevinstsikring: {(ratio / peak_ratio - 1) * 100:.0f} % fra toppen på {(peak_ratio - 1) * 100:+.0f} %.")
