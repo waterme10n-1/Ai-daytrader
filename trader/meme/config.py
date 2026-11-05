@@ -406,6 +406,8 @@ class TopTraderSettings:
     max_signal_age_seconds: float = 120.0
     min_leader_sol: float = 0.1
     follow_sells: bool = True
+    # Fra som standard: Top 10 bliver ved med at kopiere, selv om resten af botten har ramt dagens tabsgrænse.
+    daily_loss_stop: bool = False
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -424,7 +426,7 @@ TOP_BOUNDS: dict[str, tuple[float, float]] = {
     "min_leader_sol": (0.0, 50.0),
 }
 TOP_INTS = ("count", "days", "max_open", "max_per_day")
-TOP_BOOLS = ("enabled", "follow_sells")
+TOP_BOOLS = ("enabled", "follow_sells", "daily_loss_stop")
 TOP_LABELS: dict[str, str] = {
     "enabled": "Følg top-traders",
     "count": "Antal traders",
@@ -438,6 +440,7 @@ TOP_LABELS: dict[str, str] = {
     "max_signal_age_seconds": "Køb kun, hvis deres køb er højst",
     "min_leader_sol": "Ignorer køb under",
     "follow_sells": "Sælg når de sælger",
+    "daily_loss_stop": "Stop ved dagens tabsgrænse",
 }
 # Når en kopieret position er steget meget, sikres gevinsten, hvis traderen aldrig sælger.
 TOP_TRAIL_ACTIVATION = 1.0

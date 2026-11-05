@@ -2158,7 +2158,11 @@ const TOP_UNIT = { pct: "%", usd: "$", min: "t.", sec: "sek.", int: "", sol: "SO
 function topToUi(f, v) { return f.kind === "pct" ? Math.round(v * 1000) / 10 : f.kind === "min" ? Math.round(v / 6) / 10 : v; }
 function topFromUi(f, v) { return f.kind === "pct" ? v / 100 : f.kind === "min" ? v * 60 : v; }
 function topField(f) {
-  if (f.kind === "bool") return `<div class="field"><div class="field-top"><span>${esc(f.label)}</span><button class="switch" type="button" role="switch" aria-checked="${topDraft[f.name] ? "true" : "false"}" data-tb="${f.name}" aria-label="${esc(f.label)}"></button></div><span class="muted small-txt">Botten sælger hele positionen, så snart traderen sælger tokenet. Stop-loss og tidsgrænse gælder stadig.</span></div>`;
+  const BOOL_HELP = {
+    follow_sells: "Botten sælger hele positionen, så snart traderen sælger tokenet. Stop-loss og tidsgrænse gælder stadig.",
+    daily_loss_stop: "Fra: Top 10 bliver ved med at kopiere, også når resten af botten har ramt dagens tabsgrænse. Nødstop, pause, bankroll-loftet og den samlede tabsgrænse gælder altid.",
+  };
+  if (f.kind === "bool") return `<div class="field"><div class="field-top"><span>${esc(f.label)}</span><button class="switch" type="button" role="switch" aria-checked="${topDraft[f.name] ? "true" : "false"}" data-tb="${f.name}" aria-label="${esc(f.label)}"></button></div><span class="muted small-txt">${esc(BOOL_HELP[f.name] || "")}</span></div>`;
   if (f.kind === "days") return `<div class="field"><div class="field-top"><span>${esc(f.label)}</span><div class="seg" role="group" aria-label="Periode">${[[1, "I dag"], [7, "7 dage"]].map(([v, l]) => `<button type="button" data-tdays="${v}" aria-pressed="${Number(topDraft.days) === v}">${l}</button>`).join("")}</div></div><span class="muted small-txt">Hvem der har tjent mest det seneste døgn eller den seneste uge.</span></div>`;
   const v = topToUi(f, topDraft[f.name]);
   const lo = topToUi(f, f.bounds[0]), hi = topToUi(f, f.bounds[1]);
@@ -2167,7 +2171,7 @@ function topField(f) {
 }
 function renderTopForm(data) {
   const fields = data.toptraders.fields;
-  const order = ["count", "days", "position_usd", "max_open", "max_per_day", "follow_sells", "stop_loss_pct", "max_hold_minutes", "min_liquidity_usd", "max_signal_age_seconds", "min_leader_sol"];
+  const order = ["count", "days", "position_usd", "max_open", "max_per_day", "follow_sells", "daily_loss_stop", "stop_loss_pct", "max_hold_minutes", "min_liquidity_usd", "max_signal_age_seconds", "min_leader_sol"];
   const byName = {}; for (const f of fields) byName[f.name] = f;
   put("top-form", `<div class="sn-grid" style="gap:0 24px">${order.filter((n) => byName[n]).map((n) => topField(byName[n])).join("")}</div>`);
 }

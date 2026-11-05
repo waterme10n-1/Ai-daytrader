@@ -585,6 +585,8 @@ class MemeEngine:
                 halted_day, halted_dd = self._halts(totals, day, wallet, sol_usd)
                 requested = force_scan or self._scan_requested
                 entries_allowed = not (self.kill_switch or self.paused or halted_day or halted_dd)
+                # Top 10 har ingen daglig tabsgrænse, medmindre du slår den til. Nødstop, pause og samlet tabsgrænse gælder altid.
+                top_entries_allowed = not (self.kill_switch or self.paused or halted_dd or (halted_day and self.top_cfg.daily_loss_stop))
                 if requested or now - self._last_scan >= self.settings.scan_seconds:
                     self._scan_requested = False
                     self._last_scan = now
@@ -594,7 +596,7 @@ class MemeEngine:
                     self._snipe(wallet, sol_usd, day, entries_allowed=entries_allowed)
                 if (self.top_cfg.enabled or self._held_top_wallets()) and (requested or now - self._last_top_poll >= TOP_POLL_SECONDS):
                     self._last_top_poll = now
-                    self._follow_top(wallet, sol_usd, day, entries_allowed=entries_allowed)
+                    self._follow_top(wallet, sol_usd, day, entries_allowed=top_entries_allowed)
                 if now - self._last_snapshot >= 300:
                     self._last_snapshot = now
                     self.store.add_equity(self.mode, self._totals()["equity"])
@@ -1773,7 +1775,8 @@ class MemeEngine:
             if name == "position_usd":
                 high = min(high, self.settings.position_usd)
             fields.append({"name": name, "label": TOP_LABELS[name], "value": getattr(cfg, name), "default": getattr(defaults, name), "bounds": [low, high], "kind": kinds[name]})
-        fields.append({"name": "follow_sells", "label": TOP_LABELS["follow_sells"], "value": cfg.follow_sells, "default": defaults.follow_sells, "kind": "bool"})
+        for name in ("follow_sells", "daily_loss_stop"):
+            fields.append({"name": name, "label": TOP_LABELS[name], "value": getattr(cfg, name), "default": getattr(defaults, name), "kind": "bool"})
         api = self.clients.top is not None
         cached = (self.store.get_json("top_traders", None) or {}) if api else {}
         leaders = (cached.get("traders") or [])[: cfg.count] if api else self._manual_leaders()
@@ -2484,7 +2487,12 @@ class MemeEngine:
             alerts.append({"level": "warning", "text": "Nye køb er sat på pause. Åbne positioner passes stadig."})
         today = utc_day()
         if self.store.get_state(f"halt_day:{self.mode}:{today}", "0") == "1":
-            alerts.append({"level": "warning", "text": "Dagens tabsgrænse er ramt. Ingen nye køb før i morgen (UTC)."})
+            top_runs = self.top_cfg.enabled and not self.top_cfg.daily_loss_stop
+            alerts.append({
+                "level": "warning",
+                "text": "Dagens tabsgrænse er ramt. Ingen nye køb før i morgen (UTC)."
+                + (" Top 10 kopierer stadig, fordi den ikke har en daglig tabsgrænse." if top_runs else ""),
+            })
         if self.store.get_state(f"halt_dd:{self.mode}", "0") == "1":
             alerts.append({"level": "warning", "text": "Drawdown-grænsen er ramt. Tryk Genoptag, når du har set på det."})
         if not self.settings.anthropic_api_key:

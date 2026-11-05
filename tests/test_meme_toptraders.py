@@ -255,3 +255,32 @@ def test_exit_rules_for_copies():
     assert top_exit_decision(ratio=1.9, peak_ratio=3.0, minutes_held=5, cfg=cfg, **common).kind == "trailing"
     assert top_exit_decision(ratio=1.1, peak_ratio=1.2, minutes_held=61, cfg=cfg, **common).kind == "time"
     assert top_exit_decision(ratio=1.0, peak_ratio=1.0, minutes_held=1, cfg=cfg, partial_taken=False, liquidity_entry=50_000, liquidity_now=10_000).kind == "rug_liquidity"
+
+
+def test_top_10_ignores_the_daily_loss_limit_unless_you_turn_it_on():
+    from trader.meme.store import utc_day
+
+    engine, rpc, _dex, _rug = _engine()
+    engine.update_toptraders({"enabled": True})
+    _poll(engine)
+    engine.store.set_state(f"halt_day:paper:{utc_day()}", "1")  # resten af botten har ramt dagens tabsgrænse
+    rpc.buy(A, "after-limit")
+    _poll(engine)
+    assert len(engine.store.open_positions("paper")) == 1  # Top 10 køber stadig
+    assert any("Top 10 kopierer stadig" in a["text"] for a in engine.status()["alerts"])
+
+    engine.update_toptraders({"daily_loss_stop": True})
+    second = "SecondMint111111111111111111111111111111111"
+    _dex.pairs[second] = raw_pair(second, symbol="TWO")
+    _rug.reports[second] = safe_report()
+    rpc.buy(B, "blocked", mint=second)
+    _poll(engine)
+    assert len(engine.store.open_positions("paper")) == 1
+    assert "tabsgrænse" in engine.status()["toptraders"]["signals"][0]["detail"]
+
+    engine.update_toptraders({"daily_loss_stop": False})
+    engine.store.set_state("halt_dd:paper", "1")  # den samlede tabsgrænse stopper altid
+    rpc.buy(B, "after-drawdown", mint=second)
+    _poll(engine)
+    rows = engine.store.open_positions("paper") + engine.store.closed_positions("paper")
+    assert all(row["mint"] != second for row in rows)  # intet nyt køb efter den samlede tabsgrænse
