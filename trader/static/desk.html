@@ -229,6 +229,78 @@
   .big { font: 700 26px var(--mono); }
   .toast { position: fixed; left: 50%; bottom: calc(var(--nav-h) + 90px + var(--safe-b)); transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 10px 15px; border-radius: var(--r-md); font-size: 13.5px; z-index: 50; max-width: calc(100% - 32px); }
 
+  /* ---------- mere fremtid ---------- */
+  h1 { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  body::after { content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 100; background: repeating-linear-gradient(to bottom, rgba(255, 255, 255, 0.022) 0 1px, transparent 1px 3px); }
+  :root[data-theme="light"] body::after { display: none; }
+  .hud::after { content: ""; position: absolute; inset: 8px; pointer-events: none; opacity: 0.6;
+    background:
+      linear-gradient(var(--cyan), var(--cyan)) top left / 14px 1.5px no-repeat, linear-gradient(var(--cyan), var(--cyan)) top left / 1.5px 14px no-repeat,
+      linear-gradient(var(--cyan), var(--cyan)) top right / 14px 1.5px no-repeat, linear-gradient(var(--cyan), var(--cyan)) top right / 1.5px 14px no-repeat,
+      linear-gradient(var(--violet), var(--violet)) bottom left / 14px 1.5px no-repeat, linear-gradient(var(--violet), var(--violet)) bottom left / 1.5px 14px no-repeat,
+      linear-gradient(var(--violet), var(--violet)) bottom right / 14px 1.5px no-repeat, linear-gradient(var(--violet), var(--violet)) bottom right / 1.5px 14px no-repeat; }
+
+  /* kursbånd */
+  .tape { overflow: hidden; border-bottom: 1px solid var(--border); background: rgba(0, 0, 0, 0.22); white-space: nowrap; -webkit-mask-image: linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent); mask-image: linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent); }
+  :root[data-theme="light"] .tape { background: rgba(10, 20, 60, 0.03); }
+  .tape-in { display: inline-flex; gap: 30px; padding: 6px 0; animation: tape 50s linear infinite; will-change: transform; }
+  .tape-in span { font: 600 11.5px var(--mono); letter-spacing: 0.02em; }
+  .tape-in b { color: var(--text); margin-right: 6px; }
+  @keyframes tape { to { transform: translateX(-50%); } }
+  body.idle .tape-in, body.idle .sweep, body.idle .dot.on { animation-play-state: paused; }
+
+  /* radarskærm og systemer */
+  .duo { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+  .scope { position: relative; width: 100%; max-width: 330px; aspect-ratio: 1; margin: 4px auto 0; border-radius: 50%; overflow: hidden; border: 1px solid var(--border-strong);
+    background: radial-gradient(circle, rgba(34, 225, 255, 0.09), transparent 70%), var(--panel-2); }
+  .scope > svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .sweep { position: absolute; inset: 0; border-radius: 50%; background: conic-gradient(from 0deg, transparent 0deg 290deg, rgba(34, 225, 255, 0.05) 300deg, rgba(34, 225, 255, 0.4) 360deg); animation: sweep 4.5s linear infinite; will-change: transform; }
+  @keyframes sweep { to { transform: rotate(360deg); } }
+  .blip { position: absolute; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%; border: 0; padding: 0; background: var(--bc); box-shadow: 0 0 12px var(--bc); z-index: 2; }
+  .blip.flag { outline: 2px solid var(--cyan); outline-offset: 3px; }
+  .blip i { position: absolute; left: 15px; top: -3px; font: 700 10px var(--mono); font-style: normal; color: var(--text-2); white-space: nowrap; pointer-events: none; }
+  .scope-legend { display: flex; justify-content: space-between; gap: 8px; margin-top: 10px; font: 600 10px var(--mono); color: var(--muted); letter-spacing: 0.06em; }
+  .sys > div { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+  .sys > div:last-child { border-bottom: 0; }
+  .light { width: 9px; height: 9px; border-radius: 50%; flex: none; background: var(--muted); }
+  .light.ok { background: var(--up); box-shadow: 0 0 9px var(--up); }
+  .light.warn { background: var(--warn); box-shadow: 0 0 9px var(--warn); }
+  .light.bad { background: var(--down); box-shadow: 0 0 9px var(--down); }
+  .sys .nm { font: 700 10.5px var(--mono); letter-spacing: 0.1em; width: 92px; flex: none; }
+  .sys .val { font-size: 12.5px; color: var(--text-2); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* live-positioner: bane fra stop til mål */
+  .pos + .pos { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
+  .traj { position: relative; height: 8px; border-radius: 4px; margin: 22px 4px 24px; background: linear-gradient(90deg, rgba(255, 77, 109, 0.45), var(--raised-2) 45%, rgba(46, 242, 160, 0.45)); }
+  .traj .entry { position: absolute; top: -4px; bottom: -4px; width: 2px; margin-left: -1px; background: var(--text-2); }
+  .traj .mk { position: absolute; top: 50%; width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 50%; background: var(--text); box-shadow: 0 0 0 3px var(--panel), 0 0 16px var(--cyan); transition: left 0.6s ease; }
+  .traj .tk { position: absolute; top: 14px; transform: translateX(-50%); font: 600 10px var(--mono); color: var(--muted); white-space: nowrap; }
+  .traj .tk.up-t { top: -20px; }
+  .traj .tk.l { transform: none; left: 0; } .traj .tk.r { transform: none; right: 0; left: auto; }
+
+  /* ark, kommandolinje og opstart */
+  .overlay { position: fixed; inset: 0; z-index: 70; background: rgba(2, 3, 8, 0.62); display: flex; align-items: flex-end; justify-content: center; }
+  .sheet { width: min(560px, 100%); max-height: 86vh; overflow: auto; background: var(--panel); border: 1px solid var(--border-strong); border-radius: 22px 22px 0 0; padding: 18px 18px calc(18px + var(--safe-b)); animation: rise 0.2s ease-out; }
+  .sheet .big-spark { width: 100%; height: 90px; display: block; margin: 8px 0 12px; }
+  .facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .facts > div { background: var(--raised); border-radius: var(--r-md); padding: 8px 10px; }
+  .facts b { display: block; font: 700 15px var(--mono); }
+  .overlay.top { align-items: flex-start; }
+  .pal { width: min(560px, calc(100% - 24px)); margin-top: 10vh; background: var(--panel); border: 1px solid var(--border-strong); border-radius: 18px; overflow: hidden; box-shadow: 0 0 46px rgba(91, 140, 255, 0.28); animation: rise 0.15s ease-out; }
+  .pal input { width: 100%; border: 0; border-bottom: 1px solid var(--border); background: transparent; padding: 15px 16px; font: 500 15px var(--mono); outline: none; }
+  .pal-list { max-height: 50vh; overflow: auto; padding: 6px; }
+  .pal-list button { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; border: 0; background: transparent; padding: 10px 12px; border-radius: 10px; font-size: 14px; }
+  .pal-list button.sel { background: var(--raised-2); }
+  .pal-list .k { margin-left: auto; font: 600 10.5px var(--mono); color: var(--muted); }
+  .boot { position: fixed; inset: 0; z-index: 95; background: var(--bg); display: grid; place-items: center; transition: opacity 0.35s; }
+  .boot pre { font: 500 13px/1.75 var(--mono); color: var(--cyan); margin: 0; min-width: 280px; text-shadow: 0 0 10px rgba(34, 225, 255, 0.45); }
+  .boot pre b { color: var(--up); }
+  .boot.done { opacity: 0; pointer-events: none; }
+  @keyframes rise { from { transform: translateY(18px); opacity: 0; } }
+  @media (min-width: 761px) { .overlay:not(.top) { align-items: center; } .sheet { border-radius: 22px; } }
+  @media (max-width: 430px) { .hide-xs { display: none; } .bar .btn.stop { padding: 8px 11px; } .bar { gap: 8px; } }
+  @media (max-width: 760px) { .duo, .facts { grid-template-columns: 1fr 1fr; } .duo { grid-template-columns: 1fr; } }
+
   @media (max-width: 760px) {
     .g3, .bots, .form { grid-template-columns: 1fr; }
     .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -263,11 +335,14 @@
         </div>
       </div>
       <button class="btn stop" id="pause-btn" type="button">Stop nu</button>
-      <button class="icon-btn" id="theme" type="button" title="Skift tema" aria-label="Skift tema"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.5a6.5 6.5 0 0 1 0 13z" fill="currentColor"/></svg></button>
+      <button class="icon-btn" id="pal-btn" type="button" title="Kommandoer (⌘K)" aria-label="Kommandoer"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 17l6-5-6-5M12 19h8"/></svg></button>
+      <button class="icon-btn hide-xs" id="sound-btn" type="button" title="Lyd og vibration ved køb og salg" aria-label="Lyd" aria-pressed="false"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5L6 9H3v6h3l5 4z"/><path id="sound-wave" d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg></button>
+      <button class="icon-btn hide-xs" id="theme" type="button" title="Skift tema" aria-label="Skift tema"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.5a6.5 6.5 0 0 1 0 13z" fill="currentColor"/></svg></button>
     </div>
     <nav class="tabs" role="tablist" id="tabs"></nav>
   </div>
 </header>
+<div class="tape" id="tape-wrap" hidden><div class="tape-in" id="tape"></div></div>
 
 <main class="wrap">
   <div class="alerts" id="alerts"></div>
@@ -275,7 +350,7 @@
   <section id="tab-home" class="stack">
     <div id="approvals" class="stack"></div>
     <div class="g3">
-      <div class="panel edge hero">
+      <div class="panel edge hero hud">
         <div class="label">Papirkonto · Alpaca</div>
         <div class="equity" id="equity">–</div>
         <div class="row small"><span class="muted">Bordets resultat</span><b class="num" id="pnl">–</b><span class="muted" id="pnl-n"></span></div>
@@ -310,8 +385,30 @@
       <h3><span>Seneste handel</span><span class="label" id="chain-title"></span></h3>
       <div class="chain-row" id="chain"></div>
     </div>
+    <div class="panel edge hud" id="live-panel" hidden>
+      <h3><span>Live-positioner</span><span class="label">stop · indgang · mål</span></h3>
+      <div id="live"></div>
+    </div>
+    <div class="duo">
+      <div class="panel hud">
+        <h3><span>Radar</span><span class="label" id="scope-ts"></span></h3>
+        <div class="scope" id="scope">
+          <svg viewBox="0 0 100 100" aria-hidden="true">
+            <g fill="none" stroke="var(--border-strong)" stroke-width="0.35"><circle cx="50" cy="50" r="46"/><circle cx="50" cy="50" r="32"/><circle cx="50" cy="50" r="18"/><circle cx="50" cy="50" r="11" stroke="var(--warn)" stroke-dasharray="1.5 1.5"/></g>
+            <g stroke="var(--border)" stroke-width="0.35"><line x1="50" y1="2" x2="50" y2="98"/><line x1="2" y1="50" x2="98" y2="50"/></g>
+          </svg>
+          <div class="sweep"></div>
+          <div id="blips"></div>
+        </div>
+        <div class="scope-legend"><span>MIDTEN = SCOUT MARKERER</span><span>TRYK PÅ EN PRIK</span></div>
+      </div>
+      <div class="panel hud">
+        <h3><span>Systemer</span><span class="label" id="sys-ts"></span></h3>
+        <div class="sys" id="sys"></div>
+      </div>
+    </div>
     <div class="panel">
-      <h3><span>Radar</span><span class="label" id="radar-ts"></span></h3>
+      <h3><span>Watchlist</span><span class="label" id="radar-ts"></span></h3>
       <div class="radar" id="radar"></div>
       <p class="small muted" style="margin:10px 0 0">Bjælken viser, hvor tæt aktien er på SCOUT's grænse (bevægelse eller volumen). Gul = tæt på, blå kant = markeret i dag.</p>
     </div>
@@ -401,6 +498,9 @@
   </div>
 </div>
 <div class="toast" id="toast" hidden></div>
+<div class="overlay" id="sheet-bg" hidden><div class="sheet" id="sheet" role="dialog" aria-modal="true"></div></div>
+<div class="overlay top" id="pal-bg" hidden><div class="pal" role="dialog" aria-modal="true" aria-label="Kommandoer"><input id="pal-input" placeholder="Skriv en kommando eller en ticker …" autocomplete="off" spellcheck="false"><div class="pal-list" id="pal-list"></div></div></div>
+<div class="boot" id="boot" hidden><pre id="boot-text"></pre></div>
 
 <script>
 const BOT = {
@@ -630,7 +730,7 @@ function renderBots(d) {
 // Kun den fane, du kigger på, bliver tegnet. Det holder telefonen kølig.
 function renderTab() {
   const d = state;
-  if (tab === "home") { renderHome(d); tickClock(); }
+  if (tab === "home") { renderHome(d); renderScope(d); renderSystems(d); renderLive(d); tickClock(); }
   else if (tab === "trades") renderTrades(d);
   else if (tab === "learn") renderLearn(d);
   else if (tab === "bots") renderBots(d);
@@ -646,6 +746,7 @@ function render(d, fresh) {
   $("badge").hidden = !count; $("badge").textContent = count;
   notifyApprovals(d.approvals || []);
   renderChat(fresh);
+  renderTape(d);
   renderTab();
 }
 
@@ -726,11 +827,204 @@ async function refresh() {
     const d = await r.json(), first = lastId === 0;
     const fresh = d.messages.filter((m) => m.id > lastId);
     messages.push(...fresh); if (messages.length > 400) messages.splice(0, messages.length - 400);
+    if (!first) onFresh(fresh);
     lastId = d.last_message_id || lastId;
     render(d, first ? null : fresh);
   } catch (err) { $("alerts").innerHTML = `<div class="alert error">Ingen forbindelse til serveren.</div>`; }
   finally { busy = false; }
 }
+// ---------- mere fremtid ----------
+const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+function ago(iso) {
+  const d = new Date(iso); if (!iso || isNaN(d)) return "";
+  const min = Math.round((Date.now() - d) / 60000);
+  return min < 1 ? "lige nu" : min < 60 ? `for ${min} min siden` : `kl. ${hhmm(iso)}`;
+}
+const quoteMap = () => Object.fromEntries((((state || {}).quotes || {}).items || []).map((x) => [x.symbol, x]));
+function heatOf(x, p) { return Math.min(1, Math.max(Math.abs(x.move_pct) / p.move_pct, x.volume_x / p.volume_x)); }
+
+// radarskærm: jo tættere på midten, jo tættere på SCOUT's grænse
+let scopeKey = "";
+function renderScope(d) {
+  const items = ((d.quotes || {}).items || []).filter((x) => x.symbol !== "SPY"), p = d.params;
+  const key = `${(d.quotes || {}).ts}|${p.move_pct}|${p.volume_x}|${items.map((x) => x.flagged ? 1 : 0).join("")}`;
+  $("scope-ts").textContent = items.length ? `scan ${hhmm(d.quotes.ts)}` : "slukket";
+  if (key === scopeKey) return;
+  scopeKey = key;
+  $("blips").innerHTML = items.map((x, i) => {
+    const r = 9 + (1 - heatOf(x, p)) * 37, a = i * 2.39996 - Math.PI / 2;
+    const left = 50 + r * Math.cos(a), top = 50 + r * Math.sin(a);
+    const c = x.day_pct >= 0 ? "var(--up)" : "var(--down)";
+    return `<button class="blip ${x.flagged ? "flag" : ""}" style="left:${left.toFixed(1)}%;top:${top.toFixed(1)}%;--bc:${c}" data-ticker="${esc(x.symbol)}" aria-label="${esc(x.symbol)}"><i>${esc(x.symbol)}</i></button>`;
+  }).join("");
+}
+
+// systempanel som i et rumskib
+function renderSystems(d) {
+  const m = d.market || {}, ai = d.ai || {}, sys = d.systems || {}, err = (d.engine || {}).last_error;
+  const rules = ((d.learning || {}).rules || []).filter((r) => r.active).length;
+  const rows = [
+    ["ALPACA", !d.keys_present ? "bad" : err ? "bad" : "ok", !d.keys_present ? "mangler nøgler" : err ? err : "forbundet til papirkontoen"],
+    ["MARKED", m.is_open ? "ok" : m.is_open === false ? "" : "warn", m.is_open ? "åbent" : m.is_open === false ? "lukket" : "ukendt"],
+    ["SCOUT", d.paused ? "warn" : sys.last_scan ? "ok" : m.is_open ? "warn" : "", d.paused ? "på pause" : sys.last_scan ? `kiggede ${ago(sys.last_scan)}` : m.is_open ? "venter på første scan" : "sover til markedet åbner"],
+    ["CLAUDE", ai.configured ? "ok" : "warn", ai.configured ? `${money(ai.spent_today_usd)} af ${money(ai.budget_usd)} USD i dag` : "kun faste regler"],
+    ["AUTOPILOT", d.params.auto_approve ? "ok" : "warn", d.params.auto_approve ? "køber selv på papir" : "du godkender hver ordre"],
+    ["LÆRING", rules ? "ok" : "", rules ? `${rules} regel${rules > 1 ? "er" : ""} aktiv` : "samler data"],
+    ["TELEGRAM", sys.telegram ? "ok" : "", sys.telegram ? "beskeder til telefonen" : "ikke sat op"],
+  ];
+  $("sys").innerHTML = rows.map(([n, c, v]) => `<div><span class="light ${c}"></span><span class="nm">${n}</span><span class="val" title="${esc(v)}">${esc(v)}</span></div>`).join("");
+  $("sys-ts").textContent = sys.last_tick ? `puls ${hhmm(sys.last_tick)}` : "";
+}
+
+// live-positioner med bane fra stop til mål
+function renderLive(d) {
+  const open = d.open || [], q = quoteMap();
+  $("live-panel").hidden = !open.length;
+  if (!open.length) return;
+  $("live").innerHTML = open.map((p) => {
+    const fill = p.fill_price || p.entry, now = (q[p.symbol] || {}).price || fill;
+    const span = p.target - p.stop || 1, at = (v) => Math.min(100, Math.max(0, ((v - p.stop) / span) * 100));
+    const pnl = (now - fill) * (p.qty || 0);
+    return `<div class="pos"><div class="row" style="justify-content:space-between"><b style="font-family:var(--display)">${esc(p.symbol)} <span class="muted small">${p.qty} stk</span></b><b class="num ${pnl >= 0 ? "up" : "down"}">${money(pnl, true)} USD</b></div>
+      <div class="traj"><span class="entry" style="left:${at(fill).toFixed(1)}%"></span><span class="mk" style="left:${at(now).toFixed(1)}%" title="Kurs ${price(now)}"></span>
+      <span class="tk l">STOP ${price(p.stop)}</span><span class="tk up-t" style="left:${at(fill).toFixed(1)}%">IND ${price(fill)}</span><span class="tk r">MÅL ${price(p.target)}</span></div></div>`;
+  }).join("");
+}
+
+// kursbånd
+let tapeTs = "";
+function renderTape(d) {
+  const items = (d.quotes || {}).items || [];
+  $("tape-wrap").hidden = !items.length;
+  if (!items.length || d.quotes.ts === tapeTs) return;
+  tapeTs = d.quotes.ts;
+  const one = items.map((x) => `<span><b>${esc(x.symbol === "SPY" ? "S&P 500" : x.symbol)}</b>${price(x.price)} <span class="${x.day_pct >= 0 ? "up" : "down"}">${x.day_pct >= 0 ? "▲" : "▼"} ${pct(x.day_pct)}</span></span>`).join("");
+  $("tape").innerHTML = one + one;
+}
+
+// detaljekort for en ticker
+function openTicker(sym) {
+  const x = quoteMap()[sym];
+  const props = ((state || {}).proposals || []).filter((p) => p.symbol === sym).slice(0, 6);
+  const col = x && x.day_pct >= 0 ? "var(--up)" : "var(--down)";
+  const path = x ? sparkPath(x.spark, 300, 90, 4) : "";
+  $("sheet").innerHTML = `<div class="row" style="justify-content:space-between"><h2 style="font-size:24px">${esc(sym)}</h2><button class="icon-btn" data-close aria-label="Luk">✕</button></div>
+    ${x ? `<div class="row"><span class="num" style="font-size:22px;font-weight:700">${price(x.price)}</span><span class="num ${x.day_pct >= 0 ? "up" : "down"}">${pct(x.day_pct)} i dag</span>${x.flagged ? '<span class="chip on">markeret i dag</span>' : ""}</div>
+    <svg class="big-spark" viewBox="0 0 300 90" preserveAspectRatio="none">${path ? `<path d="${path}" fill="none" stroke="${col}" stroke-width="2" vector-effect="non-scaling-stroke"/>` : ""}</svg>
+    <div class="facts"><div><span class="label">1 time</span><b class="${x.move_pct >= 0 ? "up" : "down"}">${pct(x.move_pct)}</b></div><div><span class="label">Volumen</span><b>${x.volume_x}x</b></div><div><span class="label">Mod VWAP</span><b>${pct(x.vs_vwap_pct)}</b></div></div>
+    <div class="meter ${heatOf(x, state.params) >= 0.7 ? "hot" : ""}" style="margin-top:12px"><i style="width:${Math.round(heatOf(x, state.params) * 100)}%"></i></div>
+    <div class="small muted" style="margin-top:4px">${Math.round(heatOf(x, state.params) * 100)}% af vejen til SCOUT's grænse (${state.params.move_pct}% på en time eller ${state.params.volume_x}x volumen)</div>` : `<p class="muted">Ingen kurs endnu. Den kommer, når markedet er åbent.</p>`}
+    <h3 style="margin:16px 0 6px;font-size:15px">Bordets forslag i ${esc(sym)}</h3>
+    <div class="list small">${props.length ? props.map((p) => `<div class="row" style="justify-content:space-between"><span class="num">${esc(p.trading_day.slice(5))}</span>${p.ruling ? `<span class="tag ${esc(p.ruling)}">${esc(p.ruling)}</span>` : ""}<span>${esc(p.status_label)}</span><span class="num ${(p.pnl || 0) >= 0 ? "up" : "down"}">${p.pnl !== null && p.pnl !== undefined ? money(p.pnl, true) : ""}</span></div>`).join("") : '<div class="muted">Ingen endnu.</div>'}</div>
+    <div class="actions"><button class="btn go" data-ask="SKEPTIC" data-sym="${esc(sym)}">Spørg SKEPTIC</button><button class="btn" data-ask="NEWS" data-sym="${esc(sym)}">Spørg NEWS</button></div>`;
+  $("sheet-bg").hidden = false;
+}
+const closeOverlays = () => { $("sheet-bg").hidden = true; $("pal-bg").hidden = true; };
+document.addEventListener("click", async (e) => {
+  const blip = e.target.closest("[data-ticker]");
+  if (blip) { openTicker(blip.dataset.ticker); return; }
+  if (e.target.closest("[data-close]") || e.target === $("sheet-bg") || e.target === $("pal-bg")) { closeOverlays(); return; }
+  const ask = e.target.closest("[data-ask]");
+  if (ask) {
+    const text = ask.dataset.ask === "NEWS" ? `@NEWS hvorfor bevæger ${ask.dataset.sym} sig i dag?` : `@SKEPTIC hvad er de største risici ved at købe ${ask.dataset.sym} lige nu?`;
+    closeOverlays(); showTab("chat");
+    try { await post("/api/desk/message", { text }); } catch (err) { toast(err.message); }
+    refresh();
+  }
+});
+$("radar").addEventListener("click", (e) => { const t = e.target.closest(".tile"); if (t) openTicker(t.querySelector(".sym").textContent); });
+
+// lyd og vibration ved køb og salg (slås til i toppen)
+let soundOn = false, audio = null;
+try { soundOn = localStorage.getItem("desk-sound") === "1"; } catch (e) {}
+function setSound(on) {
+  soundOn = on; $("sound-btn").setAttribute("aria-pressed", String(on)); $("sound-wave").style.opacity = on ? 1 : 0.2;
+  try { localStorage.setItem("desk-sound", on ? "1" : "0"); } catch (e) {}
+}
+function beep(good) {
+  if (!soundOn) return;
+  try {
+    audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+    const t = audio.currentTime;
+    [good ? 660 : 330, good ? 990 : 247].forEach((f, i) => {
+      const o = audio.createOscillator(), g = audio.createGain();
+      o.type = "sine"; o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t + i * 0.12); g.gain.exponentialRampToValueAtTime(0.12, t + i * 0.12 + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + i * 0.12 + 0.2);
+      o.connect(g).connect(audio.destination); o.start(t + i * 0.12); o.stop(t + i * 0.12 + 0.22);
+    });
+    if (navigator.vibrate) navigator.vibrate(good ? [40, 50, 40] : [140]);
+  } catch (e) {}
+}
+setSound(soundOn);
+$("sound-btn").onclick = () => { setSound(!soundOn); if (soundOn) beep(true); toast(soundOn ? "Lyd og vibration ved køb og salg er slået til." : "Lyd slået fra."); };
+function onFresh(list) {
+  for (const m of list) {
+    if (m.kind === "fill") beep(true);
+    if (m.kind === "close") beep(((m.data || {}).pnl || 0) >= 0);
+  }
+}
+
+// kommandolinje (⌘K)
+function commands(q) {
+  const s = q.trim().toLowerCase();
+  const list = [
+    ["Stop nu – sæt alt på pause", "P", () => post("/api/desk/pause", { paused: true }).then(refresh)],
+    ["Start igen", "", () => post("/api/desk/pause", { paused: false }).then(refresh)],
+    ["Lad SCOUT kigge nu", "S", () => action("/api/desk/scan", () => "SCOUT kigger nu.")],
+    ["Skriv dagslog", "", () => action("/api/desk/log", () => "Dagsloggen er skrevet i gruppen.")],
+    ["Test Alpaca-forbindelsen", "", () => { showTab("bots"); $("diag-btn").click(); }],
+    ...TABS.map(([k, t], i) => [`Gå til ${t}`, String(i + 1), () => showTab(k)]),
+    ["Skift tema", "", () => $("theme").click()],
+    [`Lyd ${soundOn ? "fra" : "til"}`, "", () => $("sound-btn").click()],
+  ];
+  const tickers = (((state || {}).params || {}).watchlist || []).filter((t) => s && t.toLowerCase().startsWith(s.replace(/^\$/, ""))).map((t) => [`Vis ${t}`, "", () => openTicker(t)]);
+  const out = [...tickers, ...list.filter(([t]) => !s || t.toLowerCase().includes(s))];
+  if (s && (s.startsWith("@") || s.startsWith("spørg") || !out.length)) out.unshift([`Send til gruppen: ${q.trim()}`, "↵", () => { showTab("chat"); post("/api/desk/message", { text: q.trim() }).then(refresh).catch((err) => toast(err.message)); }]);
+  return out.slice(0, 9);
+}
+let palSel = 0, palItems = [];
+function drawPal() {
+  palItems = commands($("pal-input").value);
+  palSel = Math.min(palSel, Math.max(0, palItems.length - 1));
+  $("pal-list").innerHTML = palItems.map(([t, k], i) => `<button type="button" class="${i === palSel ? "sel" : ""}" data-pal="${i}"><span>${esc(t)}</span>${k ? `<span class="k">${esc(k)}</span>` : ""}</button>`).join("") || '<div class="muted small" style="padding:10px 12px">Ingen kommandoer.</div>';
+}
+function openPal() { $("pal-bg").hidden = false; $("pal-input").value = ""; palSel = 0; drawPal(); $("pal-input").focus(); }
+function runPal(i) { const c = palItems[i]; closeOverlays(); if (c) Promise.resolve(c[2]()).catch((err) => toast(err.message)); }
+$("pal-btn").onclick = openPal;
+$("pal-input").oninput = () => { palSel = 0; drawPal(); };
+$("pal-input").onkeydown = (e) => {
+  if (e.key === "ArrowDown") { palSel = Math.min(palItems.length - 1, palSel + 1); drawPal(); e.preventDefault(); }
+  else if (e.key === "ArrowUp") { palSel = Math.max(0, palSel - 1); drawPal(); e.preventDefault(); }
+  else if (e.key === "Enter") { runPal(palSel); e.preventDefault(); }
+};
+$("pal-list").onclick = (e) => { const b = e.target.closest("[data-pal]"); if (b) runPal(Number(b.dataset.pal)); };
+
+// genveje
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") { closeOverlays(); return; }
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); openPal(); return; }
+  if (e.target.closest("input, textarea") || e.metaKey || e.ctrlKey || e.altKey) return;
+  const n = Number(e.key);
+  if (n >= 1 && n <= TABS.length) showTab(TABS[n - 1][0]);
+  else if (e.key === "/") { e.preventDefault(); showTab("chat"); $("text").focus(); }
+  else if (e.key.toLowerCase() === "k") openPal();
+});
+
+// animationer holder pause, når siden ikke ses
+document.addEventListener("visibilitychange", () => document.body.classList.toggle("idle", document.hidden));
+
+// opstart: kort terminal første gang i en session
+(function boot() {
+  let seen = true; try { seen = sessionStorage.getItem("desk-booted") === "1"; sessionStorage.setItem("desk-booted", "1"); } catch (e) {}
+  if (seen || reduced) return;
+  const lines = ["HANDELSBORDET // KONTROLRUM", "> forbinder til papirkontoen ...", "> SCOUT · NEWS · CHART online", "> SKEPTIC kalibreret mod lærte regler", "> SIZER lofter låst", "> EXECUTOR klar", "<b>SYSTEM OK</b>"];
+  const el = $("boot"), out = $("boot-text"); el.hidden = false;
+  let i = 0;
+  const done = () => { el.classList.add("done"); setTimeout(() => (el.hidden = true), 400); };
+  el.onclick = done;
+  const step = setInterval(() => { out.innerHTML += (i ? "\n" : "") + lines[i]; i += 1; if (i >= lines.length) { clearInterval(step); setTimeout(done, 350); } }, 150);
+})();
+
 let start = "home";
 try { const t = localStorage.getItem("desk-tab"); if (t && document.getElementById("tab-" + t)) start = t; } catch (e) {}
 showTab(start);

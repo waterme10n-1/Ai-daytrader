@@ -105,6 +105,7 @@ class DeskEngine:
         self.last_tick: str | None = None
         self.scanning = False
         self._quotes: dict = {"ts": None, "items": []}
+        self.last_scan: str | None = None
         if self.store.get_state("welcome") is None:
             self.store.set_state("welcome", "1")
             self.store.post(
@@ -367,6 +368,7 @@ class DeskEngine:
             intraday = broker.get_intraday(everything, now)
             daily = self._daily(broker, everything, now)
             self._quotes = {"ts": now.isoformat(timespec="seconds"), "items": rules.quotes(everything, intraday, daily, now, flagged)}
+            self.last_scan = now.isoformat(timespec="seconds")
             if left <= 0:
                 return 0
             symbols = [symbol for symbol in cfg.watchlist if symbol not in flagged]
@@ -1121,6 +1123,11 @@ class DeskEngine:
                 "max_open": cfg.max_open,
             },
             "quotes": self._quotes,
+            "systems": {
+                "last_scan": self.last_scan,
+                "last_tick": self.last_tick,
+                "telegram": bool(self.main_settings.telegram_bot_token and self.main_settings.telegram_chat_id),
+            },
             "equity_curve": _curve(trades),
             "kpis": {
                 "trades": len(trades),
