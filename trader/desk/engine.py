@@ -16,7 +16,7 @@ from zoneinfo import ZoneInfo
 
 from trader.config import Settings
 from trader.desk.alpaca import ET_NAME, AlpacaPaper, BrokerError
-from trader.desk import rules
+from trader.desk import learning, rules
 from trader.desk.agents import BOTS, DeskBrain, bot_rules
 from trader.desk.config import (
     HARD_MAX_FLAGS,
@@ -25,6 +25,7 @@ from trader.desk.config import (
     HARD_MAX_STOP_PCT,
     HARD_MIN_REWARD_RISK,
     DeskSettings,
+    key_problem,
     parse_watchlist,
 )
 from trader.desk.store import DeskStore
@@ -284,8 +285,8 @@ class DeskEngine:
             self.store.post(
                 "system",
                 "info",
-                f"Papirmåneden starter i dag med {account.equity:,.0f} USD. Uge 1: godkend intet. Læs med, og tjek at "
-                "SKEPTIC faktisk siger nej.",
+                f"Bordet er i gang med {account.equity:,.0f} USD på papirkontoen. Det lærer af hver handel: "
+                "taber den samme slags køb flere gange, får den slags WAIT fremover.",
             )
 
     def _last_price(self, broker, symbol: str, now: datetime) -> float | None:
@@ -394,12 +395,20 @@ class DeskEngine:
         self.store.update_proposal(pid, entry=plan.entry, stop=plan.stop, target=plan.target)
 
         # SKEPTIC
-        verdict = self.brain.skeptic(flag.to_dict(), news, plan.to_dict(), self.skeptic_record())
+        learned = self.learned()
+        record = {**self.skeptic_record(), **learning.for_prompt(self.store.get_json("lessons", []) or [], learned)}
+        verdict = self.brain.skeptic(flag.to_dict(), news, plan.to_dict(), record)
         if verdict is None:
             verdict = rules.rules_skeptic(flag.to_dict(), news, plan.to_dict(), now, stop_max_pct=cfg.stop_max_pct)
         if not news.get("has_reason") and verdict["ruling"] != "SKIP":
             verdict["ruling"] = "SKIP"
             verdict["summary"] = "Ingen klar grund fra NEWS, så reglen siger SKIP."
+        blocked = learning.blocking(learned, flag.to_dict(), news, plan.to_dict()) if verdict["ruling"] == "BUY" else []
+        if blocked:
+            verdict["ruling"] = "WAIT"
+            verdict["learned"] = [rule["key"] for rule in blocked]
+            verdict["reasons"] = list(verdict.get("reasons") or [])[:2] + ["Lært af fejl: " + learning.rule_text(blocked[0])]
+            verdict["summary"] = "En lært regel siger WAIT."
         reasons = verdict.get("reasons") or []
         numbered = " ".join(f"{index}) {text}" for index, text in enumerate(reasons, start=1))
         label = "" if verdict.get("source") == "claude" else " (regelbaseret, ikke Claude)"
@@ -803,13 +812,22 @@ class DeskEngine:
             if outcome is not None:
                 self.store.update_proposal(row["id"], shadow=outcome)
 
+    def learned(self) -> list[dict]:
+        return learning.evaluate(self.store.proposals(500))
+
     def day_log(self, day: str | None = None, now: datetime | None = None) -> str:
         now = (now or self._now()).astimezone(ET)
         day = day or now.date().isoformat()
+        before = self.learned()
         try:
             self._shadows(day, now)
         except Exception as exc:
             logger.info("Skyggeregnskab fejlede: %s", exc)
+        after = self.learned()
+        lessons = learning.day_lessons(self.store.proposals_on(day), before, after)
+        if lessons:
+            self.store.set_json("lessons", learning.add_lessons(self.store.get_json("lessons", []) or [], day, lessons))
+            self.store.post("skeptic", "lesson", "Lært i dag: " + " ".join(lessons))
         rows = self.store.proposals_on(day)
         lines = [f"Dagslog {day}."]
         trades = [row for row in rows if row["status"] in ("placed", "closed")]
@@ -845,14 +863,65 @@ class DeskEngine:
         notify(self.main_settings, "Handelsbordet: " + text)
         return text
 
+    def diagnose(self) -> dict:
+        """Knappen 'Test Alpaca-forbindelsen': hver del for sig, så man kan se præcis, hvad der fejler."""
+        key, secret = self.base.alpaca_api_key, self.base.alpaca_secret_key
+        keys = {
+            "key_source": self.base.key_source or ("testmægler" if self._injected_broker else "mangler"),
+            "secret_source": self.base.secret_source or ("testmægler" if self._injected_broker else "mangler"),
+            "key_start": key[:2] if key else "",
+            "key_length": len(key),
+            "secret_length": len(secret),
+            "hints": [],
+        }
+        if self.base.key_source and self.base.secret_source and self.base.key_source.startswith("DESK") != self.base.secret_source.startswith("DESK"):
+            keys["hints"].append(f"Key kommer fra {self.base.key_source}, men Secret fra {self.base.secret_source}. De skal være et par fra samme sted.")
+        problem = key_problem(key)
+        if problem:
+            keys["hints"].append(problem)
+        if key and len(key) < 16:
+            keys["hints"].append(f"Key er kun {len(key)} tegn. Alpaca-nøgler er normalt omkring 20 tegn, så den er måske ikke kopieret helt.")
+        if secret and len(secret) < 30:
+            keys["hints"].append(f"Secret er kun {len(secret)} tegn. Den er normalt omkring 40 tegn, så den er måske ikke kopieret helt.")
+        if secret.upper().startswith(("PK", "AK")) and not key.upper().startswith(("PK", "AK")):
+            keys["hints"].append("Secret starter med PK eller AK. Key og Secret er nok byttet om.")
+        if not self.keys_present:
+            return {"ok": False, "keys": keys, "checks": [], "text": "Ingen nøgler fundet. Sæt DESK_ALPACA_API_KEY og DESK_ALPACA_SECRET_KEY i Railway og genstart."}
+        try:
+            broker = self.broker()
+        except BrokerError as exc:
+            return {"ok": False, "keys": keys, "checks": [], "text": str(exc)}
+        now = self._now().astimezone(ET)
+        tests = [
+            ("Handelskontoen", lambda: f"Saldo {broker.get_account().equity:,.2f} USD"),
+            ("Markedets ur", lambda: "Åbent" if broker.get_clock().is_open else "Lukket lige nu (det er i orden)"),
+            ("Kursdata", lambda: f"{len(broker.get_daily(['SPY'], 5, now).get('SPY') or [])} dagsbarer for SPY"),
+            ("Nyheder", lambda: f"{len(broker.get_news(['SPY'], now))} overskrifter"),
+        ]
+        checks = []
+        for name, run in tests:
+            try:
+                checks.append({"name": name, "ok": True, "detail": run()})
+            except Exception as exc:
+                checks.append({"name": name, "ok": False, "detail": str(exc)})
+        ok = all(item["ok"] for item in checks)
+        if ok:
+            self.last_error = ""
+            text = "Alt virker. Bordet kan handle på papirkontoen."
+        elif not checks[0]["ok"]:
+            text = "Handelskontoen afviser nøglerne. Se tipsene ovenfor, eller lav et nyt nøglesæt på Paper-kontoen."
+        else:
+            text = "Handelskontoen virker, men en af de andre dele fejler. Se detaljerne."
+        return {"ok": ok, "keys": keys, "checks": checks, "text": text}
+
     def compare(self) -> dict:
-        """Bordet mod at holde S&P 500 (SPY) siden papirmånedens første dag."""
+        """Bordet mod at holde S&P 500 (SPY) siden bordets første dag."""
         start = self.store.get_json("desk_start")
         trades = self.store.closed_trades()
         pnl = round(sum(float(row["pnl"]) for row in trades), 2)
         result: dict[str, Any] = {"started": bool(start), "trades": len(trades), "pnl": pnl}
         if not start:
-            result["text"] = "Papirmåneden er ikke startet endnu. Den starter første gang markedet er åbent."
+            result["text"] = "Bordet starter første gang markedet er åbent. Så måles det mod S&P 500 derfra."
             return result
         now = self._now().astimezone(ET)
         equity0 = float(start.get("equity") or 0)
@@ -871,7 +940,6 @@ class DeskEngine:
             {
                 "start_date": start["date"],
                 "days": days,
-                "week": days // 7 + 1,
                 "desk_pct": round(desk_pct, 2),
                 "spy_pct": round(spy_pct, 2) if spy_pct is not None else None,
                 "win_rate": round(len(wins) / len(trades), 3) if trades else None,
@@ -884,8 +952,7 @@ class DeskEngine:
             result["text"] = f"Bordet: {desk_pct:+.2f}%, SPY: {spy_pct:+.2f}% siden {start['date']}. Bordet slår indtil videre at holde S&P 500."
         else:
             result["text"] = (
-                f"Bordet: {desk_pct:+.2f}%, SPY: {spy_pct:+.2f}% siden {start['date']}. Bordet slår ikke at holde S&P 500. "
-                "Gør det det ikke på papir, hjælper rigtige penge ikke."
+                f"Bordet: {desk_pct:+.2f}%, SPY: {spy_pct:+.2f}% siden {start['date']}. Bordet slår ikke at holde S&P 500 endnu."
             )
         return result
 
@@ -922,13 +989,12 @@ class DeskEngine:
         pnl = round(sum(float(row["pnl"]) for row in trades), 2)
         wins = [row for row in trades if float(row["pnl"]) > 0]
         record = self.skeptic_record()
-        start = self.store.get_json("desk_start")
-        week = None
-        if start:
-            week = (now.date() - datetime.fromisoformat(start["date"]).date()).days // 7 + 1
         alerts: list[dict] = []
         if not self.keys_present:
             alerts.append({"level": "warning", "text": "Mangler Alpaca-papirnøgler. Sæt DESK_ALPACA_API_KEY og DESK_ALPACA_SECRET_KEY i Railway."})
+        problem = key_problem(self.base.alpaca_api_key) if not self._injected_broker else ""
+        if problem:
+            alerts.append({"level": "error", "text": problem})
         if not self.brain.configured:
             alerts.append({"level": "info", "text": "Ingen Claude-nøgle. NEWS og SKEPTIC kører på faste regler, og SKEPTIC er strengere end normalt."})
         elif self.brain.budget_left() < 0.15:
@@ -1001,7 +1067,11 @@ class DeskEngine:
                 "win_rate": round(len(wins) / len(trades), 3) if trades else None,
             },
             "skeptic": record,
-            "paper_month": {"start": start, "week": week},
+            "learning": {
+                "rules": self.learned(),
+                "lessons": (self.store.get_json("lessons", []) or [])[:12],
+                "min_trades": learning.LEARN_MIN_TRADES,
+            },
             "alerts": alerts,
             "engine": {"last_tick": self.last_tick, "last_error": self.last_error},
         }

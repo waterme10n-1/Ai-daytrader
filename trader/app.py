@@ -544,6 +544,10 @@ def create_app(
             raise HTTPException(status_code=409, detail=str(exc)) from exc
         return {"ok": True, "text": text}
 
+    @app.post("/api/desk/diagnose")
+    def desk_diagnose() -> dict:
+        return desk().diagnose()
+
     @app.get("/api/desk/compare")
     def desk_compare() -> dict:
         return desk().compare()

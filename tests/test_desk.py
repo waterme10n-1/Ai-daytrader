@@ -443,3 +443,85 @@ def test_autopilot_and_scan_interval_can_be_changed(tmp_path):
     with pytest.raises(ValueError):
         desk.update_params({"scan_minutes": 0})
     assert DeskSettings().auto_approve is True and DeskSettings().scan_minutes == 1
+
+
+def test_keys_are_cleaned_and_wrong_keys_are_explained():
+    from trader.desk.config import clean_key, key_problem
+
+    assert clean_key(' "PKABC 123" ') == "PKABC123"
+    assert clean_key("DESK_ALPACA_API_KEY=PKXYZ") == "PKXYZ"
+    assert "live-nøgle" in key_problem("AKLIVE")
+    assert "byttet om" in key_problem("abc123secret")
+    assert key_problem("PKFINE") == ""
+
+
+def test_diagnose_reports_each_part_and_key_hints(tmp_path):
+    broker = FakeBroker({"SPY": ramp_bars(end=100.3, ramp_volume=1000)})
+    desk, _ = make_desk(tmp_path, broker)
+    result = desk.diagnose()
+    assert result["ok"] and [c["name"] for c in result["checks"]] == ["Handelskontoen", "Markedets ur", "Kursdata", "Nyheder"]
+
+    def boom():
+        raise RuntimeError("Alpaca afviser nøglerne ved handelskontoen (401: unauthorized)")
+
+    broker.get_account = boom
+    bad = desk.diagnose()
+    assert not bad["ok"] and not bad["checks"][0]["ok"] and "afviser" in bad["text"]
+
+    swapped = make_desk(tmp_path / "b", FakeBroker({}), alpaca_api_key="x" * 40, alpaca_secret_key="PKSHORTKEY12345678", key_source="DESK_ALPACA_API_KEY", secret_source="ALPACA_SECRET_KEY")[0]
+    hints = " ".join(swapped.diagnose()["keys"]["hints"])
+    assert "byttet om" in hints and "samme sted" in hints
+
+
+def test_401_message_names_the_service():
+    from trader.desk.alpaca import DATA_URL, PAPER_URL, service_name, short_body
+
+    assert "handelskontoen" in service_name(PAPER_URL + "/v2/account")
+    assert "kursdata" in service_name(DATA_URL + "/v2/stocks/bars")
+    assert short_body("<html><h1>401 Authorization Required</h1></html>") == "401 Authorization Required"
+
+
+# ---------------------------------------------------------------------- læring
+def _done_row(symbol, *, vs_vwap, win, real=True):
+    flag = {"symbol": symbol, "move_pct": 3.5, "vs_vwap_pct": vs_vwap, "by_move": True, "ts": "2026-11-04T11:30:00-05:00"}
+    row = {"symbol": symbol, "flag": flag, "news": {"source": "claude"}, "chart": {"stop_pct": 0.8}}
+    if real:
+        row.update(status="closed", fill_price=100.0, exit_price=102.0 if win else 99.0, pnl=20.0 if win else -10.0, exit_reason="target" if win else "stop")
+    else:
+        row.update(status="skip", shadow={"result": "win" if win else "loss", "pct": 2.0 if win else -1.0})
+    return row
+
+
+def test_learning_turns_on_after_repeated_losses_and_off_again():
+    from trader.desk import learning
+
+    rows = [_done_row("A", vs_vwap=2.0, win=False), _done_row("B", vs_vwap=2.2, win=False, real=False), _done_row("C", vs_vwap=1.8, win=False)]
+    rule = {r["key"]: r for r in learning.evaluate(rows)}["far_above_vwap"]
+    assert rule["active"] and rule["n"] == 3 and rule["real"] == 2
+    assert learning.blocking(learning.evaluate(rows), {"vs_vwap_pct": 2.5, "by_move": True}, {}, {})
+    assert not learning.blocking(learning.evaluate(rows), {"vs_vwap_pct": 0.5, "by_move": True}, {}, {})
+    rows += [_done_row(x, vs_vwap=2.0, win=True) for x in "DEFG"]
+    assert not {r["key"]: r for r in learning.evaluate(rows)}["far_above_vwap"]["active"]
+
+
+def test_learned_rule_turns_a_buy_into_wait_and_day_log_writes_lessons(tmp_path):
+    broker = FakeBroker({"NVDA": ramp_bars(), "SPY": ramp_bars(end=100.3, ramp_volume=1000)}, news={"NVDA": fresh_news("NVDA")})
+    desk, clock = make_desk(tmp_path, broker, watchlist=("NVDA",))
+    for symbol in ("X1", "X2", "X3"):
+        pid = desk.store.create_proposal("2026-11-03", symbol, {"symbol": symbol, "move_pct": 3.4, "vs_vwap_pct": 1.9, "by_move": True, "ts": "2026-11-03T11:00:00-05:00"})
+        desk.store.update_proposal(pid, status="closed", news={"source": "rules"}, chart={"stop_pct": 0.8}, fill_price=100.0, exit_price=99.0, pnl=-10.0, exit_reason="stop", ruling="BUY")
+    assert any(r["active"] for r in desk.learned())
+    desk.tick()
+    row = desk.store.proposals_on(DAY.isoformat())[0]
+    assert row["ruling"] == "WAIT" and row["skeptic"].get("learned")
+    assert "Lært af fejl" in " ".join(row["skeptic"]["reasons"])
+    assert broker.submitted == []
+    status = desk.status()
+    assert "learning" in status and "paper_month" not in status
+
+    broker.open = False
+    clock["now"] = at(16, 15)
+    desk.tick()
+    lessons = desk.store.get_json("lessons")
+    assert lessons and lessons[0]["day"] == DAY.isoformat()
+    assert any(m["kind"] == "lesson" and m["text"].startswith("Lært i dag") for m in desk.store.messages(limit=500))

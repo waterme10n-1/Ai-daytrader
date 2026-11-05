@@ -278,7 +278,8 @@ class DeskBrain:
         prompt = (
             "CHART foreslår dette køb. Søg efter det, der kan vælte det: regnskab inden for få dage, makrotal i dag, om "
             "nyheden allerede var kendt i går, og hvor meget af bevægelsen der er sket. Giv præcis tre grunde og afgør "
-            "BUY, WAIT eller SKIP.\n" + json.dumps(payload, ensure_ascii=False, default=str)
+            "BUY, WAIT eller SKIP. your_record indeholder lessons og learned_rules fra bordets tidligere fejl: brug dem, og "
+            "sig WAIT eller SKIP, hvis handlen ligner noget, der har tabt før.\n" + json.dumps(payload, ensure_ascii=False, default=str)
         )
         try:
             result = self._parse("skeptic", self._system("skeptic"), prompt, SkepticOut, search=True)

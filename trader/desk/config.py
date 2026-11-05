@@ -36,6 +36,27 @@ HARD_MIN_REWARD_RISK = 1.5
 HARD_MAX_FLAGS = 10
 
 
+def clean_key(value: str | None) -> str:
+    """Nøgler fra Railway uden anførselstegn, mellemrum og et indsat 'NAVN=' foran."""
+    text = (value or "").strip()
+    if "=" in text and text.split("=", 1)[0].strip().upper().startswith(("DESK_", "ALPACA_", "APCA")):
+        text = text.split("=", 1)[1].strip()
+    if len(text) >= 2 and text[0] == text[-1] and text[0] in "\"'":
+        text = text[1:-1]
+    return "".join(text.split())
+
+
+def key_problem(api_key: str) -> str:
+    """En tydelig dansk forklaring, hvis nøglen åbenlyst er forkert. Tom streng, hvis den ser rigtig ud."""
+    if not api_key:
+        return ""
+    if api_key.upper().startswith("AK"):
+        return "DESK_ALPACA_API_KEY starter med AK. Det er en live-nøgle. Bordet skal bruge papirnøgler, som starter med PK."
+    if not api_key.upper().startswith("PK"):
+        return "DESK_ALPACA_API_KEY starter ikke med PK. Måske er Key og Secret byttet om."
+    return ""
+
+
 def parse_watchlist(raw: str | list[str] | tuple[str, ...] | None) -> list[str]:
     """Store bogstaver, ingen dubletter, kun gyldige tickers. Ugyldige ignoreres."""
     if raw is None:
@@ -68,6 +89,8 @@ class DeskSettings:
     alpaca_api_key: str = ""
     alpaca_secret_key: str = ""
     anthropic_api_key: str = ""
+    key_source: str = ""
+    secret_source: str = ""
     ai_daily_budget_usd: float = 1.0
     ai_model: str = "claude-opus-5-5"
     ai_effort: str = "high"
@@ -104,9 +127,11 @@ class DeskSettings:
             auto_approve=_flag(os.getenv("DESK_AUTO_APPROVE"), True),
             max_chase_pct=min(2.0, max(0.1, _float(os.getenv("DESK_MAX_CHASE_PCT"), 0.5))),
             # Egen papirkonto til bordet. ALPACA_API_KEY bruges, hvis du allerede har den sat.
-            alpaca_api_key=(os.getenv("DESK_ALPACA_API_KEY") or os.getenv("ALPACA_API_KEY") or "").strip(),
-            alpaca_secret_key=(os.getenv("DESK_ALPACA_SECRET_KEY") or os.getenv("ALPACA_SECRET_KEY") or "").strip(),
+            alpaca_api_key=clean_key(os.getenv("DESK_ALPACA_API_KEY") or os.getenv("ALPACA_API_KEY")),
+            alpaca_secret_key=clean_key(os.getenv("DESK_ALPACA_SECRET_KEY") or os.getenv("ALPACA_SECRET_KEY")),
             anthropic_api_key=os.getenv("ANTHROPIC_API_KEY", "").strip(),
+            key_source="DESK_ALPACA_API_KEY" if clean_key(os.getenv("DESK_ALPACA_API_KEY")) else ("ALPACA_API_KEY" if clean_key(os.getenv("ALPACA_API_KEY")) else ""),
+            secret_source="DESK_ALPACA_SECRET_KEY" if clean_key(os.getenv("DESK_ALPACA_SECRET_KEY")) else ("ALPACA_SECRET_KEY" if clean_key(os.getenv("ALPACA_SECRET_KEY")) else ""),
             ai_daily_budget_usd=max(0.0, _float(os.getenv("DESK_AI_DAILY_BUDGET_USD"), 1.0)),
             ai_model=(os.getenv("DESK_ANTHROPIC_MODEL") or os.getenv("ANTHROPIC_MODEL") or "claude-opus-5-5").strip(),
             ai_effort=(os.getenv("DESK_ANTHROPIC_EFFORT") or "high").strip(),

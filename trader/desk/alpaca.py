@@ -5,6 +5,7 @@ Indeholder også de små kursværktøjer, bordet regner med (barer, VWAP, bracke
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from datetime import datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
@@ -172,6 +173,19 @@ def _iso(moment: datetime) -> str:
     return moment.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
+def service_name(url: str) -> str:
+    if url.startswith(DATA_URL):
+        return "nyheder" if "/news" in url else "kursdata (data.alpaca.markets)"
+    return "handelskontoen (paper-api.alpaca.markets)"
+
+
+def short_body(text: str) -> str:
+    """Alpacas svar uden HTML, kort nok til en besked."""
+    plain = re.sub(r"<[^>]+>", " ", text or "")
+    plain = " ".join(plain.split())
+    return plain[:120] or "tomt svar"
+
+
 class AlpacaPaper:
     """Papirkontoen hos Alpaca. Der er ingen live-parameter, og adressen er altid paper-api."""
 
@@ -194,6 +208,12 @@ class AlpacaPaper:
             raise BrokerError(f"Alpaca kunne ikke kontaktes: {exc}") from exc
         if response.status_code == 404 and method == "DELETE":
             return {}
+        if response.status_code in (401, 403):
+            raise BrokerError(
+                f"Alpaca afviser nøglerne ved {service_name(url)} ({response.status_code}: {short_body(response.text)}). "
+                "Brug papirnøgler (Key starter med PK) fra app.alpaca.markets, tjek at Key og Secret ikke er byttet om, "
+                "og at de er fra samme gang du trykkede Generate."
+            )
         if response.status_code >= 400:
             detail = response.text[:300]
             raise BrokerError(f"Alpaca svarede {response.status_code}: {detail}")

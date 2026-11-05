@@ -272,13 +272,15 @@ Slår du autopiloten fra, ender hver BUY som et kort under **Godkend** (og i cha
 
 Skriv `@SKEPTIC hvorfor WAIT til NVDA?` (eller tryk på en af knapperne over skrivefeltet). Den nævnte bot svarer i sin rolle med bordets tal. Bots kan ikke lægge ordrer eller ændre grænser fra chatten. Skriv **Stop nu** for at sætte alt på pause (ventende godkendelser annulleres, åbne positioner beholder stop og mål), og **Start igen** for at fortsætte.
 
-## Papirmåneden og SKEPTIC's regnskab
+## Bordet lærer af sine fejl
 
-- **Uge 1:** godkend intet. Læs med, og tjek, at SKEPTIC siger nej.
-- **Uge 2–4:** godkend de handler, du er enig i.
-- **Slutningen:** fanen **Måneden** sammenligner bordets resultat med at holde SPY siden første dag.
+Bordet starter med det samme, når nøglerne er sat. Der er ingen prøveperiode, men det lærer af hver handel:
 
-For hver handel, der ikke blev til noget (WAIT, SKIP, afvist eller udløbet), regner bordet efter lukketid ud, om den ville have ramt stop eller mål først (skyggeregnskab). Så kan du se, om SKEPTIC sagde nej med rette. Godkender den mere end halvdelen af mindst 5 afgørelser, får du en advarsel om, at den er for blød. Regler og grænser kan ændres under **Bots**, men aldrig ud over de hårde lofter (10 % pr. handel, 5 åbne, stop 5 %, mål mindst 1,5 gange stoppet).
+- **Hver markering får et udfald.** Købte handler får det rigtige resultat. Dem, bordet sagde nej til, får et skyggeresultat efter lukketid: ville de have ramt stop eller mål først?
+- **Lærte regler.** Udfaldene sorteres i mønstre, fx køb mere end 1,5 % over VWAP, køb efter kl. 14 ET, aktier der allerede er steget 5 %, eller køb hvor grunden kun var en overskrift. Har et mønster tabt mindst 3 gange med højst en tredjedel vindere, slår reglen til, og nye køb af den slags får WAIT. Reglen slår selv fra igen, når mønstret begynder at vinde.
+- **Lektioner.** Efter lukketid skriver SKEPTIC i gruppen, hvad bordet lærte i dag: tabte handler, nye regler og handler, den afviste, men som ville have vundet. SKEPTIC får lektionerne og de lærte regler med, når Claude vurderer næste handel.
+
+Fanen **Læring** viser reglerne med tal, lektionerne og bordets resultat mod at holde S&P 500 (SPY) siden første dag. SKEPTIC's regnskab står under **Bots**.
 
 ## Opsætning
 
