@@ -312,6 +312,24 @@
   @keyframes rise { from { transform: translateY(24px); opacity: 0; } }
   @media (min-width: 761px) { .overlay:not(.top) { align-items: center; } .sheet { border-radius: 22px; } .grab { display: none; } }
 
+  /* indlæsning: grå felter der glimter, til data er hentet */
+  .sk { display: inline-block; vertical-align: middle; border-radius: 8px; background: linear-gradient(90deg, var(--fill) 0%, var(--fill-2) 50%, var(--fill) 100%); background-size: 200% 100%; animation: shimmer 1.3s ease-in-out infinite; }
+  @keyframes shimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+  .sk-row { display: grid; grid-template-columns: minmax(0, 1fr) 84px 96px; gap: 14px; align-items: center; padding: 14px 0; border-bottom: 0.5px solid var(--sep); }
+  .sk-row:last-child { border-bottom: 0; }
+
+  /* beskeder, der glider ned fra toppen */
+  .banner { position: fixed; left: 50%; top: calc(10px + var(--safe-t)); z-index: 90; width: min(440px, calc(100% - 20px)); display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 0; border-radius: 20px; background: var(--raise); color: var(--text); text-align: left; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45); transform: translate(-50%, -140%); transition: transform 0.45s cubic-bezier(.2, .9, .25, 1.1); }
+  .banner.show { transform: translate(-50%, 0); }
+  .banner .tx { flex: 1; min-width: 0; }
+  .banner .tx b { display: block; font: 600 14px var(--font); }
+  .banner .tx span { display: block; font-size: 13.5px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .banner time { align-self: flex-start; font-size: 12px; color: var(--muted); }
+  :root[data-theme="light"] .banner { background: rgba(255, 255, 255, 0.92); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); box-shadow: 0 12px 40px rgba(0, 0, 0, 0.16); }
+
+  .title small { display: block; font: 500 13px var(--font); color: var(--muted); letter-spacing: 0; margin-top: 2px; }
+  .ny { margin-top: 10px; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
   /* telefon */
   @media (max-width: 760px) {
     /* Et slør på topbjælken ville fange den faste fanebjælke i bunden, så topbjælken er massiv på telefon. */
@@ -342,7 +360,7 @@
 
 <header class="top">
   <div class="wrap bar">
-    <div class="title">Handelsbordet</div>
+    <div class="title">Handelsbordet<small id="today"></small></div>
     <button class="status" id="status" type="button" title="Systemstatus"><span class="dot"></span><span class="lbl-s" id="status-t">Forbinder</span></button>
     <button class="btn danger" id="pause-btn" type="button">Stop</button>
     <button class="round" id="pal-btn" type="button" title="Søg og kommandoer (⌘K)" aria-label="Søg og kommandoer"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></button>
@@ -359,29 +377,29 @@
         <div id="approvals" class="stack" hidden></div>
         <article class="card hero">
           <div class="lbl">Papirkonto</div>
-          <div class="value" id="equity-wrap"><span id="equity">–</span><small>$</small></div>
+          <div class="value" id="equity-wrap"><span id="equity"><span class="sk" style="width:min(260px,70%);height:38px"></span></span><small>$</small></div>
           <div class="delta" id="delta"></div>
           <div class="chart" id="chart"><svg id="chart-svg" viewBox="0 0 600 170" preserveAspectRatio="none" aria-label="Graf"></svg><div class="scrub" id="scrub" hidden></div><div class="scrub-dot" id="scrub-dot" hidden></div><div class="scrub-tip" id="scrub-tip" hidden></div></div>
           <div class="chart-src cap"><span id="chart-label"></span><span id="chart-hint">Træk henover grafen</span></div>
           <div class="hint" id="acct-off" hidden>Saldoen vises, når bordet er forbundet til din papirkonto hos Alpaca. <button class="btn plain" type="button" data-goto="bots">Forbind nu</button></div>
           <div class="stats">
-            <div class="stat"><div class="cap">Markeret</div><div class="v" id="k-flags">–</div></div>
-            <div class="stat"><div class="cap">Åbne</div><div class="v" id="k-open">–</div></div>
-            <div class="stat"><div class="cap">Vindere</div><div class="v" id="k-win">–</div></div>
+            <div class="stat"><div class="cap">Markeret</div><div class="v" id="k-flags"><span class="sk" style="width:54px;height:20px"></span></div></div>
+            <div class="stat"><div class="cap">Åbne</div><div class="v" id="k-open"><span class="sk" style="width:54px;height:20px"></span></div></div>
+            <div class="stat"><div class="cap">Vindere</div><div class="v" id="k-win"><span class="sk" style="width:54px;height:20px"></span></div></div>
           </div>
         </article>
         <article class="card" id="now-card">
           <div class="card-h"><h2>Bordet lige nu</h2><button class="btn plain right" type="button" id="now-more" hidden>Se forløbet</button></div>
           <div class="steps" id="steps"></div>
-          <div class="now-tx" id="now-tx">Venter på første markering.</div>
+          <div class="now-tx" id="now-tx"><span class="sk" style="width:90%;height:14px"></span><br><span class="sk" style="width:60%;height:14px;margin-top:8px"></span></div>
         </article>
       </div>
       <div class="col">
         <article class="card">
           <div class="card-h"><h2>New York-børsen</h2><span class="pill right" id="mk-pill">–</span></div>
           <div class="market">
-            <div class="ring" id="ring"><svg viewBox="0 0 120 120" aria-hidden="true"><circle class="trk" cx="60" cy="60" r="52"/><circle class="bar-r" id="ring-bar" cx="60" cy="60" r="52" stroke-dasharray="326.7" stroke-dashoffset="326.7"/></svg><div class="mid"><div><div class="t" id="clock">–</div><div class="s" id="clock-s"></div></div></div></div>
-            <div class="market-tx"><b id="mk-head">–</b><p id="mk-sub"></p></div>
+            <div class="ring" id="ring"><svg viewBox="0 0 120 120" aria-hidden="true"><circle class="trk" cx="60" cy="60" r="52"/><circle class="bar-r" id="ring-bar" cx="60" cy="60" r="52" stroke-dasharray="326.7" stroke-dashoffset="326.7"/></svg><div class="mid"><div><div class="t" id="clock"><span class="sk" style="width:76px;height:22px"></span></div><div class="s" id="clock-s"></div></div></div></div>
+            <div class="market-tx"><b id="mk-head"><span class="sk" style="width:150px;height:18px"></span></b><p id="mk-sub"><span class="sk" style="width:190px;height:13px"></span></p><div class="ny" id="ny"></div></div>
           </div>
         </article>
         <article class="card" id="trades-card" hidden>
@@ -390,7 +408,7 @@
         </article>
         <article class="card">
           <div class="card-h"><h2>Watchlist</h2><div class="seg right" id="wl-seg"><button type="button" data-view="list" aria-selected="true">Liste</button><button type="button" data-view="radar" aria-selected="false">Radar</button></div></div>
-          <div id="wl-list"></div>
+          <div id="wl-list"><div class="sk-row"><span><span class="sk" style="width:58px;height:16px"></span><br><span class="sk" style="width:120px;height:11px;margin-top:6px"></span></span><span class="sk" style="width:84px;height:24px"></span><span style="text-align:right"><span class="sk" style="width:62px;height:15px"></span><br><span class="sk" style="width:76px;height:20px;margin-top:5px"></span></span></div><div class="sk-row"><span><span class="sk" style="width:58px;height:16px"></span><br><span class="sk" style="width:120px;height:11px;margin-top:6px"></span></span><span class="sk" style="width:84px;height:24px"></span><span style="text-align:right"><span class="sk" style="width:62px;height:15px"></span><br><span class="sk" style="width:76px;height:20px;margin-top:5px"></span></span></div><div class="sk-row"><span><span class="sk" style="width:58px;height:16px"></span><br><span class="sk" style="width:120px;height:11px;margin-top:6px"></span></span><span class="sk" style="width:84px;height:24px"></span><span style="text-align:right"><span class="sk" style="width:62px;height:15px"></span><br><span class="sk" style="width:76px;height:20px;margin-top:5px"></span></span></div><div class="sk-row"><span><span class="sk" style="width:58px;height:16px"></span><br><span class="sk" style="width:120px;height:11px;margin-top:6px"></span></span><span class="sk" style="width:84px;height:24px"></span><span style="text-align:right"><span class="sk" style="width:62px;height:15px"></span><br><span class="sk" style="width:76px;height:20px;margin-top:5px"></span></span></div><div class="sk-row"><span><span class="sk" style="width:58px;height:16px"></span><br><span class="sk" style="width:120px;height:11px;margin-top:6px"></span></span><span class="sk" style="width:84px;height:24px"></span><span style="text-align:right"><span class="sk" style="width:62px;height:15px"></span><br><span class="sk" style="width:76px;height:20px;margin-top:5px"></span></span></div></div>
           <div id="wl-radar" hidden>
             <div class="scope"><svg viewBox="0 0 100 100" aria-hidden="true"><g fill="none" stroke="var(--fill-2)" stroke-width="0.4"><circle cx="50" cy="50" r="46"/><circle cx="50" cy="50" r="31"/><circle cx="50" cy="50" r="16"/></g><circle cx="50" cy="50" r="9" fill="var(--accent-bg)" stroke="var(--accent)" stroke-width="0.5"/></svg><div class="sweep" id="sweep"></div><div id="blips"></div></div>
             <p class="cap" style="text-align:center;margin:8px 0 0" id="radar-cap">Jo tættere på midten, jo tættere er aktien på at blive markeret af SCOUT.</p>
@@ -480,6 +498,7 @@
   </div>
 </div>
 <div class="toast" id="toast" hidden></div>
+<button class="banner" id="banner" type="button" aria-live="polite"></button>
 <div class="overlay" id="sheet-bg" hidden><div class="sheet" id="sheet" role="dialog" aria-modal="true"></div></div>
 <div class="overlay top" id="pal-bg" hidden><div class="pal" role="dialog" aria-modal="true" aria-label="Søg og kommandoer"><input id="pal-input" placeholder="Søg efter en aktie eller en kommando" autocomplete="off" spellcheck="false"><div class="pal-list" id="pal-list"></div></div></div>
 
@@ -679,6 +698,8 @@ function scrubAt(clientX) {
   const box = $("chart").getBoundingClientRect();
   const x = Math.min(1, Math.max(0, (clientX - box.left) / box.width));
   const i = Math.round(x * (chartData.values.length - 1)), pt = chartData.p[i];
+  if (i !== chartData.last && navigator.vibrate) { try { navigator.vibrate(4); } catch (e) {} }
+  chartData.last = i;
   const left = (pt[0] / chartData.W) * box.width, top = (pt[1] / chartData.H) * box.height;
   $("scrub").style.left = `${left}px`; $("scrub-dot").style.left = `${left}px`; $("scrub-dot").style.top = `${top}px`; $("scrub-dot").style.setProperty("--c", chartData.col);
   $("scrub-tip").style.left = `${Math.min(box.width - 40, Math.max(40, left))}px`; $("scrub-tip").textContent = chartData.fmt(chartData.values[i]);
@@ -857,11 +878,14 @@ function renderWatch(d) {
     $("wl-list").innerHTML = items.map((x) => {
       const up = (x.day_pct || 0) >= 0;
       const sub = x.flagged ? "Markeret i dag" : snap ? `${x.volume_x}x normal volumen` : `1 time ${pct(x.move_pct)} · ${x.volume_x}x volumen`;
-      return `<button class="stock" type="button" data-ticker="${esc(x.symbol)}"><span style="min-width:0"><span class="sym">${esc(x.symbol)}</span>${x.flagged ? '<span class="flag"></span>' : ""}<div class="sub">${esc(sub)}</div></span>${mini(x.spark, up ? "var(--up)" : "var(--down)")}<span class="px">${price(x.price)}<br><span class="chg ${up ? "" : "dn"}" data-sym="${esc(x.symbol)}">${pct(x.day_pct)}</span></span></button>`;
+      return `<button class="stock" type="button" data-ticker="${esc(x.symbol)}"><span style="min-width:0"><span class="sym">${esc(x.symbol)}</span>${x.flagged ? '<span class="flag"></span>' : ""}<div class="sub">${esc(sub)}</div></span>${mini(x.spark, up ? "var(--up)" : "var(--down)")}<span class="px"><span class="pxv" data-sym="${esc(x.symbol)}">${price(x.price)}</span><br><span class="chg ${up ? "" : "dn"}" data-sym="${esc(x.symbol)}">${pct(x.day_pct)}</span></span></button>`;
     }).join("");
     items.forEach((x) => {
       const before = lastPx[x.symbol];
-      if (before !== undefined && before !== x.price) { const el = $("wl-list").querySelector(`.chg[data-sym="${CSS.escape(x.symbol)}"]`); if (el) el.classList.add("blink"); }
+      if (before !== undefined && before !== x.price) {
+        const chg = $("wl-list").querySelector(`.chg[data-sym="${CSS.escape(x.symbol)}"]`); if (chg) chg.classList.add("blink");
+        const pv = $("wl-list").querySelector(`.pxv[data-sym="${CSS.escape(x.symbol)}"]`); if (pv) { pv._v = before; tween(pv, x.price, price, 900); }
+      }
       lastPx[x.symbol] = x.price;
     });
   }
@@ -1070,7 +1094,21 @@ function notifyApprovals(list) {
   }
 }
 document.addEventListener("click", () => { if ("Notification" in window && Notification.permission === "default") Notification.requestPermission().catch(() => {}); }, { once: true });
+// Nye hændelser glider ned fra toppen som en besked på telefonen.
+const BANNER_KINDS = { flag: "Ny markering", approval: "Venter på dig", fill: "Købt", close: "Lukket", lesson: "Lært i dag", log: "Dagslog" };
+let bannerTimer = null;
+function showBanner(m) {
+  const who = BOT[m.author] || BOT.system, el = $("banner");
+  el.innerHTML = `<span class="av lg" style="--c:${who.c}">${who.i}</span><span class="tx"><b>${esc(who.name)} · ${esc(BANNER_KINDS[m.kind] || "")}</b><span>${esc(m.text)}</span></span><time>nu</time>`;
+  el.dataset.goto = m.kind === "approval" ? "home" : "chat";
+  requestAnimationFrame(() => el.classList.add("show"));
+  clearTimeout(bannerTimer);
+  bannerTimer = setTimeout(() => el.classList.remove("show"), 4800);
+}
+$("banner").addEventListener("click", () => { $("banner").classList.remove("show"); });
 function onFresh(list) {
+  const important = list.filter((m) => BANNER_KINDS[m.kind] && m.author !== "me");
+  if (important.length && !document.hidden) showBanner(important[important.length - 1]);
   for (const m of list) {
     if (m.kind === "fill") chime(true);
     if (m.kind === "close") chime(((m.data || {}).pnl || 0) >= 0);
@@ -1124,8 +1162,13 @@ document.addEventListener("keydown", (e) => {
 });
 
 // ---------- hvert sekund ----------
+const nyFmt = new Intl.DateTimeFormat("da-DK", { timeZone: "America/New_York", hour: "2-digit", minute: "2-digit" });
+const dayFmt = new Intl.DateTimeFormat("da-DK", { weekday: "long", day: "numeric", month: "long" });
 function everySecond() {
   if (document.hidden) return;
+  const now = new Date(), dayRaw = dayFmt.format(now), dayTxt = dayRaw.charAt(0).toUpperCase() + dayRaw.slice(1), nyTxt = `Klokken i New York er ${nyFmt.format(now)}`;
+  if ($("today").textContent !== dayTxt) $("today").textContent = dayTxt;
+  if (tab === "home" && $("ny").textContent !== nyTxt) $("ny").textContent = nyTxt;
   if (tab === "home") tickClock();
   document.querySelectorAll("[data-expires]").forEach((el) => {
     const t = Math.floor((new Date(el.dataset.expires) - Date.now()) / 1000);
