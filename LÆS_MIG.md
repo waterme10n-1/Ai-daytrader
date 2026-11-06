@@ -307,7 +307,7 @@ Forsiden **Overblik** viser papirkontoen, en nedtælling til New York-børsen å
 ## Opsætning
 
 1. Opret en papirkonto på [app.alpaca.markets](https://app.alpaca.markets) (kontonavnet øverst til venstre → **Open New Paper Account** → **API Keys → Generate New Keys**) og sæt `DESK_ALPACA_API_KEY` og `DESK_ALPACA_SECRET_KEY` i Railway. Står `ALPACA_API_KEY` og `ALPACA_SECRET_KEY` der allerede, bruges de.
-2. `ANTHROPIC_API_KEY` slår Claude til for NEWS og SKEPTIC. `DESK_AI_DAILY_BUDGET_USD` (standard 1 USD) er et hårdt dagligt loft. Uden nøgle eller budget tager faste regler over, og de er strengere: kun en Alpaca-overskrift fra de sidste 6 timer tæller som grund, og SKEPTIC siger WAIT, hvis kursen ligger mere end 2 % over VWAP.
+2. `ANTHROPIC_API_KEY` slår Claude til for NEWS og SKEPTIC. Der er intet dagligt loft som standard; sæt `DESK_AI_DAILY_BUDGET_USD` (fx 2) for at få et. Knappen **Test Claude** under Bots viser, om Claude svarer, og ellers præcis hvorfor (forkert nøgle, ingen kredit, ukendt model). Uden Claude tager faste regler over, og de er strengere: kun en Alpaca-overskrift fra de sidste 6 timer tæller som grund, og SKEPTIC siger WAIT, hvis kursen ligger mere end 2 % over VWAP.
 3. Alle `DESK_*`-variabler står i `.env.example`. På Railway ligger databasen som `/data/desk.db`.
 
 SCOUT kigger hvert minut fra 9:45 til 15:30 ET (15:45–21:30 dansk tid). Intet her er finansiel rådgivning: bottene foreslår, du beslutter.

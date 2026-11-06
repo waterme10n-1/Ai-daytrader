@@ -328,7 +328,7 @@ def test_mentions_get_an_answer_without_claude(tmp_path):
     desk, _ = make_desk(tmp_path, FakeBroker({}))
     desk.post_message("@skeptic hvordan går det?")
     last = desk.store.messages(limit=5)[-1]
-    assert last["author"] == "skeptic" and "Claude er ikke sat op" in last["text"]
+    assert last["author"] == "skeptic" and "ANTHROPIC_API_KEY mangler" in last["text"] and "afgjort" in last["text"]
     desk.post_message("hej")
     assert desk.store.messages(limit=1)[-1]["author"] == "system"
 
@@ -616,3 +616,42 @@ def test_executor_rule_follows_autopilot_and_reaches_claude(tmp_path):
     assert "Autopiloten er slået til" in rules_text
     desk.post_message("@executor hej")
     assert desk.brain.settings.auto_approve is True
+
+
+def test_claude_problems_are_explained_and_fallback_answers_are_useful(tmp_path):
+    from trader.desk.agents import DeskBrain, explain_error
+
+    class ApiError(Exception):
+        def __init__(self, status, message):
+            super().__init__(message)
+            self.status_code, self.message = status, message
+
+    assert "401" in explain_error(ApiError(401, "invalid x-api-key"), "m")
+    assert "kredit" in explain_error(ApiError(400, "Your credit balance is too low"), "m")
+    assert "findes ikke" in explain_error(ApiError(404, "model: claude-x"), "claude-x")
+
+    desk, _ = make_desk(tmp_path, FakeBroker({}))
+    desk.post_message("@news hvad sker der?")
+    last = desk.store.messages(limit=1)[-1]
+    assert last["author"] == "news" and "ANTHROPIC_API_KEY mangler" in last["text"]
+    assert "Du er NEWS" not in last["text"]  # ikke regelteksten
+
+    brain = DeskBrain(DeskSettings(), desk.store, api_key="sk-ant-test")
+    assert brain.configured and not brain.limited and brain.available(10)
+
+    def boom():
+        raise ApiError(401, "invalid x-api-key")
+
+    class Client:
+        class beta:
+            class messages:
+                @staticmethod
+                def create(**kwargs):
+                    boom()
+
+    brain._client = lambda: Client()
+    result = brain.test()
+    assert not result["ok"] and "401" in result["text"] and brain.last_error
+    desk.brain = brain
+    status = desk.status()
+    assert "401" in status["ai"]["reason"] and any("Claude" in a["text"] for a in status["alerts"])

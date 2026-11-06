@@ -467,6 +467,12 @@
       </form>
     </article>
     <article class="card">
+      <div class="card-h"><h2>Forbindelsen til Claude</h2></div>
+      <p class="cap" style="margin:0 0 12px">NEWS, SKEPTIC og svarene i Gruppen bruger Claude. Testen laver ét lille kald ad samme vej og viser svaret eller præcis, hvad der er galt.</p>
+      <button class="btn primary" id="claude-btn" type="button">Test Claude</button>
+      <div id="claude-res" style="margin-top:14px"></div>
+    </article>
+    <article class="card">
       <div class="card-h"><h2>Indstillinger</h2></div>
       <form class="form" id="params">
         <label class="wide toggle"><span class="tx">Autopilot<span>Bordet køber selv på papir, når SKEPTIC siger BUY.</span></span><input name="auto_approve" type="checkbox"></label>
@@ -933,7 +939,7 @@ function systems(d) {
     ["Børsen", m.is_open ? "ok" : "", m.label || "–"],
     ["Kurser", q.ts ? "ok" : "warn", q.ts ? `${q.mode === "live" ? "Live" : "Sidste handelsdag"}, ${ago(q.ts)}` : "Ingen endnu"],
     ["SCOUT", d.paused ? "warn" : sys.last_scan ? "ok" : "", d.paused ? "På pause" : sys.last_scan ? `Kiggede ${ago(sys.last_scan)}` : m.is_open ? "Venter på første scan" : "Kigger, når børsen åbner"],
-    ["Claude", ai.configured ? "ok" : "warn", ai.configured ? `${money(ai.spent_today_usd)} af ${money(ai.budget_usd)} $ brugt i dag` : "Ikke sat op, faste regler bruges"],
+    ["Claude", !ai.configured ? "warn" : ai.last_error ? "bad" : "ok", !ai.configured ? "ANTHROPIC_API_KEY mangler i Railway" : ai.last_error ? ai.last_error : ai.limited ? `${money(ai.spent_today_usd)} af ${money(ai.budget_usd)} $ brugt i dag` : `Klar · ${money(ai.spent_today_usd)} $ brugt i dag`],
     ["Autopilot", d.params.auto_approve ? "ok" : "warn", d.params.auto_approve ? "Køber selv på papir" : "Du godkender hver ordre"],
     ["Læring", rules ? "ok" : "", rules ? `${rules} regel${rules > 1 ? "er" : ""} aktiv` : "Samler data"],
     ["Telegram", sys.telegram ? "ok" : "", sys.telegram ? "Sender beskeder" : "Ikke sat op"],
@@ -1066,6 +1072,14 @@ $("diag-btn").onclick = async () => {
   } catch (err) { $("diag").textContent = err.message; }
   btn.disabled = false; refresh();
 };
+$("claude-btn").onclick = async () => {
+  const btn = $("claude-btn"); btn.disabled = true; $("claude-res").innerHTML = '<span class="muted">Spørger Claude …</span>';
+  try {
+    const r = await post("/api/desk/claude-test");
+    $("claude-res").innerHTML = `<p class="${r.ok ? "up" : "down"}" style="margin:0 0 4px;font-weight:600">${esc(r.ok ? "Claude virker." : "Claude virker ikke.")}</p><div>${esc(r.text)}</div><div class="cap" style="margin-top:4px">Model: ${esc(r.model || "–")}</div>`;
+  } catch (err) { $("claude-res").innerHTML = `<p class="down" style="margin:0">${esc(err.message)}</p>`; }
+  btn.disabled = false; refresh();
+};
 async function sendKeys(save) {
   const f = $("keys-form"); $("keys-result").innerHTML = '<span class="muted">Spørger Alpaca …</span>';
   try {
@@ -1126,6 +1140,7 @@ function commands(q) {
     ["Lad SCOUT kigge nu", "", () => action("/api/desk/scan", () => "SCOUT kigger nu.")],
     ["Skriv dagslog", "", () => action("/api/desk/log", () => "Dagsloggen er skrevet i Gruppen.")],
     ["Test Alpaca-forbindelsen", "", () => { showTab("bots"); $("diag-btn").click(); }],
+    ["Test Claude", "", () => { showTab("bots"); $("claude-btn").click(); }],
     ["Vis status", "", () => $("status").click()],
     ...TABS.map(([k, t], i) => [`Gå til ${t}`, String(i + 1), () => showTab(k)]),
     [`${document.documentElement.dataset.theme === "light" ? "Mørkt" : "Lyst"} tema`, "", () => setTheme(document.documentElement.dataset.theme !== "light")],

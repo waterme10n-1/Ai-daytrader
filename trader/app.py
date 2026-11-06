@@ -562,6 +562,10 @@ def create_app(
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    @app.post("/api/desk/claude-test")
+    def desk_claude_test() -> dict:
+        return desk().test_claude()
+
     @app.post("/api/desk/diagnose")
     def desk_diagnose() -> dict:
         return desk().diagnose()

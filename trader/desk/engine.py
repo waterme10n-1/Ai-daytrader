@@ -820,18 +820,38 @@ class DeskEngine:
             self.store.post("system", "error", f"{BOTS[key]['name']} kunne ikke svare: {exc.__class__.__name__}.")
 
     def _rules_answer(self, key: str) -> str:
+        """Svar uden Claude: sig ærligt hvorfor, og giv bordets egne tal i stedet for regelteksten."""
         context = self._chat_context()
-        prefix = "Claude er ikke sat op (eller dagens AI-budget er brugt), så jeg svarer kun med bordets tal. "
+        cfg = self.cfg
+        reason = self.brain.why_unavailable() or "Claude svarede ikke."
+        prefix = f"Jeg kan ikke bruge Claude lige nu. {reason} Indtil da svarer jeg med bordets tal. "
+        latest = next(iter(self.store.proposals(1)), None)
+        if key == "news":
+            news = (latest or {}).get("news")
+            if news:
+                return prefix + f"Seneste aktie, jeg undersøgte, var {latest['symbol']}: {news.get('reason') or 'Ingen klar grund.'}"
+            return prefix + "Jeg har ikke undersøgt nogen aktie endnu. Jeg går i gang, så snart SCOUT markerer en."
+        if key == "chart":
+            plan = (latest or {}).get("chart")
+            if plan and plan.get("setup"):
+                return prefix + f"Seneste plan, {latest['symbol']}: indgang {plan['entry']:.2f}, stop {plan['stop']:.2f}, mål {plan['target']:.2f}."
+            if plan:
+                return prefix + f"Seneste, {latest['symbol']}: ingen setup. {plan.get('reason') or ''}".rstrip()
+            return prefix + f"Ingen planer endnu. Jeg sætter stop højst {cfg.stop_max_pct:g} % under indgangen og målet mindst {cfg.reward_risk:g} gange så langt væk."
         if key == "skeptic":
             record = context["skeptic"]
             return prefix + f"Jeg har afgjort {record['rulings']} handler: {record['buy']} BUY og {record['refused']} nej. {record['verdict']}"
         if key == "sizer":
-            return prefix + f"Højst {self.cfg.position_pct:g}% pr. handel og {self.cfg.max_open} åbne ad gangen. Lige nu: {context['open']} åbne eller ventende."
+            return prefix + f"Højst {cfg.position_pct:g} % pr. handel og {cfg.max_open} åbne ad gangen. Lige nu: {context['open']} åbne eller ventende."
         if key == "scout":
-            return prefix + f"I dag: {context['flags_today']} af {self.cfg.max_flags_per_day} markeringer. Watchlist: {', '.join(self.cfg.watchlist)}."
+            return prefix + f"I dag: {context['flags_today']} af {cfg.max_flags_per_day} markeringer. Watchlist: {', '.join(cfg.watchlist)}."
         if key == "executor":
             return prefix + f"Åbne handler: {context['open']}. Lukket i alt: {context['closed']} med {_usd(context['pnl'])}."
-        return prefix + bot_rules(key, self.cfg)
+        return prefix
+
+    def test_claude(self) -> dict:
+        self.brain.settings = self.cfg
+        return self.brain.test()
 
     def _chat_context(self) -> dict:
         now = self._now().astimezone(ET)
@@ -1091,8 +1111,10 @@ class DeskEngine:
             alerts.append({"level": "error", "text": problem})
         if not self.brain.configured:
             alerts.append({"level": "info", "text": "Ingen Claude-nøgle. NEWS og SKEPTIC kører på faste regler, og SKEPTIC er strengere end normalt."})
-        elif self.brain.budget_left() < 0.15:
+        elif self.brain.limited and self.brain.budget_left() < 0.15:
             alerts.append({"level": "info", "text": "Dagens AI-budget er brugt. Reglerne tager over til i morgen."})
+        elif self.brain.last_error:
+            alerts.append({"level": "error", "text": f"Claude: {self.brain.last_error}"})
         if record["too_soft"]:
             alerts.append({"level": "warning", "text": "SKEPTIC godkender mere end halvdelen. Den skal sige nej langt oftere end ja."})
         if cfg.auto_approve:
@@ -1116,6 +1138,10 @@ class DeskEngine:
                 "configured": self.brain.configured,
                 "model": self.base.ai_model,
                 "budget_usd": self.base.ai_daily_budget_usd,
+                "limited": self.brain.limited,
+                "reason": self.brain.why_unavailable(),
+                "last_error": self.brain.last_error,
+                "last_ok": self.brain.last_ok,
                 "spent_today_usd": round(self.store.spend_on(day), 4),
             },
             "params": {
