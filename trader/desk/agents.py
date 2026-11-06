@@ -36,7 +36,9 @@ BOTS: dict[str, dict[str, str]] = {
             "Du er SCOUT på et handelsbord med seks bots. I amerikansk åbningstid holder du øje med tickerne på "
             "watchlisten. Du markerer en ticker, der bevæger sig mere end {move_pct:g}% på en time, eller handler mere end "
             "{volume_x:g} gange sin normale volumen. Du skriver ticker, bevægelse og volumen i gruppen. Højst "
-            "{max_flags} markeringer om dagen. Du vurderer aldrig, om en bevægelse er god."
+            "{max_flags} markeringer om dagen på kursbevægelse. Markeringer kun på volumen har deres egen kvote på "
+            "lige så mange, og en ticker markeret på volumen kan markeres igen, når kursen flytter sig.{premarket} "
+            "Du vurderer aldrig, om en bevægelse er god."
         ),
     },
     "news": {
@@ -48,7 +50,7 @@ BOTS: dict[str, dict[str, str]] = {
             "Du er NEWS på et handelsbord med seks bots. Din ene opgave er at forklare, hvorfor en ticker bevæger sig. "
             "Når SCOUT markerer en, tjekker du overskrifter, indberetninger og meddelelser og skriver grunden i gruppen "
             "på to linjer med et link til kilden. Er der ingen klar grund, skriver du \"Ingen klar grund\", for det er "
-            "et brugbart svar. Du foreslår aldrig handler."
+            "et brugbart svar. Før åbning forklarer du på samme måde de gaps, SCOUT finder. Du foreslår aldrig handler."
         ),
     },
     "chart": {
@@ -108,7 +110,16 @@ DESK_CONTEXT = (
 
 
 def bot_rules(key: str, settings: DeskSettings) -> str:
+    gap = float(getattr(settings, "gap_pct", 3.0))
+    premarket = (
+        f" Før åbning (4:00-9:30 ET, 10:00-15:30 dansk tid) kigger du hvert 5. minut efter aktier, der er steget "
+        f"{gap:g}% eller mere siden i går, så NEWS kan finde grunden i god tid. Fra 9:45 til 11:00 ET markerer du et "
+        f"gap, der holder sig over VWAP, selv om det ikke har flyttet sig {settings.move_pct:g}% på en time."
+        if getattr(settings, "premarket", False)
+        else ""
+    )
     return BOTS[key]["rules"].format(
+        premarket=premarket,
         move_pct=settings.move_pct,
         volume_x=settings.volume_x,
         max_flags=settings.max_flags_per_day,
@@ -141,21 +152,95 @@ def et_day() -> str:
     return datetime.now(ET).date().isoformat()
 
 
+def explain_error(exc: Exception, model: str) -> str:
+    """Anthropics fejl på dansk, så man kan se, hvad der skal rettes."""
+    status = getattr(exc, "status_code", None)
+    raw = str(getattr(exc, "message", None) or exc)
+    low = raw.lower()
+    if status == 401 or "authentication" in low or "x-api-key" in low:
+        return "Claude afviser nøglen (401). Tjek ANTHROPIC_API_KEY i Railway: den skal starte med sk-ant- og være kopieret helt."
+    if status == 403 or "permission" in low:
+        return f"Nøglen har ikke adgang til modellen {model} (403). Tjek nøglens rettigheder i Claude Console."
+    if "credit balance" in low or "billing" in low:
+        return "Anthropic-kontoen har ingen kredit. Fyld op under Billing i Claude Console."
+    if status == 404 or "not_found" in low or "model:" in low:
+        return f"Modellen {model} findes ikke for denne nøgle (404). Sæt DESK_ANTHROPIC_MODEL eller ANTHROPIC_MODEL til en model, kontoen har."
+    if status == 429 or "rate" in low:
+        return "Claude har for mange kald lige nu (429). Det går over af sig selv."
+    if status and status >= 500:
+        return f"Claude har en midlertidig fejl ({status}). Prøv igen om lidt."
+    if "timeout" in low or "timed out" in low:
+        return "Claude svarede ikke i tide."
+    if "connection" in low:
+        return "Serveren kunne ikke nå Claude (forbindelsesfejl)."
+    return f"Kaldet til Claude fejlede: {raw[:200]}"
+
+
 class DeskBrain:
     def __init__(self, settings: DeskSettings, store: DeskStore, api_key: str) -> None:
         self.settings = settings
         self.store = store
         self.api_key = api_key
+        self.last_error = ""
+        self.last_ok: str | None = None
 
     @property
     def configured(self) -> bool:
-        return bool(self.api_key) and self.settings.ai_daily_budget_usd > 0
+        return bool(self.api_key)
+
+    @property
+    def limited(self) -> bool:
+        return self.settings.ai_daily_budget_usd > 0
 
     def budget_left(self) -> float:
+        if not self.limited:
+            return float("inf")
         return max(0.0, self.settings.ai_daily_budget_usd - self.store.spend_on(et_day()))
 
     def available(self, estimate: float) -> bool:
         return self.configured and self.budget_left() >= estimate
+
+    def why_unavailable(self) -> str:
+        """Hvorfor Claude ikke blev brugt, på dansk. Tom streng, hvis Claude kan bruges."""
+        if not self.configured:
+            return "ANTHROPIC_API_KEY mangler i Railway, så Claude er slået fra."
+        if self.limited and self.budget_left() < CHAT_COST:
+            return f"Dagens AI-budget på {self.settings.ai_daily_budget_usd:g} USD er brugt (DESK_AI_DAILY_BUDGET_USD)."
+        if self.last_error:
+            return self.last_error
+        return ""
+
+    def _failed(self, exc: Exception) -> None:
+        self.last_error = explain_error(exc, self.settings.ai_model)
+        logger.warning("Claude fejlede: %s (%s)", self.last_error, exc)
+
+    def _ok(self) -> None:
+        self.last_error = ""
+        self.last_ok = datetime.now(ET).isoformat(timespec="seconds")
+
+    def test(self) -> dict:
+        """Knappen 'Test Claude': ét lille kald ad samme vej som botsene bruger."""
+        if not self.configured:
+            return {"ok": False, "text": self.why_unavailable(), "model": self.settings.ai_model}
+        try:
+            response = self._client().beta.messages.create(
+                model=self.settings.ai_model,
+                max_tokens=200,
+                system="Du er en del af et handelsbord. Svar på dansk med højst fem ord.",
+                messages=[{"role": "user", "content": "Bekræft at du er klar."}],
+                output_config={"effort": "low"},
+                fallbacks=self.settings.ai_fallbacks,
+                betas=["server-side-fallback-2026-07-01"],
+                timeout=TIMEOUT_SECONDS,
+            )
+        except Exception as exc:
+            self._failed(exc)
+            return {"ok": False, "text": self.last_error, "model": self.settings.ai_model}
+        self._record("test", response)
+        self._ok()
+        parts = [getattr(b, "text", "") for b in getattr(response, "content", []) or [] if getattr(b, "type", "") == "text"]
+        served = str(getattr(response, "model", "") or self.settings.ai_model)
+        return {"ok": True, "text": f"Claude svarer: {' '.join(p.strip() for p in parts if p) or 'OK'}", "model": served}
 
     def _client(self):
         import anthropic
@@ -221,6 +306,10 @@ class DeskBrain:
                 "time_et": datetime.now(ET).isoformat(timespec="minutes"),
                 "alpaca_headlines_last_18h": headlines[:12],
             }
+            if flag.get("gap_pct") is not None:
+                payload["change_since_yesterday_close_pct"] = flag.get("gap_pct")
+            if flag.get("session"):
+                payload["session"] = flag["session"]
             prompt = (
                 "SCOUT har markeret denne ticker. Find ud af præcis hvorfor den bevæger sig i dag. Søg efter nyheder, "
                 "indberetninger (SEC), analytikerændringer og meddelelser fra de sidste 24 timer. has_reason er kun true, "
@@ -230,8 +319,10 @@ class DeskBrain:
             try:
                 result = self._parse("news", self._system("news"), prompt, NewsOut, search=True)
             except Exception as exc:  # netværk, kvote, ugyldigt svar
-                logger.warning("NEWS fejlede: %s", exc)
+                self._failed(exc)
                 result = None
+            else:
+                self._ok()
             if isinstance(result, NewsOut):
                 url = result.source_url.strip()
                 has = bool(result.has_reason and url.startswith(("https://", "http://")))
@@ -288,8 +379,9 @@ class DeskBrain:
         try:
             result = self._parse("skeptic", self._system("skeptic"), prompt, SkepticOut, search=True)
         except Exception as exc:
-            logger.warning("SKEPTIC fejlede: %s", exc)
+            self._failed(exc)
             return None
+        self._ok()
         if result == "refusal":
             return {"reasons": ["Claude afviste at vurdere handlen."], "ruling": "SKIP", "summary": "Afvist. SKIP.", "source": "claude"}
         if not isinstance(result, SkepticOut):
@@ -328,8 +420,9 @@ class DeskBrain:
                 timeout=TIMEOUT_SECONDS,
             )
         except Exception as exc:
-            logger.warning("Chat-svar fejlede: %s", exc)
+            self._failed(exc)
             return None
+        self._ok()
         self._record("chat", response)
         if _refused(response):
             return "Det kan jeg ikke svare på."

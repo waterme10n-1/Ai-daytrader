@@ -9,12 +9,14 @@ import math
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
 
-from trader.desk.alpaca import Bar, _bracket, _round_price, resolve_intrabar, vwap
+from trader.desk.alpaca import Bar, _bracket, _parse_ts, _round_price, resolve_intrabar, vwap
 
 MIN_BARS = 15
 SWING_BARS = 15
 MIN_STOP_PCT = 0.3
 LATEST_ENTRY = (15, 30)
+# Gap ved åbningen tæller kun den første halvanden time. Derefter er det en almindelig dagsbevægelse.
+GAP_UNTIL = (11, 0)
 
 
 def completed(bars: list[Bar], now: datetime) -> list[Bar]:
@@ -35,6 +37,8 @@ class Flag:
     by_move: bool
     by_volume: bool
     ts: str
+    by_gap: bool = False
+    gap_pct: float | None = None  # siden gårsdagens lukkekurs
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -47,8 +51,8 @@ def normal_volume_per_minute(daily: list[Bar]) -> float:
     return (sum(volumes) / len(volumes)) / 390.0
 
 
-def scout(symbol: str, intraday: list[Bar], daily: list[Bar], now: datetime, *, move_pct: float, volume_x: float) -> Flag | None:
-    """Flag ved bevægelse på mindst move_pct på en time eller volumen på mindst volume_x gange det normale."""
+def _read(symbol: str, intraday: list[Bar], daily: list[Bar], now: datetime) -> tuple[Flag, float, float, float | None] | None:
+    """Tallene SCOUT ser på: (flag uden afgørelse, bevægelse på en time, volumen i gange normal, gap siden i går)."""
     bars = completed(intraday, now)
     if len(bars) < MIN_BARS:
         return None
@@ -62,13 +66,11 @@ def scout(symbol: str, intraday: list[Bar], daily: list[Bar], now: datetime, *, 
     minutes = max(1, len(window))
     per_minute = normal_volume_per_minute(daily)
     ratio = (sum(bar.volume for bar in window) / minutes) / per_minute if per_minute > 0 else 0.0
-    by_move = abs(move) >= move_pct - 1e-9
-    by_volume = ratio >= volume_x - 1e-9
-    if not by_move and not by_volume:
-        return None
+    prev = daily[-1].close if daily and daily[-1].close > 0 else None
+    gap = (last.close - prev) / prev * 100.0 if prev else None
     level = vwap(bars) or last.close
     day_open = bars[0].open
-    return Flag(
+    flag = Flag(
         symbol=symbol,
         price=round(last.close, 2),
         move_pct=round(move, 2),
@@ -77,16 +79,91 @@ def scout(symbol: str, intraday: list[Bar], daily: list[Bar], now: datetime, *, 
         vwap=round(level, 2),
         vs_vwap_pct=round((last.close - level) / level * 100.0, 2) if level else 0.0,
         day_change_pct=round((last.close - day_open) / day_open * 100.0, 2) if day_open else 0.0,
-        by_move=by_move,
-        by_volume=by_volume,
+        by_move=False,
+        by_volume=False,
         ts=last.ts.isoformat(timespec="minutes"),
+        gap_pct=round(gap, 2) if gap is not None else None,
     )
+    return flag, move, ratio, gap
+
+
+def scout(symbol: str, intraday: list[Bar], daily: list[Bar], now: datetime, *, move_pct: float, volume_x: float) -> Flag | None:
+    """Flag ved bevægelse på mindst move_pct på en time eller volumen på mindst volume_x gange det normale."""
+    read = _read(symbol, intraday, daily, now)
+    if read is None:
+        return None
+    flag, move, ratio, _gap = read
+    flag.by_move = abs(move) >= move_pct - 1e-9
+    flag.by_volume = ratio >= volume_x - 1e-9
+    return flag if flag.by_move or flag.by_volume else None
+
+
+def gap_flag(symbol: str, intraday: list[Bar], daily: list[Bar], now: datetime, *, gap_pct: float, volume_x: float) -> Flag | None:
+    """Gap ved åbningen: steget mindst gap_pct siden i går og stadig over VWAP. Kun til kl. 11 ET.
+
+    En aktie, der åbner 4 % højere og holder sig over VWAP, har købere med fra start, selv om den har ligget
+    stille det første kvarter og derfor ikke har flyttet sig move_pct på en time.
+    """
+    if (now.hour, now.minute) >= GAP_UNTIL:
+        return None
+    read = _read(symbol, intraday, daily, now)
+    if read is None:
+        return None
+    flag, _move, ratio, gap = read
+    if gap is None or gap < gap_pct - 1e-9 or flag.vs_vwap_pct <= 0:
+        return None
+    flag.by_gap = True
+    flag.by_move = True  # kursen har flyttet sig, bare natten over
+    flag.by_volume = ratio >= volume_x - 1e-9
+    return flag
 
 
 def scout_text(flag: Flag) -> str:
     move = f"{flag.move_pct:+.1f}%"
     span = "den sidste time" if flag.window_minutes >= 60 else f"de sidste {flag.window_minutes} min"
+    if flag.by_gap:
+        return (
+            f"GAP: {flag.symbol} {flag.gap_pct:+.1f}% siden i går og over VWAP ({move} {span}), handler "
+            f"{flag.volume_x:.1f}x normal volumen. Kurs {flag.price:.2f}."
+        )
     return f"FLAG: {flag.symbol} {move} {span}, handler {flag.volume_x:.1f}x normal volumen. Kurs {flag.price:.2f}."
+
+
+def premarket_gaps(symbols: list[str], snapshots: dict, daily: dict, now: datetime, *, gap_pct: float) -> list[dict]:
+    """Før åbning: seneste handel i dag mod gårsdagens lukkekurs. Kun handler fra i dag tæller, ellers er kursen gammel."""
+    out = []
+    for symbol in symbols:
+        snap = snapshots.get(symbol)
+        bars = daily.get(symbol) or []
+        if not snap or not bars or bars[-1].close <= 0:
+            continue
+        try:
+            stamp = _parse_ts(str(snap.get("ts") or ""))
+        except ValueError:
+            continue
+        if stamp.date() != now.date():
+            continue
+        prev = bars[-1].close
+        gap = (float(snap["price"]) - prev) / prev * 100.0
+        if gap >= gap_pct - 1e-9:
+            out.append(
+                {
+                    "symbol": symbol,
+                    "price": round(float(snap["price"]), 2),
+                    "prev_close": round(prev, 2),
+                    "gap_pct": round(gap, 2),
+                    "ts": stamp.isoformat(timespec="minutes"),
+                }
+            )
+    out.sort(key=lambda item: item["gap_pct"], reverse=True)
+    return out
+
+
+def premarket_text(item: dict) -> str:
+    return (
+        f"Før åbning: {item['symbol']} {item['gap_pct']:+.1f}% mod i går (kurs {item['price']:.2f}, lukkede "
+        f"{item['prev_close']:.2f}). Jeg holder øje med den, når børsen åbner."
+    )
 
 
 # ---------------------------------------------------------------------- CHART
@@ -120,7 +197,8 @@ def chart(
         return ChartPlan(False, reason="For sent på dagen. Alt lukkes kl. 15:50, så der er ikke tid til målet.")
     price = bars[-1].close
     level = vwap(bars) or price
-    if flag.move_pct < 0:
+    rising = flag.gap_pct if flag.by_gap and flag.gap_pct is not None else flag.move_pct
+    if rising < 0:
         return ChartPlan(False, reason="Kursen falder, og bordet køber kun (ingen short).")
     if price <= level:
         return ChartPlan(False, reason=f"Kursen {price:.2f} er under VWAP {level:.2f}. Køberne har ikke kontrollen.")
@@ -240,7 +318,10 @@ def rules_skeptic(flag: dict, news: dict, plan: dict, now: datetime, *, stop_max
     reasons: list[str] = []
     move = float(flag.get("move_pct") or 0)
     vs_vwap = float(flag.get("vs_vwap_pct") or 0)
-    if flag.get("by_move"):
+    if flag.get("by_gap"):
+        gap = float(flag.get("gap_pct") or 0)
+        reasons.append(f"Aktien er allerede steget {gap:+.1f}% siden i går. Gaps lukker tit igen i løbet af dagen.")
+    elif flag.get("by_move"):
         reasons.append(f"Aktien har allerede flyttet sig {move:+.1f}%. En stor del af bevægelsen skete, før vi så den.")
     else:
         reasons.append("Flaget kommer kun fra volumen. Kursen har ikke bekræftet noget endnu.")
@@ -299,10 +380,12 @@ def quotes(symbols: list[str], intraday: dict, daily: dict, now: datetime, flagg
         if not bars:
             continue
         last = bars[-1]
-        day_open = bars[0].open
+        prior = daily.get(symbol) or []
+        # "I dag" er mod gårsdagens lukkekurs, som i enhver aktie-app. Uden dagsbarer: mod åbningen.
+        day_open = prior[-1].close if prior and prior[-1].close > 0 else bars[0].open
         start = last.ts - timedelta(minutes=60)
         window = [bar for bar in bars if bar.ts > start]
-        ref = window[0].open if window else day_open
+        ref = window[0].open if window else bars[0].open
         per_minute = normal_volume_per_minute(daily.get(symbol, []))
         vol_x = (sum(bar.volume for bar in window) / max(1, len(window))) / per_minute if per_minute > 0 else 0.0
         level = vwap(bars) or last.close
@@ -325,7 +408,9 @@ def quotes(symbols: list[str], intraday: dict, daily: dict, now: datetime, flagg
     return out
 
 
-def snapshot_quotes(symbols: list[str], snapshots: dict, daily: dict, flagged: list[str], points: int = 24) -> list[dict]:
+def snapshot_quotes(
+    symbols: list[str], snapshots: dict, daily: dict, flagged: list[str], points: int = 24, *, now: datetime | None = None
+) -> list[dict]:
     """Radarens tal uden for åbningstid: seneste kurs mod gårsdagens lukkekurs, kurve over de sidste dages lukkekurser."""
     out = []
     for symbol in symbols:
@@ -335,6 +420,15 @@ def snapshot_quotes(symbols: list[str], snapshots: dict, daily: dict, flagged: l
         price = snap["price"]
         closes = [bar.close for bar in daily.get(symbol, [])][-(points - 1):]
         prev = snap.get("prev_close") or (closes[-1] if closes else None)
+        # Er der handlet i dag (før åbning eller efter lukning), er referencen gårsdagens lukkekurs fra vores egne
+        # dagsbarer. Alpacas prevDailyBar kan før åbning stadig være dagen før i går.
+        if now is not None and closes:
+            try:
+                traded_today = _parse_ts(str(snap.get("ts") or "")).date() == now.date()
+            except ValueError:
+                traded_today = False
+            if traded_today:
+                prev = closes[-1]
         per_day = sum(bar.volume for bar in daily.get(symbol, [])) / max(1, len(daily.get(symbol, [])))
         vwap_value = snap.get("vwap")
         out.append(

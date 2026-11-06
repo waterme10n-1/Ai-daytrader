@@ -11,7 +11,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from trader.app import create_app
-from trader.desk import rules
+from trader.desk import learning, rules
 from trader.desk.alpaca import Account, Bar, Clock, NewsItem, Order, Position
 from trader.desk.config import DeskSettings, parse_watchlist
 from trader.desk.engine import DeskEngine
@@ -324,11 +324,192 @@ def test_max_flags_and_max_open_are_respected(tmp_path):
     assert sum(1 for r in rows if r["status"] == "sized_zero") == 2
 
 
+def loud_flat(volume: float = 3000.0) -> list[Bar]:
+    """Handler tre gange normal volumen hele dagen, men kursen står næsten stille."""
+    return ramp_bars(end=100.5, volume=volume, ramp_volume=volume)
+
+
+def test_volume_only_flags_do_not_use_up_the_daily_quota(tmp_path):
+    loud = ["V1", "V2", "V3", "V4", "V5", "V6"]
+    data = {name: loud_flat() for name in loud} | {"M": ramp_bars()}
+    broker = FakeBroker(data, news={name: fresh_news(name) for name in [*loud, "M"]})
+    desk, clock = make_desk(tmp_path, broker, watchlist=(*loud, "M"), max_flags_per_day=5)
+    clock["now"] = at(10, 15)
+    assert desk.scan() == 5  # første time: alt handler tungt, men kun volumen-kvoten bliver brugt
+    flags = desk.flags_on(DAY.isoformat())
+    assert len(flags["volume"]) == 5 and flags["move"] == [] and "V6" not in flags["all"]
+    clock["now"] = at(10, 16)
+    assert desk.scan() == 0  # samme aktier markeres ikke igen på volumen
+    clock["now"] = at(11, 30)
+    assert desk.scan() == 1  # M flytter sig, og der er stadig plads, selv om fem er markeret på volumen
+    flags = desk.flags_on(DAY.isoformat())
+    assert flags["move"] == ["M"]
+    status = desk.status()
+    assert status["today"]["flags"] == 1 and status["today"]["volume_flags"] == 5
+
+
+def test_a_volume_flag_can_be_followed_by_a_real_move(tmp_path):
+    broker = FakeBroker({"NVDA": ramp_bars(volume=3000.0)}, news={"NVDA": fresh_news("NVDA")})
+    desk, clock = make_desk(tmp_path, broker, watchlist=("NVDA",))
+    clock["now"] = at(10, 15)
+    assert desk.scan() == 1
+    clock["now"] = at(11, 30)
+    assert desk.scan() == 1
+    rows = desk.store.proposals_on(DAY.isoformat())
+    assert [bool(row["flag"]["by_move"]) for row in rows] == [False, True]
+    clock["now"] = at(11, 45)
+    assert desk.scan() == 0  # markeret på kursbevægelse: ikke igen samme dag
+
+
+def test_move_quota_still_caps_real_moves(tmp_path):
+    names = ["A", "B", "C"]
+    broker = FakeBroker({n: ramp_bars() for n in names}, news={n: fresh_news(n) for n in names})
+    desk, _ = make_desk(tmp_path, broker, watchlist=tuple(names), max_flags_per_day=2)
+    assert desk.scan() == 2
+    assert desk.scan() == 0
+    assert len(desk.flags_on(DAY.isoformat())["move"]) == 2
+
+
+def test_new_scout_defaults():
+    from trader.desk.config import DEFAULT_WATCHLIST
+
+    assert DeskSettings().move_pct == 2.0 and DeskSettings().max_flags_per_day == 8
+    assert DeskSettings().premarket and DeskSettings().gap_pct == 3.0
+    assert {"SMCI", "MSTR", "SOFI", "RIVN"} <= set(DEFAULT_WATCHLIST) and len(DEFAULT_WATCHLIST) == 16
+
+
+def test_old_saved_defaults_give_way_to_the_new_ones(tmp_path):
+    from trader.desk.config import DEFAULT_WATCHLIST, RETIRED_DEFAULTS
+
+    broker = FakeBroker({})
+    store = DeskStore(str(tmp_path / "desk.db"))
+    store.set_state("welcome", "1")
+    store.set_json("params", {"move_pct": 3.0, "max_flags_per_day": 5, "watchlist": list(RETIRED_DEFAULTS["watchlist"]), "position_pct": 3.0})
+    desk, _ = make_desk(tmp_path, broker, watchlist=DEFAULT_WATCHLIST)
+    assert desk.cfg.move_pct == 2.0 and desk.cfg.watchlist == DEFAULT_WATCHLIST and desk.cfg.position_pct == 3.0
+    assert desk.cfg.max_flags_per_day == 8
+    assert "SCOUT er opdateret" in desk.store.messages(limit=5)[-1]["text"]
+    # Kun én gang: vælger man selv 3 % bagefter, bliver det ved med at gælde.
+    desk.update_params({"move_pct": 3})
+    again, _ = make_desk(tmp_path, broker, watchlist=DEFAULT_WATCHLIST)
+    assert again.cfg.move_pct == 3.0
+
+
+def test_saving_the_defaults_does_not_pin_them(tmp_path):
+    desk, _ = make_desk(tmp_path, FakeBroker({}))
+    desk.update_params({"move_pct": desk.base.move_pct, "watchlist": ",".join(desk.base.watchlist), "auto_approve": desk.base.auto_approve, "max_open": 2})
+    assert desk.store.get_json("params") == {"max_open": 2}
+
+
+# ---------------------------------------------------------------------- før åbning og gaps
+def snapshots(prices: dict[str, float], when: datetime) -> callable:
+    return lambda symbols: {
+        s: {"price": prices[s], "prev_close": 99.0, "day_open": None, "day_volume": 50_000.0, "vwap": None, "ts": when.isoformat()}
+        for s in symbols
+        if s in prices
+    }
+
+
+def gap_bars(start: float = 104.0, end: float = 104.5) -> list[Bar]:
+    """Åbner med et gap (gårsdagens lukkekurs er 100) og stiger lidt det første kvarter."""
+    return ramp_bars(start=start, end=end, ramp_from=(9, 30), ramp_to=(9, 45))
+
+
+def test_premarket_scout_and_news_find_gaps_before_the_open(tmp_path):
+    broker = FakeBroker({}, news={"MSTR": fresh_news("MSTR")})
+    broker.open = False
+    broker.get_snapshots = snapshots({"MSTR": 104.2, "NVDA": 101.0, "AAPL": 106.0}, at(7, 58))
+    desk, clock = make_desk(tmp_path, broker, watchlist=("MSTR", "NVDA"))
+    clock["now"] = at(8, 0)
+    desk.tick()
+    notes = desk.premarket_on(DAY.isoformat())
+    assert list(notes) == ["MSTR"]  # NVDA er kun +1 %, AAPL er ikke på watchlisten
+    assert notes["MSTR"]["gap_pct"] == 4.2 and notes["MSTR"]["news"]["has_reason"]
+    said = [(m["author"], m["kind"]) for m in desk.store.messages(limit=50)]
+    assert ("scout", "premarket") in said and ("news", "news") in said
+    assert desk.store.proposals_on(DAY.isoformat()) == []  # ingen køb før åbning
+    status = desk.status()
+    assert status["premarket"][0]["symbol"] == "MSTR" and status["premarket"][0]["has_reason"]
+    assert status["quotes"]["mode"] == "snapshot"
+    mstr = next(q for q in status["quotes"]["items"] if q["symbol"] == "MSTR")
+    assert mstr["day_pct"] == 4.2  # mod gårsdagens lukkekurs, ikke Alpacas prevDailyBar
+    # Samme gap noteres ikke igen, og uden for hvert 5. minut kigger SCOUT ikke.
+    clock["now"] = at(8, 5)
+    desk.tick()
+    assert sum(1 for m in desk.store.messages(limit=80) if m["kind"] == "premarket") == 1
+    assert "Før åbning: MSTR +4.2 %" in desk._rules_answer("scout")
+
+
+def test_premarket_ignores_old_prices_and_can_be_switched_off(tmp_path):
+    broker = FakeBroker({})
+    broker.open = False
+    broker.get_snapshots = snapshots({"MSTR": 108.0}, at(7, 58) - timedelta(days=1))
+    desk, clock = make_desk(tmp_path, broker, watchlist=("MSTR",))
+    clock["now"] = at(8, 0)
+    assert desk.premarket_scan() == 0  # kursen er fra i går og siger intet om i dag
+    broker.get_snapshots = snapshots({"MSTR": 108.0}, at(7, 58))
+    desk.update_params({"premarket": False})
+    clock["now"] = at(8, 10)
+    desk.tick()
+    assert desk.premarket_on(DAY.isoformat()) == {}
+    clock["now"] = at(3, 55)
+    assert not desk._premarket_now(at(3, 55))
+
+
+def test_a_gap_that_holds_is_flagged_at_the_open_and_reuses_the_early_news(tmp_path):
+    broker = FakeBroker({"MSTR": gap_bars()}, news={"MSTR": fresh_news("MSTR")})
+    broker.get_snapshots = snapshots({"MSTR": 104.2}, at(7, 58))
+    desk, clock = make_desk(tmp_path, broker, watchlist=("MSTR",))
+    clock["now"] = at(8, 0)
+    assert desk.premarket_scan() == 1
+    broker.news = {}  # ingen nye overskrifter: NEWS må ikke slå op igen
+    clock["now"] = at(9, 45)
+    assert desk.scan() == 1
+    row = desk.store.proposals_on(DAY.isoformat())[0]
+    assert row["flag"]["by_gap"] and row["flag"]["by_move"] and row["flag"]["gap_pct"] >= 4
+    assert row["news"]["premarket"] and row["news"]["has_reason"]
+    assert row["chart"]["setup"] and row["ruling"] == "BUY" and row["status"] == "awaiting"
+    texts = [m["text"] for m in desk.store.messages(limit=80)]
+    assert any(t.startswith("GAP: MSTR") for t in texts) and any("(fundet før åbning)" in t for t in texts)
+
+
+def test_gaps_only_count_early_and_only_when_above_vwap(tmp_path):
+    late = rules.gap_flag("MSTR", gap_bars(), daily_bars(), at(11, 0), gap_pct=3, volume_x=2)
+    assert late is None
+    fading = ramp_bars(start=106.0, end=103.5, ramp_from=(9, 30), ramp_to=(9, 45))
+    assert rules.gap_flag("MSTR", fading, daily_bars(), at(9, 45), gap_pct=3, volume_x=2) is None
+    small = rules.gap_flag("MSTR", gap_bars(start=101.0, end=101.5), daily_bars(), at(9, 45), gap_pct=3, volume_x=2)
+    assert small is None
+    held = rules.gap_flag("MSTR", gap_bars(), daily_bars(), at(9, 45), gap_pct=3, volume_x=2)
+    assert held is not None and held.by_gap and held.gap_pct >= 4 and held.vs_vwap_pct > 0
+
+
+def test_chart_judges_a_gap_on_the_gap_not_the_first_minutes(tmp_path):
+    held = rules.gap_flag("MSTR", gap_bars(), daily_bars(), at(9, 45), gap_pct=3, volume_x=2)
+    held.move_pct = -0.2  # et lille dyk efter åbningen må ikke afvise et gap, der stadig er +4 %
+    plan = rules.chart(held, gap_bars(), at(9, 45), stop_max_pct=2, reward_risk=2)
+    assert plan.setup, plan.reason
+
+
+def test_live_day_change_is_against_yesterdays_close():
+    items = rules.quotes(["MSTR"], {"MSTR": gap_bars()}, {"MSTR": daily_bars()}, at(9, 45), [])
+    assert items[0]["day_pct"] >= 4  # gårsdagens lukkekurs er 100, ikke dagens åbning på 104
+
+
+def test_gap_buys_are_a_pattern_the_desk_can_learn_from():
+    rows = [
+        {"status": "closed", "pnl": -40, "fill_price": 100, "exit_price": 98, "flag": {"by_gap": True, "by_move": True}}
+        for _ in range(3)
+    ]
+    rule = next(item for item in learning.evaluate(rows) if item["key"] == "gap_open")
+    assert rule["active"] and rule["n"] == 3
+
+
 def test_mentions_get_an_answer_without_claude(tmp_path):
     desk, _ = make_desk(tmp_path, FakeBroker({}))
     desk.post_message("@skeptic hvordan går det?")
     last = desk.store.messages(limit=5)[-1]
-    assert last["author"] == "skeptic" and "Claude er ikke sat op" in last["text"]
+    assert last["author"] == "skeptic" and "ANTHROPIC_API_KEY mangler" in last["text"] and "afgjort" in last["text"]
     desk.post_message("hej")
     assert desk.store.messages(limit=1)[-1]["author"] == "system"
 
@@ -616,3 +797,71 @@ def test_executor_rule_follows_autopilot_and_reaches_claude(tmp_path):
     assert "Autopiloten er slået til" in rules_text
     desk.post_message("@executor hej")
     assert desk.brain.settings.auto_approve is True
+
+
+def test_claude_problems_are_explained_and_fallback_answers_are_useful(tmp_path):
+    from trader.desk.agents import DeskBrain, explain_error
+
+    class ApiError(Exception):
+        def __init__(self, status, message):
+            super().__init__(message)
+            self.status_code, self.message = status, message
+
+    assert "401" in explain_error(ApiError(401, "invalid x-api-key"), "m")
+    assert "kredit" in explain_error(ApiError(400, "Your credit balance is too low"), "m")
+    assert "findes ikke" in explain_error(ApiError(404, "model: claude-x"), "claude-x")
+
+    desk, _ = make_desk(tmp_path, FakeBroker({}))
+    desk.post_message("@news hvad sker der?")
+    last = desk.store.messages(limit=1)[-1]
+    assert last["author"] == "news" and "ANTHROPIC_API_KEY mangler" in last["text"]
+    assert "Du er NEWS" not in last["text"]  # ikke regelteksten
+
+    brain = DeskBrain(DeskSettings(), desk.store, api_key="sk-ant-test")
+    assert brain.configured and not brain.limited and brain.available(10)
+
+    def boom():
+        raise ApiError(401, "invalid x-api-key")
+
+    class Client:
+        class beta:
+            class messages:
+                @staticmethod
+                def create(**kwargs):
+                    boom()
+
+    brain._client = lambda: Client()
+    result = brain.test()
+    assert not result["ok"] and "401" in result["text"] and brain.last_error
+    desk.brain = brain
+    status = desk.status()
+    assert "401" in status["ai"]["reason"] and any("Claude" in a["text"] for a in status["alerts"])
+
+
+def test_status_never_waits_for_alpaca(tmp_path):
+    broker = FakeBroker({"NVDA": ramp_bars()})
+    desk, _ = make_desk(tmp_path, broker)
+    desk.tick()
+    calls = []
+
+    def slow(*args, **kwargs):
+        calls.append(1)
+        raise AssertionError("status må ikke kalde Alpaca")
+
+    broker.get_clock = broker.get_account = broker.get_positions = slow
+    status = desk.status()
+    assert calls == [] and status["account"]["equity"] == 100_000.0 and status["market"]["source"] == "alpaca"
+    # Uden et frisk ur bruges kalenderen, stadig uden netværk.
+    desk._cache.pop("clock")
+    assert desk.status()["market"]["source"] == "kalender" and calls == []
+
+
+def test_status_errors_come_back_as_readable_json(tmp_path):
+    settings = _settings(tmp_path)
+    desk, _ = make_desk(tmp_path, FakeBroker({}))
+    desk.start = lambda: None
+    desk.status = lambda after=0: (_ for _ in ()).throw(RuntimeError("database er låst"))
+    with TestClient(create_app(settings=settings, meme_engine=quiet_engine(), desk_engine=desk)) as client:
+        assert _login(client).status_code == 303
+        response = client.get("/api/desk/status")
+        assert response.status_code == 500 and "database er låst" in response.json()["detail"]

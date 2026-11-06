@@ -470,7 +470,12 @@ def create_app(
 
     @app.get("/api/desk/status")
     def desk_status(after: int = 0) -> dict:
-        return desk().status(after=max(0, after))
+        engine_ = desk()
+        try:
+            return engine_.status(after=max(0, after))
+        except Exception as exc:  # siden skal kunne vise, hvad der gik galt, i stedet for at hænge
+            logger.exception("Handelsbordets status fejlede")
+            raise HTTPException(status_code=500, detail=f"Handelsbordet fejlede: {exc.__class__.__name__}: {exc}") from exc
 
     @app.post("/api/desk/message")
     def desk_message(body: MessageBody) -> dict:
@@ -561,6 +566,10 @@ def create_app(
             return desk().test_keys(str(body.get("key") or ""), str(body.get("secret") or ""), save=save)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.post("/api/desk/claude-test")
+    def desk_claude_test() -> dict:
+        return desk().test_claude()
 
     @app.post("/api/desk/diagnose")
     def desk_diagnose() -> dict:
