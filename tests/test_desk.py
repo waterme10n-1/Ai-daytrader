@@ -561,3 +561,58 @@ def test_keys_from_the_page_are_tested_saved_and_used(tmp_path, monkeypatch):
     assert desk.keys()[0] == "PKRAILWAY"
     with pytest.raises(ValueError):
         desk.test_keys("", "", save=False)
+
+
+def test_quotes_also_arrive_when_the_market_is_closed(tmp_path):
+    broker = FakeBroker({"NVDA": ramp_bars()})
+    broker.open = False
+    broker.get_snapshots = lambda symbols: {
+        s: {"price": 105.0, "prev_close": 100.0, "day_open": 101.0, "day_volume": 780_000.0, "vwap": 104.0, "ts": "x"}
+        for s in symbols if s in ("NVDA", "SPY")
+    }
+    desk, clock = make_desk(tmp_path, broker)
+    clock["now"] = at(18, 0)
+    desk.tick()
+    quotes = desk.status()["quotes"]
+    assert quotes["mode"] == "snapshot"
+    nvda = next(q for q in quotes["items"] if q["symbol"] == "NVDA")
+    assert nvda["day_pct"] == 5.0 and nvda["volume_x"] == 2.0 and nvda["move_pct"] is None and len(nvda["spark"]) >= 2
+    # Ny runde inden for 10 minutter henter ikke igen.
+    calls = []
+    broker.get_snapshots = lambda symbols: calls.append(1) or {}
+    clock["now"] = at(18, 5)
+    desk.tick()
+    assert calls == []
+    clock["now"] = at(18, 11)
+    desk.tick()
+    assert calls == [1]
+
+
+def test_snapshot_parsing_handles_alpaca_shapes():
+    from trader.desk.alpaca import AlpacaPaper
+
+    client = AlpacaPaper.__new__(AlpacaPaper)
+    body = {
+        "AAPL": {"latestTrade": {"p": 190.5, "t": "2026-11-06T20:59:59Z"}, "dailyBar": {"o": 188, "c": 190.4, "v": 1000, "vw": 189.9}, "prevDailyBar": {"c": 187.0}},
+        "BAD": None,
+        "EMPTY": {"latestTrade": {}},
+    }
+    client._request = lambda *a, **k: body
+    snaps = client.get_snapshots(["AAPL", "BAD", "EMPTY"])
+    assert list(snaps) == ["AAPL"] and snaps["AAPL"]["price"] == 190.5 and snaps["AAPL"]["prev_close"] == 187.0
+    client._request = lambda *a, **k: {"snapshots": body}
+    assert client.get_snapshots(["AAPL"])["AAPL"]["vwap"] == 189.9
+
+
+def test_executor_rule_follows_autopilot_and_reaches_claude(tmp_path):
+    from trader.desk.agents import bot_rules
+
+    on = bot_rules("executor", DeskSettings(auto_approve=True))
+    off = bot_rules("executor", DeskSettings(auto_approve=False))
+    assert "Autopiloten er slået til" in on and "uden min godkendelse" in off
+    desk, _ = make_desk(tmp_path, FakeBroker({}), auto_approve=False)
+    desk.update_params({"auto_approve": True})
+    rules_text = next(b["rules"] for b in desk.status()["bots"] if b["key"] == "executor")
+    assert "Autopiloten er slået til" in rules_text
+    desk.post_message("@executor hej")
+    assert desk.brain.settings.auto_approve is True

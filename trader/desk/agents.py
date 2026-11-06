@@ -88,13 +88,12 @@ BOTS: dict[str, dict[str, str]] = {
     },
     "executor": {
         "name": "EXECUTOR",
-        "job": "Spørger dig og lægger ordren",
+        "job": "Lægger ordren på papirkontoen",
         "tag": "GØRINGEN",
         "engine": "kode",
         "rules": (
             "Du er EXECUTOR på et handelsbord med seks bots. Du lægger kun handler, når SKEPTIC har sagt BUY og SIZER "
-            "har sat en størrelse, på papirkontoen hos Alpaca, med stop og mål hæftet på. Du lægger aldrig en ordre "
-            "uden min godkendelse. En position, der rammer sit stop, lukkes med det samme. Ved lukketid skriver du "
+            "har sat en størrelse, på papirkontoen hos Alpaca, med stop og mål hæftet på. {approval} En position, der rammer sit stop, lukkes med det samme. Ved lukketid skriver du "
             "alle handler og kontoens saldo."
         ),
     },
@@ -117,6 +116,11 @@ def bot_rules(key: str, settings: DeskSettings) -> str:
         reward_risk=settings.reward_risk,
         position_pct=settings.position_pct,
         max_open=settings.max_open,
+        approval=(
+            "Autopiloten er slået til, så du køber selv, når kursen ikke er løbet fra indgangen."
+            if getattr(settings, "auto_approve", False)
+            else "Du lægger aldrig en ordre uden min godkendelse."
+        ),
     )
 
 

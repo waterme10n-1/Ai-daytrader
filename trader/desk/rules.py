@@ -323,3 +323,30 @@ def quotes(symbols: list[str], intraday: dict, daily: dict, now: datetime, flagg
             }
         )
     return out
+
+
+def snapshot_quotes(symbols: list[str], snapshots: dict, daily: dict, flagged: list[str], points: int = 24) -> list[dict]:
+    """Radarens tal uden for åbningstid: seneste kurs mod gårsdagens lukkekurs, kurve over de sidste dages lukkekurser."""
+    out = []
+    for symbol in symbols:
+        snap = snapshots.get(symbol)
+        if not snap:
+            continue
+        price = snap["price"]
+        closes = [bar.close for bar in daily.get(symbol, [])][-(points - 1):]
+        prev = snap.get("prev_close") or (closes[-1] if closes else None)
+        per_day = sum(bar.volume for bar in daily.get(symbol, [])) / max(1, len(daily.get(symbol, [])))
+        vwap_value = snap.get("vwap")
+        out.append(
+            {
+                "symbol": symbol,
+                "price": round(price, 2),
+                "day_pct": round((price - prev) / prev * 100.0, 2) if prev else 0.0,
+                "move_pct": None,
+                "volume_x": round(snap.get("day_volume", 0) / per_day, 1) if per_day > 0 else 0.0,
+                "vs_vwap_pct": round((price - vwap_value) / vwap_value * 100.0, 2) if vwap_value else None,
+                "flagged": symbol in flagged,
+                "spark": [round(value, 2) for value in closes] + [round(price, 2)],
+            }
+        )
+    return out
