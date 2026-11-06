@@ -88,3 +88,13 @@ def test_dashboard_effects_stay_light_on_phones(tmp_path):
         assert "grid-drift" not in future and "@keyframes pulse" not in page  # animeret gitter, box-shadow-puls
         assert "drop-shadow(0 0 2px ${color})" not in page  # filter på hver radarprik
         assert "IntersectionObserver" in page  # bånd og radar står stille uden for skærmen
+
+
+def test_home_counts_down_from_the_engine_clock(tmp_path):
+    """Hjem har motortavlen og uret, og serveren sender de absolutte tider, siden tæller ned efter."""
+    with _client(tmp_path) as client:
+        assert _login(client).status_code == 303
+        page = client.get("/meme").text
+        for marker in ('id="motor"', 'id="lanes"', 'id="clock"', 'id="equity"', "function secondTick", "function jobState"):
+            assert marker in page, marker
+        assert "#9945ff" not in page.split('<style id="future">')[1]  # ingen lilla neon i det nye tema

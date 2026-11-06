@@ -333,7 +333,7 @@ _LOGIN_HTML = """<!DOCTYPE html>
 <title>Log ind · Memebot</title>
 <link rel="icon" type="image/png" href="/icons/icon-192.png">
 <link rel="manifest" href="/manifest.webmanifest">
-<meta name="theme-color" content="#07080c">
+<meta name="theme-color" content="#0b0b0a">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -341,23 +341,23 @@ _LOGIN_HTML = """<!DOCTYPE html>
 <meta name="apple-mobile-web-app-title" content="Memebot">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400..700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root {
     color-scheme: dark;
-    --bg: #07080c; --surface: #10131b; --surface-2: #151925; --raised: #1b2030;
-    --border: rgba(255,255,255,0.08); --border-strong: rgba(255,255,255,0.15);
-    --text: #f3f4fa; --muted: #7c8297; --accent: #a47cff; --accent-soft: rgba(164,124,255,0.16);
-    --bad: #ff5d7d; --bad-soft: rgba(255,93,125,0.13);
-    --grad: linear-gradient(135deg, #9945ff 0%, #6a5cf5 45%, #14f195 100%);
-    --font: "Geist", -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+    --bg: #0b0b0a; --surface: #131311; --surface-2: #181815; --raised: #201f1b;
+    --border: rgba(236,231,214,0.085); --border-strong: rgba(236,231,214,0.17);
+    --text: #ece8dc; --muted: #8b877b; --accent: #ffb020; --accent-soft: rgba(255,176,32,0.14); --on-accent: #1d1404;
+    --bad: #ff5a6a; --bad-soft: rgba(255,90,106,0.12);
+    --font: "Archivo", -apple-system, BlinkMacSystemFont, "Helvetica Neue", system-ui, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
   }
   :root[data-theme="light"] {
     color-scheme: light;
-    --bg: #f3f4f8; --surface: #ffffff; --surface-2: #f7f8fb; --raised: #eef0f5;
-    --border: rgba(12,16,32,0.08); --border-strong: rgba(12,16,32,0.16);
-    --text: #0b0d14; --muted: #6a7085; --accent: #7a3ff0; --accent-soft: rgba(122,63,240,0.1);
-    --bad: #e0365a; --bad-soft: rgba(224,54,90,0.1);
+    --bg: #eeeae1; --surface: #f8f6f0; --surface-2: #f2efe7; --raised: #e7e2d6;
+    --border: rgba(26,24,19,0.11); --border-strong: rgba(26,24,19,0.22);
+    --text: #1a1813; --muted: #777266; --accent: #c45c00; --accent-soft: rgba(196,92,0,0.12); --on-accent: #fff8ef;
+    --bad: #c42a3c; --bad-soft: rgba(196,42,60,0.09);
   }
   * { box-sizing: border-box; }
   html { -webkit-text-size-adjust: 100%; }
@@ -368,32 +368,33 @@ _LOGIN_HTML = """<!DOCTYPE html>
     -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent;
   }
   body::before {
-    content: ""; position: fixed; inset: -30vh -20vw auto; height: 80vh; z-index: -1; pointer-events: none;
-    background: radial-gradient(55% 55% at 25% 10%, rgba(153,69,255,0.32), transparent 70%), radial-gradient(45% 45% at 85% 20%, rgba(20,241,149,0.16), transparent 70%);
+    content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+    background-image: radial-gradient(circle, rgba(236,231,214,0.075) 1px, transparent 1.3px); background-size: 22px 22px;
+    -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, #000, transparent 75%); mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, #000, transparent 75%);
   }
-  :root[data-theme="light"] body::before { opacity: 0.55; }
+  :root[data-theme="light"] body::before { background-image: radial-gradient(circle, rgba(26,24,19,0.1) 1px, transparent 1.3px); }
   main { width: 100%; max-width: 380px; }
-  .brand { text-align: center; margin-bottom: 26px; }
-  .brand img { width: 76px; height: 76px; border-radius: 22px; display: block; margin: 0 auto 16px; box-shadow: 0 18px 40px -16px rgba(124,77,255,0.8); }
-  h1 { margin: 0; font-size: 30px; font-weight: 700; letter-spacing: -0.035em; }
-  .brand p { margin: 6px 0 0; color: var(--muted); font-size: 15px; }
-  form { display: grid; gap: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 26px; padding: 22px 20px; box-shadow: 0 24px 60px -30px rgba(0,0,0,0.7); }
-  .field { display: grid; gap: 7px; font-size: 13px; font-weight: 600; color: var(--muted); }
+  .brand { text-align: center; margin-bottom: 24px; }
+  .brand img { width: 72px; height: 72px; border-radius: 18px; display: block; margin: 0 auto 16px; }
+  h1 { margin: 0; font-size: 30px; font-weight: 700; font-stretch: 85%; letter-spacing: -0.02em; }
+  .brand p { margin: 6px 0 0; color: var(--muted); font: 12px var(--mono); letter-spacing: 0.06em; text-transform: uppercase; }
+  form { display: grid; gap: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 22px 20px; }
+  .field { display: grid; gap: 7px; font: 600 10.5px var(--mono); letter-spacing: 0.09em; text-transform: uppercase; color: var(--muted); }
   input {
-    height: 52px; padding: 0 16px; border-radius: 14px; border: 1px solid var(--border-strong); background: var(--surface-2);
+    height: 52px; padding: 0 16px; border-radius: 10px; border: 1px solid var(--border-strong); background: var(--surface-2);
     color: var(--text); font: 17px var(--font); outline: none; width: 100%;
   }
   input:focus { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
-  input[name="code"] { letter-spacing: 0.25em; text-align: center; font-size: 20px; }
+  input[name="code"] { letter-spacing: 0.25em; text-align: center; font: 20px var(--mono); }
   button[type="submit"] {
-    height: 54px; margin-top: 4px; border: 0; border-radius: 15px; background: var(--grad); color: #fff;
-    font: 650 17px var(--font); cursor: pointer; box-shadow: 0 14px 30px -14px rgba(124,77,255,0.9); touch-action: manipulation;
+    height: 54px; margin-top: 4px; border: 0; border-radius: 10px; background: var(--accent); color: var(--on-accent);
+    font: 700 16px var(--font); cursor: pointer; box-shadow: inset 0 -2px 0 rgba(0,0,0,0.22); touch-action: manipulation;
   }
   button[type="submit"]:active { transform: scale(0.985); }
-  .error { margin: 0; padding: 12px 14px; border-radius: 14px; background: var(--bad-soft); color: var(--bad); font-size: 14px; font-weight: 550; }
+  .error { margin: 0; padding: 12px 14px; border-radius: 10px; background: var(--bad-soft); color: var(--bad); font-size: 14px; font-weight: 550; }
   .error[hidden] { display: none; }
   .hint { margin: 2px 2px 0; color: var(--muted); font-size: 12.5px; line-height: 1.45; }
-  .theme { margin: 22px auto 0; display: block; height: 40px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--border); background: transparent; color: var(--muted); font: 600 13px var(--font); cursor: pointer; }
+  .theme { margin: 22px auto 0; display: block; height: 36px; padding: 0 14px; border-radius: 8px; border: 1px solid var(--border); background: transparent; color: var(--muted); font: 600 11px var(--mono); letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer; }
 </style>
 </head>
 <body>
@@ -426,7 +427,7 @@ function applyTheme(theme) {
   try { localStorage.setItem("meme-theme", theme); } catch (e) {}
   document.getElementById("theme").textContent = theme === "dark" ? "Lyst tema" : "Mørkt tema";
   var meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute("content", theme === "dark" ? "#07080c" : "#f3f4f8");
+  if (meta) meta.setAttribute("content", theme === "dark" ? "#0b0b0a" : "#eeeae1");
 }
 var stored = null;
 try { stored = localStorage.getItem("meme-theme"); } catch (e) {}

@@ -303,9 +303,20 @@ class MemeEngine:
         self._sell_queue: set[int] = set()
         self._missing_price: dict[int, int] = {}
         self._copy_sells: set[tuple[str, str]] = set()
-        # Kursforløb pr. åben position til mini-grafer på dashboardet (kun i hukommelsen).
+        # Kursforløb pr. åben position til mini-grafer på dashboardet. Gemmes også i databasen.
         self._paths: dict[int, deque] = {}
         self._path_at: dict[int, float] = {}
+        self._priced_at: dict[int, float] = {}
+        # Uret, som dashboardet tæller ned efter: hvad laver botten lige nu, og hvornår sker det næste.
+        self._started_at = time.time()
+        self._phase = "starter"
+        self._phase_since = time.time()
+        self._tick_started = 0.0
+        self._last_monitor = 0.0
+        self._tick_seconds: float | None = None
+        self._jobs: dict[str, dict[str, Any]] = {
+            name: {"running": False, "started": 0.0, "duration": None, "runs": 0} for name in ("scan", "snipe", "top")
+        }
         self.last_tick: str | None = None
         self.last_scan_at: str | None = None
         self.last_scan: dict[str, Any] = {}
@@ -352,11 +363,39 @@ class MemeEngine:
     def _loop(self) -> None:
         while not self._stop.is_set():
             try:
-                self.tick()
+                self.tick(from_loop=True)
             except Exception:
                 logger.exception("Memebottens løkke fangede en fejl")
-            self._wake.wait(self._loop_seconds())
+            self._wake.wait(self._sleep_seconds())
             self._wake.clear()
+
+    def _sleep_seconds(self) -> float:
+        """Vågn præcis, når næste scanning, snipe eller Top 10-tjek skal køre, så nedtællingen passer."""
+        base = self._loop_seconds()
+        due = [self._last_monitor + base] + [at for at in self._due_times().values() if at is not None]
+        return max(0.2, min(base, min(due) - time.time()))
+
+    def _due_times(self) -> dict[str, float | None]:
+        return {
+            "scan": self._last_scan + self.settings.scan_seconds,
+            "snipe": self._last_snipe + self.settings.sniper_scan_seconds if self.sniper.enabled else None,
+            "top": self._last_top_poll + TOP_POLL_SECONDS if (self.top_cfg.enabled or self._held_top_wallets()) else None,
+        }
+
+    def _set_phase(self, phase: str) -> None:
+        self._phase = phase
+        self._phase_since = time.time()
+
+    def _run_job(self, name: str, phase: str, fn: Callable[[], None]) -> None:
+        job = self._jobs[name]
+        job["running"], job["started"] = True, time.time()
+        self._set_phase(phase)
+        try:
+            fn()
+        finally:
+            job["running"] = False
+            job["duration"] = round(time.time() - job["started"], 1)
+            job["runs"] += 1
 
     def _loop_seconds(self) -> float:
         """Sniperen kræver hurtigere runder, så stop og gevinstmål rammes i tide."""
@@ -589,10 +628,14 @@ class MemeEngine:
         self._scan_requested = True
         self._wake.set()
 
-    def tick(self, force_scan: bool = False) -> None:
+    def tick(self, force_scan: bool = False, *, from_loop: bool = False) -> None:
         with self._lock:
             now = time.time()
             self.last_tick = now_iso()
+            # Vågner løkken kun for at scanne, er positionerne lige tjekket. Så starter scanningen til tiden.
+            monitor_due = not from_loop or force_scan or self._scan_requested or now - self._last_monitor >= self._loop_seconds() - 0.5
+            self._tick_started = now
+            self._set_phase("positioner" if monitor_due else "venter")
             try:
                 sol_usd = self._sol_price()
                 wallet = self._wallet()
@@ -603,7 +646,9 @@ class MemeEngine:
                     except SourceError as exc:
                         logger.info("SOL-saldo kunne ikke hentes: %s", exc)
                     self._maybe_sweep(wallet, sol_usd)
-                self._monitor(wallet, sol_usd)
+                if monitor_due:
+                    self._last_monitor = time.time()
+                    self._monitor(wallet, sol_usd)
                 self._learn()
                 self._check_guard()
                 self._maybe_auto_targets()
@@ -621,21 +666,24 @@ class MemeEngine:
                 entries_allowed = not (self.kill_switch or self.paused or halted_day or halted_dd)
                 # Top 10 har ingen daglig tabsgrænse, medmindre du slår den til. Nødstop, pause og samlet tabsgrænse gælder altid.
                 top_entries_allowed = not (self.kill_switch or self.paused or halted_dd or (halted_day and self.top_cfg.daily_loss_stop))
+                # Lidt slæk, så en runde der vågner et øjeblik for tidligt ikke venter en hel runde mere.
+                now = time.time() + 0.25
                 if requested or now - self._last_scan >= self.settings.scan_seconds:
                     self._scan_requested = False
-                    self._last_scan = now
-                    self._scan(wallet, sol_usd, day, entries_allowed=entries_allowed)
+                    self._last_scan = time.time()
+                    self._run_job("scan", "scan", lambda: self._scan(wallet, sol_usd, day, entries_allowed=entries_allowed))
                 if self.sniper.enabled and (requested or now - self._last_snipe >= self.settings.sniper_scan_seconds):
-                    self._last_snipe = now
-                    self._snipe(wallet, sol_usd, day, entries_allowed=entries_allowed)
+                    self._last_snipe = time.time()
+                    self._run_job("snipe", "sniper", lambda: self._snipe(wallet, sol_usd, day, entries_allowed=entries_allowed))
                 if (self.top_cfg.enabled or self._held_top_wallets()) and (requested or now - self._last_top_poll >= TOP_POLL_SECONDS):
-                    self._last_top_poll = now
-                    self._follow_top(wallet, sol_usd, day, entries_allowed=top_entries_allowed)
+                    self._last_top_poll = time.time()
+                    self._run_job("top", "top10", lambda: self._follow_top(wallet, sol_usd, day, entries_allowed=top_entries_allowed))
                 if now - self._last_snapshot >= 300:
                     self._last_snapshot = now
                     self.store.add_equity(self.mode, self._totals()["equity"])
                     self.store.set_day_end(day, self.mode, self._totals()["equity"])
                     self.store.prune()
+                    self.store.prune_paths(PATH_POINTS)
                 self.consecutive_errors = 0
                 self.last_error = ""
             except Exception as exc:
@@ -647,6 +695,9 @@ class MemeEngine:
                 if self.consecutive_errors in (5, 60):
                     self._notify(f"{self.consecutive_errors} fejl i træk: {message}")
                 logger.warning("Memebot-fejl: %s", message)
+            finally:
+                self._tick_seconds = round(time.time() - self._tick_started, 2)
+                self._set_phase("venter")
 
     # ------------------------------------------------------------------ positioner og salg
     def _monitor(self, wallet, sol_usd: float) -> None:
@@ -690,6 +741,7 @@ class MemeEngine:
                     self._sell(pos, 1.0, "no_price", "Ingen kurs i lang tid. Forsøger at sælge.", wallet, sol_usd)
                 continue
             self._missing_price.pop(pos["id"], None)
+            self._priced_at[int(pos["id"])] = time.time()
             self._record_path(int(pos["id"]), price / float(pos["entry_price_usd"]))
             ratio = price / float(pos["entry_price_usd"])
             peak = max(float(pos["peak_ratio"] or 1.0), ratio)
@@ -769,17 +821,31 @@ class MemeEngine:
         self._notify(f"Solgt {fraction * 100:.0f} % af {pos['symbol']} (+{fill.usd:.2f} USD). {reason}")
         return True
 
+    def _path_of(self, position_id: int) -> deque:
+        path = self._paths.get(position_id)
+        if path is None:
+            # Efter en genstart: hent forløbet fra databasen, så mini-grafen ikke starter forfra.
+            points = self.store.path_points(position_id, PATH_POINTS)
+            path = deque([1.0] + [ratio for _ts, ratio in points], maxlen=PATH_POINTS)
+            if points:
+                self._path_at[position_id] = points[-1][0]
+            self._paths[position_id] = path
+        return path
+
     def _record_path(self, position_id: int, ratio: float) -> None:
         now = time.time()
+        path = self._path_of(position_id)
         if now - self._path_at.get(position_id, 0.0) < PATH_STEP_SECONDS:
             return
         self._path_at[position_id] = now
-        path = self._paths.setdefault(position_id, deque([1.0], maxlen=PATH_POINTS))
         path.append(round(ratio, 5))
+        self.store.add_path_point(position_id, now, round(ratio, 5))
 
     def _close(self, pos: dict, proceeds: float, fees: float, kind: str, reason: str, signatures: list) -> None:
         self._paths.pop(int(pos["id"]), None)
         self._path_at.pop(int(pos["id"]), None)
+        self._priced_at.pop(int(pos["id"]), None)
+        self.store.drop_path(int(pos["id"]))
         cost = float(pos["cost_usd"])
         pnl = proceeds - cost - fees
         pnl_pct = pnl / cost if cost > 0 else 0.0
@@ -2775,6 +2841,7 @@ class MemeEngine:
                 "paper_cash": self._paper.cash_usd(0.0),
                 "running": bool(self._thread and self._thread.is_alive()),
                 "next_scan_in": round(next_scan),
+                "clock": self._clock_view(),
                 "scan_seconds": self.settings.scan_seconds,
                 "monitor_seconds": self.settings.monitor_seconds,
                 "jupiter": self._jupiter_usage(),
@@ -2782,6 +2849,38 @@ class MemeEngine:
                 "rugcheck": self._usage_of(self.clients.rug),
             },
         }
+
+    def _clock_view(self) -> dict:
+        """Absolutte tider (sekunder siden 1970), så dashboardet kan tælle ned sekund for sekund."""
+        now = time.time()
+        due = self._due_times()
+        jobs = {}
+        for name, job in self._jobs.items():
+            at = due[name]
+            jobs[name] = {
+                "enabled": at is not None,
+                "running": bool(job["running"]),
+                "started_at": job["started"] or None,
+                "next_at": (at if at is not None and self._last_of(name) else now) if at is not None else None,
+                "last_duration": job["duration"],
+                "every": {"scan": self.settings.scan_seconds, "snipe": self.settings.sniper_scan_seconds, "top": TOP_POLL_SECONDS}[name],
+                "runs": job["runs"],
+            }
+        tomorrow = (datetime.now(timezone.utc) + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+        return {
+            "now": now,
+            "started_at": self._started_at,
+            "phase": self._phase,
+            "phase_since": self._phase_since,
+            "tick_every": self._loop_seconds(),
+            "last_tick_at": self._tick_started or None,
+            "last_tick_seconds": self._tick_seconds,
+            "day_ends_at": tomorrow.timestamp(),
+            "jobs": jobs,
+        }
+
+    def _last_of(self, name: str) -> float:
+        return {"scan": self._last_scan, "snipe": self._last_snipe, "top": self._last_top_poll}[name]
 
     def _jupiter_usage(self) -> dict | None:
         return self._usage_of(self.clients.jup)
@@ -2901,7 +3000,8 @@ class MemeEngine:
             "peak_pct": (float(row["peak_ratio"] or 1.0) - 1.0),
             "partial": bool(row["partial_taken"]),
             "strategy": row.get("strategy") or "momentum",
-            "path": list(self._paths.get(int(row["id"]), [])) if row["status"] == "open" else [],
+            "path": list(self._path_of(int(row["id"]))) if row["status"] == "open" else [],
+            "priced_at": self._priced_at.get(int(row["id"])) if row["status"] == "open" else None,
             "watching": bool(self.settings.dev_watch and (watch.get("dev") or watch.get("holders"))),
             "stop_pct": stop_pct,
             "tp_pct": tp_pct,
