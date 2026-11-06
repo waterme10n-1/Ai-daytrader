@@ -6,340 +6,334 @@
 <meta name="color-scheme" content="dark light">
 <title>Handelsbordet</title>
 <link rel="manifest" href="/manifest.webmanifest">
-<meta name="theme-color" content="#0b0b0c">
+<meta name="theme-color" content="#000000">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230b0b0c'/%3E%3Crect x='1.5' y='1.5' width='29' height='29' rx='6' fill='none' stroke='%23ff5f1f' stroke-width='2'/%3E%3Ctext x='16' y='22' text-anchor='middle' font-size='16' font-weight='700' fill='%23ff5f1f' font-family='monospace'%3E6%3C/text%3E%3C/svg%3E">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230a84ff'/%3E%3Cpath d='M7 21l6-6 4 4 8-9' fill='none' stroke='white' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Doto:wght@700..900&family=Geist:wght@400..700&family=Geist+Mono:wght@400..700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400..700&display=swap" rel="stylesheet">
 <style>
-  /* ---------- Farver og mål ---------- */
   :root {
     color-scheme: dark;
-    --bg: #0b0b0c; --panel: #121214; --panel-2: #18181b; --panel-3: #1f1f23;
-    --line: rgba(255, 255, 255, 0.075); --line-2: rgba(255, 255, 255, 0.14);
-    --text: #ececec; --text-2: #a1a1a6; --muted: #6e6e74;
-    --signal: #ff5f1f; --signal-2: #ff8a4c; --signal-soft: rgba(255, 95, 31, 0.12);
-    --up: #34c759; --up-soft: rgba(52, 199, 89, 0.12);
-    --down: #ff453a; --down-soft: rgba(255, 69, 58, 0.12);
-    --warn: #ffb020; --warn-soft: rgba(255, 176, 32, 0.12);
-    --scout: #d4a24c; --news: #6f9fd8; --chart: #4fb3a6; --skeptic: #e0685e; --sizer: #9b87d6; --executor: #6fbf73;
-    --ui: "Geist", -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif;
-    --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
-    --dots: "Doto", "Geist Mono", ui-monospace, monospace;
-    --r: 10px; --r-s: 7px;
-    --nav-h: 60px;
+    --bg: #000; --card: #141416; --card-2: #1c1c1f; --raise: #232327;
+    --fill: rgba(118, 118, 128, 0.18); --fill-2: rgba(118, 118, 128, 0.28); --sep: rgba(255, 255, 255, 0.08);
+    --text: #f5f5f7; --text-2: #c7c7cc; --muted: #8e8e93;
+    --accent: #0a84ff; --accent-bg: rgba(10, 132, 255, 0.16);
+    --up: #30d158; --up-bg: rgba(48, 209, 88, 0.16);
+    --down: #ff453a; --down-bg: rgba(255, 69, 58, 0.16);
+    --warn: #ff9f0a; --warn-bg: rgba(255, 159, 10, 0.16);
+    --scout: #ff9f0a; --news: #0a84ff; --chart: #40c8e0; --skeptic: #ff375f; --sizer: #bf5af2; --executor: #30d158;
+    --shadow: none;
+    --bar: rgba(20, 20, 22, 0.78);
+    --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", system-ui, sans-serif;
+    --display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", system-ui, sans-serif;
+    --r-card: 22px; --r: 14px; --r-s: 10px;
+    --nav-h: 64px;
     --safe-b: env(safe-area-inset-bottom, 0px); --safe-t: env(safe-area-inset-top, 0px);
   }
   :root[data-theme="light"] {
     color-scheme: light;
-    --bg: #f2f1ed; --panel: #fbfaf7; --panel-2: #f1efe9; --panel-3: #e8e5dd;
-    --line: rgba(20, 20, 20, 0.09); --line-2: rgba(20, 20, 20, 0.18);
-    --text: #141414; --text-2: #4a4a4a; --muted: #85837d;
-    --signal: #e5500f; --signal-2: #c4430a; --signal-soft: rgba(229, 80, 15, 0.1);
-    --up: #1a8f4a; --up-soft: rgba(26, 143, 74, 0.1); --down: #d92d20; --down-soft: rgba(217, 45, 32, 0.09);
-    --warn: #b7790c; --warn-soft: rgba(183, 121, 12, 0.12);
-    --scout: #a67412; --news: #2f6db5; --chart: #22877a; --skeptic: #c0392b; --sizer: #6c55b8; --executor: #2e8b3a;
+    --bg: #f2f2f7; --card: #ffffff; --card-2: #f6f6f9; --raise: #ececf1;
+    --fill: rgba(118, 118, 128, 0.12); --fill-2: rgba(118, 118, 128, 0.2); --sep: rgba(60, 60, 67, 0.12);
+    --text: #1c1c1e; --text-2: #3a3a3c; --muted: #6e6e73;
+    --accent: #007aff; --accent-bg: rgba(0, 122, 255, 0.1);
+    --up: #1f9d48; --up-bg: rgba(52, 199, 89, 0.14);
+    --down: #e0352b; --down-bg: rgba(255, 59, 48, 0.12);
+    --warn: #c76b00; --warn-bg: rgba(255, 149, 0, 0.14);
+    --scout: #ff9500; --news: #007aff; --chart: #32ade6; --skeptic: #ff2d55; --sizer: #af52de; --executor: #34c759;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 10px 30px rgba(0, 0, 0, 0.06);
+    --bar: rgba(249, 249, 251, 0.82);
   }
   * { box-sizing: border-box; }
   html { -webkit-text-size-adjust: 100%; }
   html, body { margin: 0; }
-  body { font: 400 15px/1.5 var(--ui); color: var(--text); background: var(--bg); min-height: 100vh; -webkit-font-smoothing: antialiased; font-feature-settings: "ss01", "tnum"; }
-  button, input, textarea { font: inherit; color: inherit; }
-  button { cursor: pointer; }
-  :focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
-  a { color: var(--signal); }
+  body { font: 400 15px/1.45 var(--font); color: var(--text); background: var(--bg); min-height: 100vh; -webkit-font-smoothing: antialiased; font-feature-settings: "tnum"; letter-spacing: -0.005em; }
+  button, input, textarea { font: inherit; color: inherit; letter-spacing: inherit; }
+  button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--accent); text-decoration: none; }
   [hidden] { display: none !important; }
-  .wrap { width: min(1160px, 100%); margin: 0 auto; padding: 0 16px; }
-  .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
-  .label { font: 500 10.5px/1.2 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
-  .up { color: var(--up); } .down { color: var(--down); } .muted { color: var(--muted); } .warn-t { color: var(--warn); } .sig { color: var(--signal); }
-  .small { font-size: 13px; }
+  .wrap { width: min(1080px, 100%); margin: 0 auto; padding: 0 16px; }
+  .num { font-variant-numeric: tabular-nums; }
+  .up { color: var(--up); } .down { color: var(--down); } .muted { color: var(--muted); } .small { font-size: 13px; }
+  .cap { font-size: 13px; color: var(--muted); }
 
-  /* ---------- Skifter mellem sider ---------- */
+  /* ---------- skifter mellem sider ---------- */
   .appnav { display: flex; justify-content: center; padding: 8px 12px 0; padding-top: max(8px, var(--safe-t)); }
-  .appnav-in { display: inline-flex; gap: 2px; padding: 3px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); }
-  .appnav a { padding: 5px 14px; border-radius: 999px; font: 500 13px/1.2 var(--ui); color: var(--text-2); text-decoration: none; white-space: nowrap; }
-  .appnav a[aria-current="page"] { background: var(--panel-3); color: var(--text); }
+  .appnav-in { display: inline-flex; gap: 2px; padding: 2px; border-radius: 10px; background: var(--fill); }
+  .appnav a { padding: 6px 16px; border-radius: 8px; font: 500 13px/1.2 var(--font); color: var(--text-2); white-space: nowrap; }
+  .appnav a[aria-current="page"] { background: var(--card); color: var(--text); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2); }
 
-  /* ---------- Top ---------- */
-  header.top { position: sticky; top: 0; z-index: 20; background: var(--bg); border-bottom: 1px solid var(--line); }
+  /* ---------- top ---------- */
+  header.top { position: sticky; top: 0; z-index: 20; background: var(--bar); -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px); border-bottom: 0.5px solid var(--sep); }
   .bar { display: flex; align-items: center; gap: 10px; padding: 10px 16px; }
-  .mark { width: 34px; height: 34px; flex: none; display: grid; place-items: center; border: 1.5px solid var(--signal); border-radius: 8px; color: var(--signal); font: 900 19px/1 var(--dots); text-decoration: none; }
-  .title { display: grid; min-width: 0; flex: 1; line-height: 1.2; }
-  .title b { font: 600 16px var(--ui); letter-spacing: -0.01em; }
-  .title .sub { font: 500 11px var(--mono); color: var(--muted); letter-spacing: 0.04em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .live { display: inline-flex; align-items: center; gap: 7px; font: 500 11px var(--mono); color: var(--text-2); letter-spacing: 0.06em; padding: 6px 10px; border: 1px solid var(--line); border-radius: 999px; white-space: nowrap; }
-  .live.stale { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 40%, transparent); }
-  .live.lost { color: var(--down); border-color: color-mix(in srgb, var(--down) 40%, transparent); }
-  .led { width: 7px; height: 7px; border-radius: 2px; background: var(--muted); flex: none; }
-  .led.on { background: var(--up); animation: blink 2s steps(1) infinite; }
-  .led.warn { background: var(--warn); }
-  .led.bad { background: var(--down); animation: blink 1s steps(1) infinite; }
-  @keyframes blink { 50% { opacity: 0.25; } }
-  .btn { border: 1px solid var(--line-2); background: var(--panel); border-radius: var(--r-s); padding: 8px 13px; font: 500 13.5px var(--ui); white-space: nowrap; transition: background 0.12s, border-color 0.12s, transform 0.08s; }
-  .btn:hover { background: var(--panel-2); border-color: var(--muted); }
-  .btn:active { transform: translateY(1px); }
-  .btn.primary { background: var(--signal); border-color: var(--signal); color: #fff; }
-  .btn.primary:hover { background: var(--signal-2); }
-  .btn.danger { background: transparent; border-color: color-mix(in srgb, var(--down) 60%, transparent); color: var(--down); }
-  .btn.danger:hover { background: var(--down-soft); }
-  .btn.resume { border-color: color-mix(in srgb, var(--up) 60%, transparent); color: var(--up); }
+  .title { flex: 1; min-width: 0; font: 700 22px/1.15 var(--display); letter-spacing: -0.025em; }
+  .status { display: inline-flex; align-items: center; gap: 7px; padding: 6px 11px; border-radius: 999px; border: 0; background: var(--fill); font: 500 13px var(--font); color: var(--text-2); white-space: nowrap; }
+  .status .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+  .status.ok .dot { background: var(--up); }
+  .status.warn .dot { background: var(--warn); }
+  .status.bad .dot { background: var(--down); }
+  .status.live .dot { animation: breathe 2.4s ease-in-out infinite; }
+  @keyframes breathe { 50% { opacity: 0.35; } }
+  .btn { border: 0; background: var(--fill); border-radius: 12px; padding: 9px 15px; font: 600 14.5px var(--font); white-space: nowrap; transition: transform 0.12s ease, background 0.15s ease, opacity 0.15s; }
+  .btn:hover { background: var(--fill-2); }
+  .btn:active { transform: scale(0.97); }
+  .btn.primary { background: var(--accent); color: #fff; }
+  .btn.primary:hover { filter: brightness(1.08); }
+  .btn.danger { background: var(--down-bg); color: var(--down); }
+  .btn.resume { background: var(--up-bg); color: var(--up); }
+  .btn.plain { background: none; color: var(--accent); padding-left: 0; padding-right: 0; }
+  .btn.big { padding: 13px 18px; font-size: 16px; border-radius: 14px; }
   .btn:disabled { opacity: 0.45; cursor: default; }
-  .icon { width: 36px; height: 36px; flex: none; display: grid; place-items: center; border: 1px solid var(--line); background: transparent; border-radius: var(--r-s); color: var(--text-2); }
-  .icon:hover { border-color: var(--line-2); color: var(--text); }
-  .icon[aria-pressed="true"] { color: var(--signal); border-color: color-mix(in srgb, var(--signal) 50%, transparent); }
-  .loadbar { height: 2px; background: transparent; overflow: hidden; }
-  .loadbar i { display: block; height: 100%; width: 30%; background: var(--signal); animation: load 1.1s ease-in-out infinite; }
-  @keyframes load { from { transform: translateX(-100%); } to { transform: translateX(340%); } }
+  .round { width: 36px; height: 36px; flex: none; display: grid; place-items: center; border: 0; border-radius: 50%; background: var(--fill); color: var(--text-2); }
+  .round:hover { background: var(--fill-2); }
 
-  nav.tabs { display: flex; gap: 22px; padding: 0 16px; }
-  nav.tabs button { position: relative; display: inline-flex; align-items: center; gap: 7px; border: 0; background: none; padding: 10px 0 11px; color: var(--muted); font: 500 14px var(--ui); white-space: nowrap; }
-  nav.tabs button:hover { color: var(--text-2); }
-  nav.tabs button svg { width: 17px; height: 17px; flex: none; }
-  nav.tabs button[aria-selected="true"] { color: var(--text); }
-  nav.tabs button[aria-selected="true"]::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: var(--signal); }
-  .badge { display: inline-grid; place-items: center; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 4px; background: var(--signal); color: #fff; font: 600 10.5px var(--mono); }
+  nav.tabs { display: flex; justify-content: center; padding: 0 16px 10px; }
+  .seg { display: inline-flex; padding: 2px; border-radius: 10px; background: var(--fill); gap: 2px; }
+  .seg button { border: 0; background: none; padding: 6px 14px; border-radius: 8px; font: 500 13.5px var(--font); color: var(--text-2); display: inline-flex; align-items: center; gap: 6px; position: relative; }
+  .seg button svg { display: none; }
+  .seg button[aria-selected="true"] { background: var(--card); color: var(--text); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25); }
+  .badge { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--down); color: #fff; font: 600 11px var(--font); }
 
-  /* kursbånd */
-  .tape { overflow: hidden; border-bottom: 1px solid var(--line); background: var(--panel); white-space: nowrap; }
-  .tape-in { display: inline-flex; padding: 7px 0; animation: tape 60s linear infinite; will-change: transform; }
-  .tape-in > span { font: 500 12px var(--mono); padding: 0 18px; border-right: 1px solid var(--line); }
-  .tape-in b { font-weight: 600; color: var(--text); margin-right: 8px; }
-  .tape-in .px { color: var(--text-2); margin-right: 8px; }
-  @keyframes tape { to { transform: translateX(-50%); } }
-  body.idle .tape-in, body.idle .sweep, body.idle .blip::after, body.idle .led { animation-play-state: paused; }
-
-  main { padding: 14px 0 60px; }
+  main { padding: 16px 0 70px; }
   body.chatting main { padding-bottom: 150px; }
-  .notice { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; padding: 9px 12px; border: 1px solid var(--line); border-left: 2px solid var(--signal); border-radius: var(--r-s); background: var(--panel); font: 500 12.5px var(--mono); color: var(--text-2); transition: opacity 0.4s; }
-  .notice.fade { opacity: 0; }
-  .alerts { display: grid; gap: 8px; margin-bottom: 12px; }
-  .alert { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: var(--r-s); font-size: 13.5px; background: var(--panel); border: 1px solid var(--line); border-left: 2px solid var(--muted); }
-  .alert.warning { border-left-color: var(--warn); }
-  .alert.error { border-left-color: var(--down); }
-  .alert .act { margin-left: auto; flex: none; }
 
-  /* ---------- Paneler ---------- */
-  .home { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 12px; }
-  .span-12 { grid-column: span 12; } .span-7 { grid-column: span 7; } .span-5 { grid-column: span 5; } .span-4 { grid-column: span 4; } .span-3 { grid-column: span 3; }
-  .stack { display: grid; gap: 12px; }
-  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 14px 16px 16px; min-width: 0; position: relative; }
-  .ph { display: flex; align-items: baseline; gap: 10px; margin: -2px 0 12px; }
-  .ph .no { font: 500 10.5px var(--mono); color: var(--signal); letter-spacing: 0.06em; }
-  .ph .pt { font: 600 13px var(--ui); letter-spacing: 0.01em; }
-  .ph .meta { margin-left: auto; font: 500 10.5px var(--mono); color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  h3 { margin: 0; }
+  /* ---------- kort ---------- */
+  .card { background: var(--card); border-radius: var(--r-card); padding: 18px 20px 20px; box-shadow: var(--shadow); min-width: 0; position: relative; }
+  .card-h { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .card-h h2 { margin: 0; font: 600 17px var(--display); letter-spacing: -0.015em; }
+  .card-h .right { margin-left: auto; }
+  .grid { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+  .col { display: grid; gap: 16px; }
+  .stack { display: grid; gap: 16px; }
+  .issue { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; padding: 14px 16px; border-radius: 18px; background: var(--card); box-shadow: var(--shadow); }
+  .issue .ic { width: 32px; height: 32px; flex: none; display: grid; place-items: center; border-radius: 50%; background: var(--warn-bg); color: var(--warn); font-weight: 700; }
+  .issue.error .ic { background: var(--down-bg); color: var(--down); }
+  .issue .tx { flex: 1; min-width: 0; font-size: 14px; }
+  .issue .tx b { display: block; font-weight: 600; }
 
-  /* prikmatrix-tal */
-  .dots { font-family: var(--dots); font-weight: 800; letter-spacing: 0.02em; font-variant-numeric: tabular-nums; line-height: 1; }
-  .equity { font-size: 46px; margin: 2px 0 8px; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
-  .equity small { font: 500 13px var(--mono); color: var(--muted); letter-spacing: 0.04em; }
-  .acct-row { display: flex; gap: 8px; align-items: baseline; font-size: 13.5px; color: var(--text-2); flex-wrap: wrap; }
-  .acct-row b { font: 600 14px var(--mono); }
-  .curve { width: 100%; height: 70px; display: block; margin-top: 14px; overflow: visible; }
-  .curve path.ln { stroke-dasharray: var(--len, 0); stroke-dashoffset: 0; }
-  .curve path.ln.draw { animation: draw 1.1s ease-out both; }
-  @keyframes draw { from { stroke-dashoffset: var(--len, 0); } }
-  .hint { margin-top: 12px; padding: 12px; border: 1px dashed var(--line-2); border-radius: var(--r-s); font-size: 13px; color: var(--muted); }
-  .hint .btn { margin-top: 8px; }
+  /* kontokort */
+  .hero .lbl { font: 500 15px var(--font); color: var(--muted); }
+  .value { font: 700 44px/1.08 var(--display); letter-spacing: -0.035em; margin: 4px 0 6px; font-variant-numeric: tabular-nums; }
+  .value small { font-size: 22px; font-weight: 600; color: var(--muted); margin-left: 4px; letter-spacing: -0.02em; }
+  .delta { display: flex; align-items: center; gap: 8px; font: 600 15px var(--font); flex-wrap: wrap; }
+  .delta .cap { font-weight: 400; }
+  .chart { position: relative; margin: 18px -6px 0; height: 170px; touch-action: pan-y; }
+  .chart svg { width: 100%; height: 100%; display: block; overflow: visible; }
+  .chart .ln { fill: none; stroke-width: 2.25; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+  .chart .ln.draw { stroke-dasharray: var(--len); animation: draw 1.2s cubic-bezier(.3, .7, .2, 1) both; }
+  @keyframes draw { from { stroke-dashoffset: var(--len); } to { stroke-dashoffset: 0; } }
+  .chart .area { opacity: 0; animation: fade 0.9s 0.3s ease forwards; }
+  @keyframes fade { to { opacity: 1; } }
+  .scrub { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--fill-2); pointer-events: none; }
+  .scrub-dot { position: absolute; width: 11px; height: 11px; margin: -5.5px 0 0 -5.5px; border-radius: 50%; background: var(--card); border: 2.5px solid var(--c); pointer-events: none; }
+  .scrub-tip { position: absolute; top: -6px; transform: translate(-50%, -100%); padding: 4px 8px; border-radius: 8px; background: var(--raise); font: 600 12px var(--font); white-space: nowrap; pointer-events: none; }
+  .chart-src { display: flex; justify-content: space-between; margin-top: 8px; }
+  .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 16px; }
+  .stat { background: var(--card-2); border-radius: var(--r); padding: 11px 13px; min-width: 0; }
+  .stat .v { font: 600 19px var(--display); letter-spacing: -0.02em; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hint { margin-top: 14px; padding: 14px; border-radius: var(--r); background: var(--card-2); font-size: 14px; color: var(--text-2); }
 
   /* børsen */
-  .phases { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--line); border-radius: var(--r-s); overflow: hidden; }
-  .phases span { text-align: center; padding: 5px 0; font: 600 10.5px var(--mono); letter-spacing: 0.08em; color: var(--muted); border-right: 1px solid var(--line); }
-  .phases span:last-child { border-right: 0; }
-  .phases span.on { background: var(--signal-soft); color: var(--signal); }
-  .clock-label { margin-top: 14px; }
-  .clock { font-size: 52px; margin: 6px 0 4px; white-space: nowrap; }
-  .clock .d { font-size: 30px; margin-right: 6px; color: var(--text-2); }
-  .sess { margin-top: 14px; }
-  .sess-track { position: relative; height: 10px; border: 1px solid var(--line-2); border-radius: 3px; overflow: hidden; background: repeating-linear-gradient(90deg, transparent 0 calc(100% / 13 - 1px), var(--line) calc(100% / 13 - 1px) calc(100% / 13)); }
-  .sess-track i { position: absolute; inset: 0 auto 0 0; background: var(--signal); opacity: 0.85; }
-  .sess-now { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; background: var(--text); }
-  .sess-ticks { display: flex; justify-content: space-between; margin-top: 5px; font: 500 10.5px var(--mono); color: var(--muted); }
-  .clock-sub { margin-top: 10px; font-size: 13px; color: var(--text-2); }
+  .pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font: 600 12.5px var(--font); background: var(--fill); color: var(--text-2); white-space: nowrap; }
+  .pill.open { background: var(--up-bg); color: var(--up); }
+  .pill.pre, .pill.after { background: var(--warn-bg); color: var(--warn); }
+  .pill.up { background: var(--up-bg); color: var(--up); }
+  .pill.down { background: var(--down-bg); color: var(--down); }
+  .market { display: flex; align-items: center; gap: 18px; }
+  .ring { position: relative; width: 132px; height: 132px; flex: none; }
+  .ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+  .ring .trk { fill: none; stroke: var(--fill); stroke-width: 9; }
+  .ring .bar-r { fill: none; stroke: var(--accent); stroke-width: 9; stroke-linecap: round; transition: stroke-dashoffset 0.8s ease; }
+  .ring.open .bar-r { stroke: var(--up); }
+  .ring .mid { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; }
+  .ring .t { font: 600 22px/1.05 var(--display); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+  .ring .s { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+  .market-tx { min-width: 0; }
+  .market-tx b { display: block; font: 600 17px var(--display); letter-spacing: -0.015em; margin: 8px 0 4px; }
+  .market-tx p { margin: 0; font-size: 14px; color: var(--text-2); }
 
-  /* nøgletal */
-  .kpis { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); padding: 0; }
-  .kpi { padding: 12px 14px; border-right: 1px solid var(--line); min-width: 0; }
-  .kpi:last-child { border-right: 0; }
-  .kpi .v { font: 600 20px var(--mono); margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .segs { display: flex; gap: 2px; margin-top: 7px; }
-  .segs i { flex: 1; height: 4px; border-radius: 1px; background: var(--panel-3); }
-  .segs i.on { background: var(--text-2); }
-  .segs i.sig { background: var(--signal); }
-  .segs i.dn { background: var(--down); }
+  /* godkendelse */
+  .approve { border: 1.5px solid var(--accent); }
+  .levels { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 4px 0 12px; }
+  .levels > div { background: var(--card-2); border-radius: var(--r); padding: 10px 12px; }
+  .levels .v { font: 600 17px var(--display); margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .why { font-size: 14px; color: var(--text-2); }
+  .why > div { display: grid; grid-template-columns: 26px 1fr; gap: 10px; align-items: start; padding: 7px 0; }
+  .actions { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+  .actions .btn { flex: 1 1 0; min-width: 120px; }
+  .expires { font: 600 13px var(--font); color: var(--accent); }
 
-  /* radar */
-  .scope { position: relative; width: 100%; max-width: 300px; aspect-ratio: 1; margin: 2px auto 0; border-radius: 50%; overflow: hidden; background: var(--panel-2); border: 1px solid var(--line-2); }
-  .scope > svg { position: absolute; inset: 0; width: 100%; height: 100%; }
-  .sweep { position: absolute; inset: 0; border-radius: 50%; background: conic-gradient(from 0deg, transparent 0deg 300deg, color-mix(in srgb, var(--signal) 6%, transparent) 320deg, color-mix(in srgb, var(--signal) 32%, transparent) 360deg); animation: sweep 6s linear infinite; will-change: transform; }
-  .sweep::after { content: ""; position: absolute; left: 50%; top: 0; width: 1.5px; height: 50%; margin-left: -0.75px; background: var(--signal); }
-  @keyframes sweep { to { transform: rotate(360deg); } }
-  .blip { position: absolute; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%; border: 0; padding: 0; background: var(--bc); z-index: 2; }
-  .blip::after { content: ""; position: absolute; inset: -5px; border-radius: 50%; border: 1.5px solid var(--bc); opacity: 0; animation: ping 6s linear infinite; animation-delay: var(--d, 0s); }
-  @keyframes ping { 0% { opacity: 0.9; transform: scale(0.6); } 12% { opacity: 0; transform: scale(1.9); } 100% { opacity: 0; } }
-  .blip.flag { box-shadow: 0 0 0 2px var(--panel-2), 0 0 0 3.5px var(--signal); }
-  .blip i { position: absolute; left: 13px; top: -3px; font: 600 9.5px var(--mono); font-style: normal; color: var(--text-2); white-space: nowrap; pointer-events: none; }
-  .scope-foot { display: flex; justify-content: space-between; gap: 8px; margin-top: 10px; }
+  /* avatarer */
+  .av { width: 26px; height: 26px; flex: none; display: grid; place-items: center; border-radius: 50%; background: var(--c); color: #fff; font: 700 10.5px var(--font); letter-spacing: 0.02em; }
+  .av.lg { width: 36px; height: 36px; font-size: 12.5px; }
 
-  /* systemer */
-  .sys > div { display: grid; grid-template-columns: 9px 84px 1fr; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); }
-  .sys > div:last-child { border-bottom: 0; }
-  .sys .nm { font: 600 10.5px var(--mono); letter-spacing: 0.08em; }
-  .sys .val { font-size: 12.5px; color: var(--text-2); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* åbne handler */
+  .trade + .trade { margin-top: 16px; padding-top: 16px; border-top: 0.5px solid var(--sep); }
+  .trade-h { display: flex; align-items: center; gap: 10px; }
+  .trade-h .nm { flex: 1; min-width: 0; }
+  .trade-h .nm b { display: block; font: 600 16px var(--display); }
+  .track { position: relative; height: 6px; border-radius: 3px; background: var(--fill); margin: 16px 0 8px; }
+  .track .fillbar { position: absolute; top: 0; bottom: 0; border-radius: 3px; transition: left 0.8s ease, width 0.8s ease; }
+  .track .dot { position: absolute; top: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; background: var(--text); box-shadow: 0 0 0 3px var(--card); transition: left 0.8s ease; }
+  .track .ent { position: absolute; top: -4px; bottom: -4px; width: 2px; margin-left: -1px; border-radius: 1px; background: var(--muted); }
+  .track-l { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
 
-  /* kæden for seneste handel */
-  .pipe { list-style: none; margin: 0; padding: 0; position: relative; }
-  .pipe::before { content: ""; position: absolute; left: 13px; top: 14px; bottom: 14px; width: 1px; background: var(--line-2); }
-  .pipe li { position: relative; display: grid; grid-template-columns: 28px 1fr; gap: 10px; align-items: center; padding: 5px 0; }
-  .pipe .tx { min-width: 0; }
-  .pipe .tx b { font: 600 10.5px var(--mono); letter-spacing: 0.08em; color: var(--c); }
-  .pipe .tx span { display: block; font-size: 12.5px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .pipe li.off { opacity: 0.38; padding: 2px 0; }
-  .pipe li.good .tx span { color: var(--text); }
-  .pipe li.bad .tx span { color: var(--down); }
-  .pipe li.mid .tx span { color: var(--warn); }
-  .cs { width: 28px; height: 28px; flex: none; display: grid; place-items: center; border-radius: 6px; background: var(--panel-3); border: 1px solid var(--line-2); font: 700 10.5px var(--mono); color: var(--c, var(--text)); position: relative; z-index: 1; }
-  .cs.act::after { content: ""; position: absolute; right: -3px; top: -3px; width: 7px; height: 7px; border-radius: 2px; background: var(--signal); }
-
-  /* live-positioner */
-  .pos + .pos { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
-  .pos-h { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
-  .pos-h b { font: 600 15px var(--ui); }
-  .traj { position: relative; height: 6px; border-radius: 3px; margin: 26px 2px 26px; background: linear-gradient(90deg, var(--down-soft), var(--panel-3) 45%, var(--up-soft)); border: 1px solid var(--line); }
-  .traj .entry { position: absolute; top: -6px; bottom: -6px; width: 1px; background: var(--text-2); }
-  .traj .mk { position: absolute; top: 50%; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 3px; background: var(--signal); transform: rotate(45deg); transition: left 0.8s cubic-bezier(.2,.8,.2,1); }
-  .traj .tk { position: absolute; top: 12px; font: 500 10.5px var(--mono); color: var(--muted); white-space: nowrap; }
-  .traj .tk.l { left: 0; } .traj .tk.r { right: 0; } .traj .tk.c { top: -22px; transform: translateX(-50%); color: var(--text-2); }
+  /* bordet lige nu */
+  .steps { display: flex; align-items: center; margin: 6px 0 14px; }
+  .steps .st { position: relative; flex: 1; display: grid; justify-items: center; gap: 6px; }
+  .steps .st::before { content: ""; position: absolute; top: 15px; left: -50%; right: 50%; height: 2px; background: var(--fill); z-index: 0; }
+  .steps .st:first-child::before { display: none; }
+  .steps .st.done::before { background: var(--c-prev, var(--fill-2)); }
+  .steps .ic { position: relative; z-index: 1; width: 32px; height: 32px; display: grid; place-items: center; border-radius: 50%; background: var(--fill); color: var(--muted); font: 700 11px var(--font); transition: background 0.3s, color 0.3s, transform 0.3s; }
+  .steps .st.good .ic { background: var(--c); color: #fff; }
+  .steps .st.bad .ic { background: var(--down-bg); color: var(--down); }
+  .steps .st.mid .ic { background: var(--warn-bg); color: var(--warn); }
+  .steps .st.now .ic { animation: pop 0.5s ease; }
+  @keyframes pop { 40% { transform: scale(1.15); } }
+  .steps .nm { font: 500 10.5px var(--font); color: var(--muted); letter-spacing: 0.02em; }
+  .now-tx { font-size: 15px; color: var(--text-2); }
+  .now-tx b { color: var(--text); font-weight: 600; }
 
   /* watchlist */
-  .wl-row { display: grid; grid-template-columns: 64px minmax(64px, 1fr) 72px 110px minmax(80px, 1.2fr) 52px; gap: 12px; align-items: center; padding: 8px 6px; border-bottom: 1px solid var(--line); border-radius: 4px; width: 100%; background: none; border-left: 0; border-right: 0; border-top: 0; text-align: left; font: inherit; color: inherit; }
-  .wl-row.head { padding-top: 0; cursor: default; }
-  button.wl-row:hover { background: var(--panel-2); }
-  .wl-row:last-child { border-bottom: 0; }
-  .wl-row .sym { font: 600 13.5px var(--ui); }
-  .wl-row .n { font: 500 13px var(--mono); text-align: right; }
-  .wl-row svg { width: 100%; height: 24px; display: block; }
-  .meter { height: 4px; border-radius: 2px; background: var(--panel-3); overflow: hidden; }
-  .meter i { display: block; height: 100%; background: var(--text-2); border-radius: 2px; transition: width 0.6s ease; }
-  .meter.hot i { background: var(--signal); }
-  .meter-l { display: flex; justify-content: space-between; margin-top: 3px; font: 500 10px var(--mono); color: var(--muted); }
-  .flag-mark { display: inline-block; width: 6px; height: 6px; border-radius: 1px; background: var(--signal); margin-left: 6px; vertical-align: middle; }
-  @keyframes flashUp { from { background: var(--up-soft); } to { background: transparent; } }
-  @keyframes flashDn { from { background: var(--down-soft); } to { background: transparent; } }
-  .flash-up { animation: flashUp 1.2s ease-out; }
-  .flash-dn { animation: flashDn 1.2s ease-out; }
+  .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .stock { display: grid; grid-template-columns: minmax(0, 1fr) 84px 96px; gap: 14px; align-items: center; width: 100%; padding: 11px 0; border: 0; border-bottom: 0.5px solid var(--sep); background: none; text-align: left; color: inherit; font: inherit; }
+  .stock:last-child { border-bottom: 0; }
+  .stock:hover .sym { color: var(--accent); }
+  .stock .sym { font: 600 16px var(--display); letter-spacing: -0.01em; transition: color 0.15s; }
+  .stock .sub { font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .stock svg { width: 84px; height: 30px; display: block; }
+  .stock .px { text-align: right; font: 600 15px var(--display); font-variant-numeric: tabular-nums; }
+  .chg { display: inline-block; min-width: 76px; margin-top: 3px; padding: 3px 8px; border-radius: 7px; text-align: right; font: 600 13px var(--font); color: #fff; background: var(--up); font-variant-numeric: tabular-nums; transition: transform 0.2s; }
+  .chg.dn { background: var(--down); }
+  .chg.blink { animation: blinkchg 0.9s ease; }
+  @keyframes blinkchg { 30% { transform: scale(1.08); filter: brightness(1.3); } }
+  .flag { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); margin-left: 6px; vertical-align: 2px; }
+
+  /* radar */
+  .scope { position: relative; width: 100%; max-width: 330px; aspect-ratio: 1; margin: 6px auto 4px; border-radius: 50%; overflow: hidden; background: radial-gradient(circle, var(--accent-bg), transparent 70%), var(--card-2); }
+  .scope > svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .sweep { position: absolute; inset: 0; border-radius: 50%; background: conic-gradient(from 0deg, transparent 0deg 290deg, color-mix(in srgb, var(--accent) 8%, transparent) 310deg, color-mix(in srgb, var(--accent) 40%, transparent) 360deg); animation: sweep 6s linear infinite; will-change: transform; }
+  @keyframes sweep { to { transform: rotate(360deg); } }
+  .blip { position: absolute; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%; border: 2px solid var(--card-2); padding: 0; background: var(--bc); z-index: 2; }
+  .blip::after { content: ""; position: absolute; inset: -7px; border-radius: 50%; background: var(--bc); opacity: 0; animation: ping 6s linear infinite; animation-delay: var(--d, 0s); }
+  @keyframes ping { 0% { opacity: 0.55; transform: scale(0.4); } 14% { opacity: 0; transform: scale(1.6); } 100% { opacity: 0; } }
+  .blip i { position: absolute; left: 14px; top: -4px; font: 600 10.5px var(--font); font-style: normal; color: var(--text-2); white-space: nowrap; pointer-events: none; }
+  body.idle .sweep, body.idle .blip::after, body.idle .status .dot { animation-play-state: paused; }
 
   /* chat */
-  .chat { display: flex; flex-direction: column; gap: 2px; }
-  .msg { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; padding: 8px 10px; border-radius: var(--r-s); max-width: 820px; }
-  .msg:hover { background: var(--panel); }
-  .mh { display: flex; gap: 8px; align-items: baseline; }
-  .mh b { font: 600 11px var(--mono); letter-spacing: 0.08em; color: var(--c); }
-  .mh time { font: 500 11px var(--mono); color: var(--muted); }
-  .mt { overflow-wrap: anywhere; font-size: 14.5px; }
-  .msg.me { margin-left: auto; grid-template-columns: minmax(0, 1fr); background: var(--panel); border: 1px solid var(--line); max-width: min(560px, 88%); }
-  .msg.me .mh { justify-content: flex-end; }
-  .msg.sys { display: flex; align-items: center; gap: 10px; max-width: none; padding: 10px 0; color: var(--muted); font-size: 12.5px; text-align: center; }
-  .msg.sys::before, .msg.sys::after { content: ""; flex: 1; height: 1px; background: var(--line); min-width: 20px; }
-  .msg.sys span { max-width: 640px; }
+  .chat { display: flex; flex-direction: column; gap: 10px; max-width: 760px; margin: 0 auto; }
+  .msg { display: flex; gap: 8px; align-items: flex-end; max-width: 88%; }
+  .msg .who { font: 600 12px var(--font); color: var(--c); margin: 0 0 3px 12px; }
+  .bub { background: var(--card); border-radius: 18px 18px 18px 6px; padding: 9px 13px; font-size: 15px; overflow-wrap: anywhere; box-shadow: var(--shadow); }
+  .bub time { display: block; margin-top: 3px; font-size: 11px; color: var(--muted); }
+  .msg.me { margin-left: auto; flex-direction: row-reverse; }
+  .msg.me .bub { background: var(--accent); color: #fff; border-radius: 18px 18px 6px 18px; }
+  .msg.me .bub time { color: rgba(255, 255, 255, 0.7); text-align: right; }
+  .msg.sys { max-width: 100%; justify-content: center; text-align: center; font-size: 12.5px; color: var(--muted); padding: 4px 30px; }
   .msg.sys.error { color: var(--down); }
-  .msg.kind-approval { border: 1px solid color-mix(in srgb, var(--signal) 45%, transparent); background: var(--signal-soft); }
-  .msg.kind-fill .mt, .msg.kind-close .mt { font-weight: 500; }
-  .source { display: inline-block; margin-top: 4px; font: 500 12px var(--mono); }
-  .typing { display: flex; align-items: center; gap: 10px; padding: 8px 10px; color: var(--muted); font: 500 12px var(--mono); }
-  .typing i { display: inline-block; width: 4px; height: 4px; margin: 0 1.5px; border-radius: 1px; background: var(--muted); animation: blink 1.2s steps(1) infinite; }
-  .typing i:nth-child(2) { animation-delay: 0.2s; } .typing i:nth-child(3) { animation-delay: 0.4s; }
-  .actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
-  .actions .btn { flex: 1 1 0; min-width: 120px; }
-  .composer { position: fixed; left: 0; right: 0; bottom: 0; z-index: 15; background: var(--bg); border-top: 1px solid var(--line); padding: 8px 0 calc(8px + var(--safe-b)); }
+  .msg.kind-approval .bub { box-shadow: 0 0 0 1.5px var(--accent); }
+  .msg .source { display: inline-block; margin-top: 5px; font-weight: 600; font-size: 13.5px; }
+  .typing { display: flex; align-items: center; gap: 8px; max-width: 760px; margin: 10px auto 0; }
+  .typing .bub { display: inline-flex; gap: 4px; padding: 12px 14px; }
+  .typing .bub i { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); animation: bounce 1.2s ease-in-out infinite; }
+  .typing .bub i:nth-child(2) { animation-delay: 0.15s; } .typing .bub i:nth-child(3) { animation-delay: 0.3s; }
+  @keyframes bounce { 0%, 60%, 100% { transform: none; opacity: 0.5; } 30% { transform: translateY(-4px); opacity: 1; } }
+  .composer { position: fixed; left: 0; right: 0; bottom: 0; z-index: 15; background: var(--bar); -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px); border-top: 0.5px solid var(--sep); padding: 8px 0 calc(8px + var(--safe-b)); }
+  .composer .wrap { max-width: 792px; }
   .mentions { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 8px; scrollbar-width: none; }
   .mentions::-webkit-scrollbar { display: none; }
-  .mention { border: 1px solid var(--line-2); background: var(--panel); border-radius: 6px; padding: 4px 9px; font: 600 11px var(--mono); color: var(--c, var(--text-2)); white-space: nowrap; letter-spacing: 0.04em; }
+  .mention { border: 0; background: var(--fill); border-radius: 999px; padding: 5px 11px; font: 600 12.5px var(--font); color: var(--c, var(--text-2)); white-space: nowrap; }
   form.send { display: flex; gap: 8px; }
-  form.send input { flex: 1; min-width: 0; border: 1px solid var(--line-2); background: var(--panel); border-radius: var(--r-s); padding: 10px 12px; }
-  .empty { color: var(--muted); text-align: center; padding: 24px 12px; font-size: 13.5px; }
+  form.send input { flex: 1; min-width: 0; border: 0; background: var(--fill); border-radius: 20px; padding: 10px 15px; font-size: 16px; outline: none; }
+  form.send .btn { border-radius: 20px; }
+  .empty { color: var(--muted); text-align: center; padding: 26px 12px; font-size: 14.5px; }
 
-  /* kort og tabeller */
-  .levels { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border: 1px solid var(--line); border-radius: var(--r-s); margin: 10px 0; }
-  .levels > div { padding: 8px 10px; border-right: 1px solid var(--line); }
-  .levels > div:last-child { border-right: 0; }
-  .levels .v { font: 600 16px var(--mono); margin-top: 2px; }
-  .step { display: grid; grid-template-columns: 76px 1fr; gap: 8px; font-size: 13.5px; padding: 6px 0; border-top: 1px solid var(--line); }
-  .step .n { font: 600 10.5px var(--mono); letter-spacing: 0.08em; color: var(--c); padding-top: 2px; }
-  .tag { display: inline-block; font: 600 10.5px var(--mono); letter-spacing: 0.06em; padding: 2px 7px; border-radius: 4px; border: 1px solid var(--line-2); color: var(--text-2); }
-  .tag.BUY { color: var(--up); border-color: color-mix(in srgb, var(--up) 45%, transparent); }
-  .tag.WAIT { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 45%, transparent); }
-  .tag.SKIP, .tag.on { color: var(--down); border-color: color-mix(in srgb, var(--down) 45%, transparent); }
-  .tag.sig { color: var(--signal); border-color: color-mix(in srgb, var(--signal) 45%, transparent); }
-  .countdown { font: 600 11px var(--mono); color: var(--signal); }
-  .table-wrap { overflow-x: auto; }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th, td { text-align: left; padding: 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
-  td.n, th.n { font-family: var(--mono); text-align: right; }
-  th { font: 500 10.5px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
-  .list > div { padding: 9px 0; border-bottom: 1px solid var(--line); }
+  /* lister, tabeller, formularer */
+  .list > div { padding: 12px 0; border-bottom: 0.5px solid var(--sep); }
   .list > div:last-child { border-bottom: 0; }
-  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-  .big { font: 600 24px var(--mono); }
-  .bots { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-  .bot-head { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; }
-  .bot-head .name { font: 600 12px var(--mono); letter-spacing: 0.08em; color: var(--c); }
-  .rules { font-size: 13.5px; color: var(--text-2); border-left: 2px solid var(--c); padding: 2px 0 2px 12px; }
-  .form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-  .form label { display: grid; gap: 5px; font-size: 12.5px; color: var(--muted); }
-  .form input, .form textarea { border: 1px solid var(--line-2); background: var(--panel-2); border-radius: var(--r-s); padding: 9px 11px; width: 100%; }
+  .table-wrap { overflow-x: auto; margin: 0 -4px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 10px 6px; border-bottom: 0.5px solid var(--sep); white-space: nowrap; }
+  td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
+  th { font: 500 12.5px var(--font); color: var(--muted); }
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 6px; font: 600 12px var(--font); background: var(--fill); color: var(--text-2); }
+  .tag.BUY { background: var(--up-bg); color: var(--up); } .tag.WAIT { background: var(--warn-bg); color: var(--warn); } .tag.SKIP, .tag.on { background: var(--down-bg); color: var(--down); }
+  .big { font: 700 26px var(--display); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+  .kv { display: flex; gap: 28px; flex-wrap: wrap; }
+  .kv .cap { margin-bottom: 2px; }
+  .sysl > div { display: grid; grid-template-columns: 10px 110px 1fr; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 0.5px solid var(--sep); }
+  .sysl > div:last-child { border-bottom: 0; }
+  .sysl .d { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
+  .sysl .d.ok { background: var(--up); } .sysl .d.warn { background: var(--warn); } .sysl .d.bad { background: var(--down); }
+  .sysl .n { font-weight: 600; font-size: 14.5px; }
+  .sysl .v { font-size: 14px; color: var(--text-2); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bots { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  .bot-h { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+  .bot-h b { display: block; font: 600 16px var(--display); }
+  .bot-h .tag { margin-left: auto; }
+  .bot-rules { font-size: 14px; color: var(--text-2); }
+  .form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+  .form label { display: grid; gap: 6px; font-size: 13px; color: var(--muted); }
+  .form input, .form textarea { border: 0; background: var(--fill); border-radius: 12px; padding: 11px 13px; width: 100%; font-size: 15px; outline: none; }
+  .form input:focus, .form textarea:focus { box-shadow: 0 0 0 2px var(--accent); }
   .form .wide { grid-column: 1 / -1; }
-  .form label.check { display: flex; gap: 12px; align-items: flex-start; color: var(--text); font-size: 14px; border: 1px solid var(--line); padding: 12px 14px; border-radius: var(--r-s); }
-  .form label.check input { width: 20px; height: 20px; flex: none; accent-color: var(--signal); }
-  .toast { position: fixed; left: 50%; bottom: calc(var(--nav-h) + 90px + var(--safe-b)); transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 10px 14px; border-radius: var(--r-s); font-size: 13.5px; z-index: 80; max-width: calc(100% - 32px); }
+  .form label.toggle, .toggle { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-radius: var(--r); background: var(--card-2); font-size: 15px; color: var(--text); cursor: pointer; }
+  .toggle .tx { flex: 1; }
+  .toggle .tx span { display: block; font-size: 13px; color: var(--muted); }
+  .toggle input { appearance: none; -webkit-appearance: none; width: 51px; height: 31px; flex: none; border-radius: 16px; background: var(--fill-2); position: relative; transition: background 0.2s; cursor: pointer; margin: 0; padding: 0; }
+  .toggle input::after { content: ""; position: absolute; top: 2px; left: 2px; width: 27px; height: 27px; border-radius: 50%; background: #fff; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25); transition: transform 0.2s; }
+  .toggle input:checked { background: var(--up); }
+  .toggle input:checked::after { transform: translateX(20px); }
+  .toast { position: fixed; left: 50%; bottom: calc(var(--nav-h) + 96px + var(--safe-b)); transform: translateX(-50%); background: var(--raise); color: var(--text); padding: 11px 16px; border-radius: 14px; font-size: 14px; z-index: 80; max-width: calc(100% - 32px); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35); animation: rise 0.2s ease; }
 
   /* ark og kommandolinje */
-  .overlay { position: fixed; inset: 0; z-index: 70; background: rgba(0, 0, 0, 0.55); display: flex; align-items: flex-end; justify-content: center; }
+  .overlay { position: fixed; inset: 0; z-index: 70; background: rgba(0, 0, 0, 0.45); display: flex; align-items: flex-end; justify-content: center; animation: fadein 0.2s ease; }
+  @keyframes fadein { from { opacity: 0; } }
   .overlay.top { align-items: flex-start; }
-  .sheet { width: min(560px, 100%); max-height: 88vh; overflow: auto; background: var(--panel); border: 1px solid var(--line-2); border-radius: 14px 14px 0 0; padding: 16px 18px calc(18px + var(--safe-b)); animation: rise 0.18s ease-out; }
-  .sheet .px-big { font-size: 40px; }
-  .sheet svg.big-spark { width: 100%; height: 90px; display: block; margin: 10px 0 12px; }
-  .facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border: 1px solid var(--line); border-radius: var(--r-s); }
-  .facts > div { padding: 8px 10px; border-right: 1px solid var(--line); }
-  .facts > div:last-child { border-right: 0; }
-  .facts b { display: block; font: 600 15px var(--mono); margin-top: 2px; }
-  .pal { width: min(560px, calc(100% - 24px)); margin-top: 12vh; background: var(--panel); border: 1px solid var(--line-2); border-radius: 12px; overflow: hidden; animation: rise 0.14s ease-out; }
-  .pal input { width: 100%; border: 0; border-bottom: 1px solid var(--line); background: transparent; padding: 14px 16px; font: 500 15px var(--mono); outline: none; }
-  .pal-list { max-height: 50vh; overflow: auto; padding: 6px; }
-  .pal-list button { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; border: 0; background: transparent; padding: 9px 12px; border-radius: 6px; font-size: 14px; }
-  .pal-list button.sel { background: var(--panel-3); }
-  .pal-list button.sel::before { content: "›"; color: var(--signal); font-family: var(--mono); margin-right: -4px; }
-  .pal-list .k { margin-left: auto; font: 500 11px var(--mono); color: var(--muted); border: 1px solid var(--line-2); border-radius: 4px; padding: 0 5px; }
-  @keyframes rise { from { transform: translateY(14px); opacity: 0; } }
-  @media (min-width: 761px) { .overlay:not(.top) { align-items: center; } .sheet { border-radius: 14px; } }
+  .sheet { width: min(560px, 100%); max-height: 90vh; overflow: auto; background: var(--card); border-radius: 22px 22px 0 0; padding: 10px 20px calc(22px + var(--safe-b)); animation: rise 0.28s cubic-bezier(.2, .9, .3, 1); }
+  .grab { width: 36px; height: 5px; border-radius: 3px; background: var(--fill-2); margin: 0 auto 12px; }
+  .sheet h2 { margin: 0; font: 700 24px var(--display); letter-spacing: -0.02em; }
+  .facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .facts > div { background: var(--card-2); border-radius: var(--r); padding: 10px 12px; }
+  .facts b { display: block; font: 600 16px var(--display); margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .meter { height: 6px; border-radius: 3px; background: var(--fill); overflow: hidden; }
+  .meter i { display: block; height: 100%; border-radius: 3px; background: var(--accent); transition: width 0.6s ease; }
+  .meter.hot i { background: var(--warn); }
+  .pal { width: min(560px, calc(100% - 24px)); margin-top: 12vh; background: var(--card); border-radius: 16px; overflow: hidden; box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45); animation: rise 0.18s ease; }
+  .pal input { width: 100%; border: 0; border-bottom: 0.5px solid var(--sep); background: transparent; padding: 16px 18px; font-size: 17px; outline: none; }
+  .pal-list { max-height: 52vh; overflow: auto; padding: 6px; }
+  .pal-list button { display: flex; align-items: center; width: 100%; text-align: left; border: 0; background: transparent; padding: 11px 12px; border-radius: 10px; font-size: 15px; }
+  .pal-list button.sel { background: var(--accent); color: #fff; }
+  .pal-list .k { margin-left: auto; font-size: 12px; opacity: 0.6; }
+  @keyframes rise { from { transform: translateY(24px); opacity: 0; } }
+  @media (min-width: 761px) { .overlay:not(.top) { align-items: center; } .sheet { border-radius: 22px; } .grab { display: none; } }
 
-  /* ---------- Telefon ---------- */
+  /* telefon */
   @media (max-width: 760px) {
-    .span-7, .span-5, .span-4, .span-3 { grid-column: span 12; }
-    .bots, .form { grid-template-columns: 1fr; }
-    .kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-    .kpi:nth-child(3) { border-right: 0; }
-    .kpi:nth-child(-n+3) { border-bottom: 1px solid var(--line); }
-    .equity { font-size: 38px; }
-    .clock { font-size: 44px; }
-    .wl-row { grid-template-columns: 58px minmax(60px, 1fr) 68px minmax(70px, 1fr); }
-    .wl-row .c-spark, .wl-row .c-vol { display: none; }
-    .live { display: none; }
-    nav.tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; justify-content: space-around; gap: 0; padding: 6px 4px calc(6px + var(--safe-b)); background: var(--bg); border-top: 1px solid var(--line); }
-    nav.tabs button { flex-direction: column; gap: 3px; font-size: 10.5px; padding: 4px 2px; flex: 1; }
-    nav.tabs button[aria-selected="true"] { color: var(--signal); }
-    nav.tabs button[aria-selected="true"]::after { top: -7px; bottom: auto; left: 30%; right: 30%; }
-    nav.tabs .badge { position: absolute; top: -2px; right: calc(50% - 20px); }
+    /* Et slør på topbjælken ville fange den faste fanebjælke i bunden, så topbjælken er massiv på telefon. */
+    header.top { -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--bg); }
+    #chart-hint { display: none; }
+    .grid, .bots, .form { grid-template-columns: 1fr; }
+    .title { font-size: 20px; }
+    .value { font-size: 38px; }
+    .chart { height: 150px; }
+    .ring { width: 116px; height: 116px; }
+    nav.tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; padding: 6px 4px calc(4px + var(--safe-b)); background: var(--bar); -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px); border-top: 0.5px solid var(--sep); }
+    nav.tabs .seg { display: flex; width: 100%; background: none; padding: 0; }
+    nav.tabs .seg button { flex: 1; flex-direction: column; gap: 2px; padding: 4px 2px; font-size: 10.5px; font-weight: 500; color: var(--muted); border-radius: 0; }
+    nav.tabs .seg button svg { display: block; width: 25px; height: 25px; }
+    nav.tabs .seg button[aria-selected="true"] { background: none; box-shadow: none; color: var(--accent); }
+    nav.tabs .badge { position: absolute; top: 0; left: calc(50% + 6px); }
     .composer { bottom: calc(var(--nav-h) + var(--safe-b)); }
     main { padding-bottom: calc(var(--nav-h) + 40px + var(--safe-b)); }
     body.chatting main { padding-bottom: calc(var(--nav-h) + 150px + var(--safe-b)); }
+    .card { padding: 16px 16px 18px; }
   }
-  @media (max-width: 430px) { .hide-xs { display: none; } .bar { gap: 8px; } .bar .btn { padding: 8px 10px; } }
+  @media (max-width: 400px) { .status .lbl-s { display: none; } .stock { grid-template-columns: minmax(0, 1fr) 70px 90px; } .stock svg { width: 70px; } }
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 </style>
 </head>
@@ -348,87 +342,63 @@
 
 <header class="top">
   <div class="wrap bar">
-    <a class="mark" href="/desk" aria-label="Handelsbordet">6</a>
-    <div class="title"><b>Handelsbordet</b><span class="sub" id="sub">Forbinder …</span></div>
-    <span class="live" id="live"><span class="led" id="led"></span><span id="fresh">FORBINDER</span></span>
-    <button class="btn danger" id="pause-btn" type="button">Stop nu</button>
-    <button class="icon" id="pal-btn" type="button" title="Kommandoer (⌘K)" aria-label="Kommandoer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 17l5-5-5-5M12 19h7"/></svg></button>
-    <button class="icon hide-xs" id="sound-btn" type="button" title="Lyd og vibration ved køb og salg" aria-label="Lyd" aria-pressed="false"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5L6 9H3v6h3l5 4z"/><path id="sound-wave" d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg></button>
-    <button class="icon hide-xs" id="theme" type="button" title="Skift tema" aria-label="Skift tema"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.5a6.5 6.5 0 0 1 0 13z" fill="currentColor"/></svg></button>
+    <div class="title">Handelsbordet</div>
+    <button class="status" id="status" type="button" title="Systemstatus"><span class="dot"></span><span class="lbl-s" id="status-t">Forbinder</span></button>
+    <button class="btn danger" id="pause-btn" type="button">Stop</button>
+    <button class="round" id="pal-btn" type="button" title="Søg og kommandoer (⌘K)" aria-label="Søg og kommandoer"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></button>
   </div>
-  <nav class="wrap tabs" role="tablist" id="tabs"></nav>
-  <div class="loadbar" id="loadbar"><i></i></div>
+  <nav class="tabs" role="tablist"><div class="seg" id="tabs"></div></nav>
 </header>
-<div class="tape" id="tape-wrap" hidden><div class="tape-in" id="tape"></div></div>
 
 <main class="wrap">
-  <div class="notice" id="notice" hidden></div>
-  <div class="alerts" id="alerts"></div>
+  <div id="issue"></div>
 
-  <section id="tab-home" class="home">
-    <div id="approvals" class="span-12 stack" hidden></div>
-
-    <article class="panel span-7">
-      <div class="ph"><span class="no">01</span><span class="pt">Papirkonto</span><span class="meta" id="acct-meta">Alpaca · papir</span></div>
-      <div class="equity"><span class="dots" id="equity">–</span><small>USD</small></div>
-      <div class="acct-row"><span>Bordets resultat</span><b id="pnl">–</b><span class="muted" id="pnl-n"></span></div>
-      <svg class="curve" id="curve" viewBox="0 0 300 70" preserveAspectRatio="none" aria-label="Bordets resultat over tid"></svg>
-      <div class="hint" id="curve-empty" hidden>Kurven tegnes, når bordet har lukket sin første handel.</div>
-      <div class="hint" id="acct-off" hidden>Ingen forbindelse til Alpaca, så saldoen kan ikke vises. <br><button class="btn" type="button" data-goto="bots">Forbind under Bots</button></div>
-    </article>
-
-    <article class="panel span-5">
-      <div class="ph"><span class="no">02</span><span class="pt">New York-børsen</span><span class="meta" id="clock-src"></span></div>
-      <div class="phases" id="phases"><span data-p="pre">Før</span><span data-p="open">Åben</span><span data-p="after">Efter</span><span data-p="closed">Lukket</span></div>
-      <div class="label clock-label" id="clock-label">–</div>
-      <div class="dots clock" id="clock">--:--:--</div>
-      <div class="sess"><div class="sess-track"><i id="sess-fill" style="width:0%"></i><span class="sess-now" id="sess-now" hidden></span></div><div class="sess-ticks" id="sess-ticks"></div></div>
-      <div class="clock-sub" id="clock-sub"></div>
-    </article>
-
-    <article class="panel span-12 kpis" id="kpis">
-      <div class="kpi"><div class="label">Markeret i dag</div><div class="v" id="k-flags">–</div><div class="segs" id="k-flags-s"></div></div>
-      <div class="kpi"><div class="label">Åbne handler</div><div class="v" id="k-open">–</div><div class="segs" id="k-open-s"></div></div>
-      <div class="kpi"><div class="label">Vindere</div><div class="v" id="k-win">–</div><div class="segs" id="k-win-s"></div></div>
-      <div class="kpi"><div class="label">Skeptic siger nej</div><div class="v" id="k-no">–</div><div class="segs" id="k-no-s"></div></div>
-      <div class="kpi"><div class="label">Lærte regler</div><div class="v" id="k-rules">–</div><div class="segs" id="k-rules-s"></div></div>
-      <div class="kpi"><div class="label">Claude i dag</div><div class="v" id="k-ai">–</div><div class="segs" id="k-ai-s"></div></div>
-    </article>
-
-    <article class="panel span-5">
-      <div class="ph"><span class="no">03</span><span class="pt">Radar</span><span class="meta" id="scope-ts"></span></div>
-      <div class="scope" id="scope">
-        <svg viewBox="0 0 100 100" aria-hidden="true">
-          <g fill="none" stroke="var(--line-2)" stroke-width="0.4"><circle cx="50" cy="50" r="46"/><circle cx="50" cy="50" r="33"/><circle cx="50" cy="50" r="20"/></g>
-          <circle cx="50" cy="50" r="10" fill="none" stroke="var(--signal)" stroke-width="0.5" stroke-dasharray="1.4 1.4"/>
-          <g stroke="var(--line)" stroke-width="0.4"><line x1="50" y1="2" x2="50" y2="98"/><line x1="2" y1="50" x2="98" y2="50"/></g>
-          <g font-family="monospace" font-size="2.6" fill="var(--muted)"><text x="51" y="7">N</text></g>
-        </svg>
-        <div class="sweep" id="sweep"></div>
-        <div id="blips"></div>
+  <section id="tab-home">
+    <div class="grid">
+      <div class="col">
+        <div id="approvals" class="stack" hidden></div>
+        <article class="card hero">
+          <div class="lbl">Papirkonto</div>
+          <div class="value" id="equity-wrap"><span id="equity">–</span><small>$</small></div>
+          <div class="delta" id="delta"></div>
+          <div class="chart" id="chart"><svg id="chart-svg" viewBox="0 0 600 170" preserveAspectRatio="none" aria-label="Graf"></svg><div class="scrub" id="scrub" hidden></div><div class="scrub-dot" id="scrub-dot" hidden></div><div class="scrub-tip" id="scrub-tip" hidden></div></div>
+          <div class="chart-src cap"><span id="chart-label"></span><span id="chart-hint">Træk henover grafen</span></div>
+          <div class="hint" id="acct-off" hidden>Saldoen vises, når bordet er forbundet til din papirkonto hos Alpaca. <button class="btn plain" type="button" data-goto="bots">Forbind nu</button></div>
+          <div class="stats">
+            <div class="stat"><div class="cap">Markeret</div><div class="v" id="k-flags">–</div></div>
+            <div class="stat"><div class="cap">Åbne</div><div class="v" id="k-open">–</div></div>
+            <div class="stat"><div class="cap">Vindere</div><div class="v" id="k-win">–</div></div>
+          </div>
+        </article>
+        <article class="card" id="now-card">
+          <div class="card-h"><h2>Bordet lige nu</h2><button class="btn plain right" type="button" id="now-more" hidden>Se forløbet</button></div>
+          <div class="steps" id="steps"></div>
+          <div class="now-tx" id="now-tx">Venter på første markering.</div>
+        </article>
       </div>
-      <div class="scope-foot"><span class="label" id="scope-legend">Midten = SCOUT markerer</span><span class="label">Tryk på en prik</span></div>
-    </article>
-
-    <article class="panel span-3">
-      <div class="ph"><span class="no">04</span><span class="pt">Systemer</span><span class="meta" id="sys-ts"></span></div>
-      <div class="sys" id="sys"></div>
-    </article>
-
-    <article class="panel span-4">
-      <div class="ph"><span class="no">05</span><span class="pt">Seneste forslag</span><span class="meta" id="chain-title"></span></div>
-      <ol class="pipe" id="chain"></ol>
-    </article>
-
-    <article class="panel span-12" id="live-panel" hidden>
-      <div class="ph"><span class="no">06</span><span class="pt">Åbne positioner</span><span class="meta">stop · indgang · mål</span></div>
-      <div id="pos-list"></div>
-    </article>
-
-    <article class="panel span-12">
-      <div class="ph"><span class="no">07</span><span class="pt">Watchlist</span><span class="meta" id="radar-ts"></span></div>
-      <div id="radar"></div>
-    </article>
+      <div class="col">
+        <article class="card">
+          <div class="card-h"><h2>New York-børsen</h2><span class="pill right" id="mk-pill">–</span></div>
+          <div class="market">
+            <div class="ring" id="ring"><svg viewBox="0 0 120 120" aria-hidden="true"><circle class="trk" cx="60" cy="60" r="52"/><circle class="bar-r" id="ring-bar" cx="60" cy="60" r="52" stroke-dasharray="326.7" stroke-dashoffset="326.7"/></svg><div class="mid"><div><div class="t" id="clock">–</div><div class="s" id="clock-s"></div></div></div></div>
+            <div class="market-tx"><b id="mk-head">–</b><p id="mk-sub"></p></div>
+          </div>
+        </article>
+        <article class="card" id="trades-card" hidden>
+          <div class="card-h"><h2>Åbne handler</h2></div>
+          <div id="trades"></div>
+        </article>
+        <article class="card">
+          <div class="card-h"><h2>Watchlist</h2><div class="seg right" id="wl-seg"><button type="button" data-view="list" aria-selected="true">Liste</button><button type="button" data-view="radar" aria-selected="false">Radar</button></div></div>
+          <div id="wl-list"></div>
+          <div id="wl-radar" hidden>
+            <div class="scope"><svg viewBox="0 0 100 100" aria-hidden="true"><g fill="none" stroke="var(--fill-2)" stroke-width="0.4"><circle cx="50" cy="50" r="46"/><circle cx="50" cy="50" r="31"/><circle cx="50" cy="50" r="16"/></g><circle cx="50" cy="50" r="9" fill="var(--accent-bg)" stroke="var(--accent)" stroke-width="0.5"/></svg><div class="sweep" id="sweep"></div><div id="blips"></div></div>
+            <p class="cap" style="text-align:center;margin:8px 0 0" id="radar-cap">Jo tættere på midten, jo tættere er aktien på at blive markeret af SCOUT.</p>
+          </div>
+          <div class="cap" style="margin-top:10px" id="wl-src"></div>
+        </article>
+      </div>
+    </div>
   </section>
 
   <section id="tab-chat" hidden>
@@ -437,59 +407,54 @@
   </section>
 
   <section id="tab-trades" class="stack" hidden>
-    <article class="panel">
-      <div class="ph"><span class="pt">Åbne positioner</span></div>
+    <article class="card">
+      <div class="card-h"><h2>Åbne positioner</h2></div>
       <div id="open-list" class="list"></div>
-      <div class="actions">
-        <button class="btn" id="scan-btn" type="button">Lad SCOUT kigge nu</button>
-        <button class="btn" id="log-btn" type="button">Dagslog nu</button>
-        <button class="btn" id="close-btn" type="button">Luk bordets positioner</button>
-      </div>
+      <div class="actions"><button class="btn" id="scan-btn" type="button">Lad SCOUT kigge nu</button><button class="btn" id="log-btn" type="button">Skriv dagslog</button><button class="btn danger" id="close-btn" type="button">Luk alle</button></div>
     </article>
-    <article class="panel">
-      <div class="ph"><span class="pt">Alle forslag</span><span class="meta">Skygge = hvad der ville være sket</span></div>
+    <article class="card">
+      <div class="card-h"><h2>Alle forslag</h2><span class="cap right">Skygge = hvad der ville være sket</span></div>
       <div class="table-wrap"><table>
-        <thead><tr><th>Dag</th><th>Ticker</th><th>Skeptic</th><th>Status</th><th class="n">Indgang</th><th class="n">Stop</th><th class="n">Mål</th><th class="n">Antal</th><th class="n">Resultat</th><th>Skygge</th></tr></thead>
+        <thead><tr><th>Dag</th><th>Aktie</th><th>Skeptic</th><th>Status</th><th class="n">Indgang</th><th class="n">Stop</th><th class="n">Mål</th><th class="n">Antal</th><th class="n">Resultat</th><th>Skygge</th></tr></thead>
         <tbody id="proposals"></tbody>
       </table></div>
     </article>
   </section>
 
   <section id="tab-learn" class="stack" hidden>
-    <article class="panel"><div class="ph"><span class="pt">Bordet mod S&amp;P 500</span></div><div id="compare" class="small muted">Henter …</div></article>
-    <article class="panel">
-      <div class="ph"><span class="pt">Lærte regler</span></div>
-      <p class="muted small" style="margin:0 0 6px">Taber et mønster mindst <span id="learn-min">3</span> gange med højst en tredjedel vindere, slår reglen til, og den slags køb får WAIT. Den slår selv fra igen, når mønstret vinder oftere.</p>
+    <article class="card"><div class="card-h"><h2>Bordet mod S&amp;P 500</h2></div><div id="compare" class="muted">Henter …</div></article>
+    <article class="card"><div class="card-h"><h2>SKEPTIC's regnskab</h2></div><div id="skeptic-card"></div></article>
+    <article class="card">
+      <div class="card-h"><h2>Lærte regler</h2></div>
+      <p class="cap" style="margin:0 0 4px">Taber et mønster mindst <span id="learn-min">3</span> gange med højst en tredjedel vindere, får den slags køb WAIT, indtil mønstret vinder igen.</p>
       <div id="learn-rules" class="list"></div>
     </article>
-    <article class="panel"><div class="ph"><span class="pt">Lektioner</span></div><div id="lessons" class="list small"></div></article>
+    <article class="card"><div class="card-h"><h2>Lektioner</h2></div><div id="lessons" class="list"></div></article>
   </section>
 
   <section id="tab-bots" class="stack" hidden>
-    <article class="panel">
-      <div class="ph"><span class="pt">SKEPTIC's regnskab</span></div>
-      <div id="skeptic-card" class="small"></div>
-    </article>
-    <article class="panel">
-      <div class="ph"><span class="pt">Forbindelsen til Alpaca</span></div>
-      <p class="muted small" style="margin:0 0 10px">Tester handelskontoen, uret, kursdata og nyheder hver for sig. Nøglerne vises aldrig.</p>
-      <button class="btn primary" id="diag-btn" type="button">Test Alpaca-forbindelsen</button>
-      <div id="diag" class="small" style="margin-top:12px"></div>
-      <form class="form" id="keys-form" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line)" autocomplete="off">
-        <div class="wide"><b>Indsæt nøgler direkte</b><div class="muted small">Sendes kun til din egen server, testes hos Alpaca med det samme og vises aldrig igen. Gemte nøgler bruges i stedet for dem i Railway, og kun på papirkontoen.</div></div>
+    <article class="card"><div class="card-h"><h2>Status</h2></div><div class="sysl" id="sys"></div></article>
+    <article class="card">
+      <div class="card-h"><h2>Forbindelsen til Alpaca</h2></div>
+      <p class="cap" style="margin:0 0 12px">Tester handelskontoen, uret, kursdata og nyheder hver for sig. Nøglerne vises aldrig.</p>
+      <button class="btn primary" id="diag-btn" type="button">Test forbindelsen</button>
+      <div id="diag" style="margin-top:14px"></div>
+      <form class="form" id="keys-form" style="margin-top:18px;padding-top:16px;border-top:0.5px solid var(--sep)" autocomplete="off">
+        <div class="wide"><b>Indsæt nøgler direkte</b><div class="cap">Sendes kun til din egen server, testes hos Alpaca med det samme og vises aldrig igen. Gemte nøgler bruges i stedet for dem i Railway, og kun på papirkontoen.</div></div>
         <label>Key (starter med PK)<input name="key" type="password" autocomplete="off" spellcheck="false" autocapitalize="off"></label>
         <label>Secret<input name="secret" type="password" autocomplete="off" spellcheck="false" autocapitalize="off"></label>
         <label class="wide">Kode fra godkendelses-appen (kun hvis to-trins-login er slået til)<input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="7"></label>
         <div class="row wide"><button class="btn" type="button" id="keys-test">Test nøglerne</button><button class="btn primary" type="submit">Test og gem</button><button class="btn" type="button" id="keys-forget" hidden>Slet gemte nøgler</button></div>
-        <div class="wide small" id="keys-result"></div>
+        <div class="wide" id="keys-result"></div>
       </form>
     </article>
-    <div class="bots" id="bots"></div>
-    <article class="panel">
-      <div class="ph"><span class="pt">Indstillinger</span><span class="meta">Hårde lofter kan ikke overskrides</span></div>
+    <article class="card">
+      <div class="card-h"><h2>Indstillinger</h2></div>
       <form class="form" id="params">
-        <label class="wide check"><input name="auto_approve" type="checkbox"> <span><b>Autopilot</b> · bordet køber selv på papir, når SKEPTIC siger BUY. Slå fra, hvis du vil godkende hver ordre.</span></label>
-        <label class="wide">Watchlist (10–20 tickers du kender)<textarea name="watchlist" rows="2"></textarea></label>
+        <label class="wide toggle"><span class="tx">Autopilot<span>Bordet køber selv på papir, når SKEPTIC siger BUY.</span></span><input name="auto_approve" type="checkbox"></label>
+        <label class="wide toggle"><span class="tx">Lyd og vibration<span>Ved køb og salg (gemmes på denne enhed).</span></span><input id="sound-toggle" type="checkbox"></label>
+        <label class="wide toggle"><span class="tx">Lyst tema<span>Gemmes på denne enhed.</span></span><input id="theme-toggle" type="checkbox"></label>
+        <label class="wide">Watchlist (10–20 aktier du kender)<textarea name="watchlist" rows="2"></textarea></label>
         <label>SCOUT: bevægelse på en time (%)<input name="move_pct" type="number" step="0.1" min="0.5" max="20"></label>
         <label>SCOUT: volumen (gange normal)<input name="volume_x" type="number" step="0.1" min="1.2" max="20"></label>
         <label>SCOUT: højst markeringer pr. dag<input name="max_flags_per_day" type="number" step="1" min="1"></label>
@@ -498,9 +463,10 @@
         <label>CHART: målet mindst (gange stoppet)<input name="reward_risk" type="number" step="0.1" min="1.5" max="5"></label>
         <label>SIZER: højst (% af kontoen pr. handel)<input name="position_pct" type="number" step="0.5" min="0.5"></label>
         <label>SIZER: højst åbne handler<input name="max_open" type="number" step="1" min="1"></label>
-        <div class="row wide"><button class="btn primary" type="submit">Gem regler</button><button class="btn" type="button" id="reset-params">Tilbage til standard</button><span class="muted small" id="hard"></span></div>
+        <div class="row wide"><button class="btn primary" type="submit">Gem regler</button><button class="btn" type="button" id="reset-params">Standard</button><span class="cap" id="hard"></span></div>
       </form>
     </article>
+    <div class="bots" id="bots"></div>
   </section>
 </main>
 
@@ -508,36 +474,36 @@
   <div class="wrap">
     <div class="mentions" id="mentions"></div>
     <form class="send" id="send">
-      <input id="text" autocomplete="off" maxlength="1000" placeholder="Skriv til gruppen, fx @SKEPTIC hvorfor WAIT?" aria-label="Besked til gruppen">
+      <input id="text" autocomplete="off" maxlength="1000" placeholder="Besked til gruppen" aria-label="Besked til gruppen">
       <button class="btn primary" type="submit">Send</button>
     </form>
   </div>
 </div>
 <div class="toast" id="toast" hidden></div>
 <div class="overlay" id="sheet-bg" hidden><div class="sheet" id="sheet" role="dialog" aria-modal="true"></div></div>
-<div class="overlay top" id="pal-bg" hidden><div class="pal" role="dialog" aria-modal="true" aria-label="Kommandoer"><input id="pal-input" placeholder="Skriv en kommando eller en ticker …" autocomplete="off" spellcheck="false"><div class="pal-list" id="pal-list"></div></div></div>
+<div class="overlay top" id="pal-bg" hidden><div class="pal" role="dialog" aria-modal="true" aria-label="Søg og kommandoer"><input id="pal-input" placeholder="Søg efter en aktie eller en kommando" autocomplete="off" spellcheck="false"><div class="pal-list" id="pal-list"></div></div></div>
 
 <script>
 const BOT = {
-  scout: { name: "SCOUT", c: "var(--scout)", i: "SC" },
-  news: { name: "NEWS", c: "var(--news)", i: "NW" },
-  chart: { name: "CHART", c: "var(--chart)", i: "CH" },
-  skeptic: { name: "SKEPTIC", c: "var(--skeptic)", i: "SK" },
-  sizer: { name: "SIZER", c: "var(--sizer)", i: "SZ" },
-  executor: { name: "EXECUTOR", c: "var(--executor)", i: "EX" },
-  me: { name: "DIG", c: "var(--signal)", i: "DU" },
-  system: { name: "BORDET", c: "var(--muted)", i: "··" },
+  scout: { name: "SCOUT", c: "var(--scout)", i: "SC", job: "markerer" },
+  news: { name: "NEWS", c: "var(--news)", i: "NW", job: "finder grunden" },
+  chart: { name: "CHART", c: "var(--chart)", i: "CH", job: "sætter stop og mål" },
+  skeptic: { name: "SKEPTIC", c: "var(--skeptic)", i: "SK", job: "siger imod" },
+  sizer: { name: "SIZER", c: "var(--sizer)", i: "SZ", job: "sætter beløbet" },
+  executor: { name: "EXECUTOR", c: "var(--executor)", i: "EX", job: "køber" },
+  me: { name: "Dig", c: "var(--accent)", i: "DU" },
+  system: { name: "Bordet", c: "var(--muted)", i: "·" },
 };
 const ORDER = ["scout", "news", "chart", "skeptic", "sizer", "executor"];
 const TABS = [
-  ["home", "Overblik", '<path d="M4 4h7v7H4zM13 4h7v4h-7zM13 10h7v10h-7zM4 13h7v7H4z"/>'],
-  ["chat", "Gruppen", '<path d="M4 5h16v11H9l-5 4z"/>'],
+  ["home", "Overblik", '<path d="M3 13l9-8 9 8M5 11v9h14v-9"/>'],
+  ["chat", "Gruppen", '<path d="M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H9l-5 4z"/>'],
   ["trades", "Handler", '<path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/>'],
-  ["learn", "Læring", '<path d="M4 19V5M4 19h16M8 15l3-4 3 2 5-6"/>'],
-  ["bots", "Bots", '<rect x="5" y="8" width="14" height="11" rx="2"/><path d="M12 4v4M9.5 13h.01M14.5 13h.01"/>'],
+  ["learn", "Læring", '<path d="M12 3l9 5-9 5-9-5z"/><path d="M7 10.5V16c3 2.5 7 2.5 10 0v-5.5"/>'],
+  ["bots", "Bots", '<rect x="5" y="8" width="14" height="11" rx="3"/><path d="M12 4v4M9.5 13h.01M14.5 13h.01"/>'],
 ];
 const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
-let state = null, lastId = 0, busy = false, tab = "home", lastOk = 0, failed = false;
+let state = null, lastId = 0, busy = false, tab = "home", lastOk = 0, failed = false, wlView = "list";
 const messages = [];
 const $ = (id) => document.getElementById(id);
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -548,7 +514,7 @@ const price = (v) => (v === null || v === undefined || isNaN(v) ? "–" : nf2.fo
 const pct = (v) => (v === null || v === undefined || isNaN(v) ? "–" : `${v > 0 ? "+" : ""}${nf2.format(v)} %`);
 const hhmm = (iso) => { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleTimeString("da-DK", { hour: "2-digit", minute: "2-digit" }); };
 const pad = (n) => String(n).padStart(2, "0");
-function toast(text) { const el = $("toast"); el.textContent = text; el.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => (el.hidden = true), 4200); }
+function toast(text) { const el = $("toast"); el.textContent = text; el.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => (el.hidden = true), 3800); }
 function csrf() { const m = document.cookie.match(/(?:^|; )dt_csrf=([^;]*)/); return m ? decodeURIComponent(m[1]) : ""; }
 async function post(url, body = {}) {
   const r = await fetch(url, { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf() }, body: JSON.stringify(body) });
@@ -560,11 +526,10 @@ async function post(url, body = {}) {
 function ago(iso) {
   const d = new Date(iso); if (!iso || isNaN(d)) return "";
   const s = Math.max(0, Math.round((Date.now() - d) / 1000));
-  return s < 60 ? `${s} s siden` : s < 3600 ? `${Math.round(s / 60)} min siden` : `kl. ${hhmm(iso)}`;
+  return s < 45 ? "lige nu" : s < 3600 ? `for ${Math.round(s / 60)} min siden` : `kl. ${hhmm(iso)}`;
 }
-
-// tal, der tæller op til den nye værdi
-function tween(el, to, fmt, dur = 650) {
+// tal glider over til den nye værdi
+function tween(el, to, fmt, dur = 700) {
   if (to === null || to === undefined || isNaN(to)) { cancelAnimationFrame(el._raf); el._v = undefined; el.textContent = fmt(null); return; }
   const from = el._v === undefined ? to : el._v;
   el._v = to;
@@ -574,30 +539,50 @@ function tween(el, to, fmt, dur = 650) {
   const step = (t) => { const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3); el.textContent = fmt(from + (to - from) * e); if (k < 1) el._raf = requestAnimationFrame(step); };
   el._raf = requestAnimationFrame(step);
 }
-function flash(el, up) { el.classList.remove("flash-up", "flash-dn"); void el.offsetWidth; el.classList.add(up ? "flash-up" : "flash-dn"); }
-function segs(id, n, total, cls = "on") {
-  const k = Math.max(0, Math.min(total, Math.round(n)));
-  $(id).innerHTML = Array.from({ length: total }, (_, i) => `<i class="${i < k ? cls : ""}"></i>`).join("");
-}
-function sparkPath(values, w, h, pad = 2) {
-  if (!values || values.length < 2) return "";
+function pts(values, w, h, pad = 2) {
+  if (!values || values.length < 2) return [];
   const lo = Math.min(...values), hi = Math.max(...values), span = hi - lo || 1;
-  return values.map((v, i) => `${i ? "L" : "M"}${(pad + (i / (values.length - 1)) * (w - pad * 2)).toFixed(1)},${(h - pad - ((v - lo) / span) * (h - pad * 2)).toFixed(1)}`).join("");
+  return values.map((v, i) => [pad + (i / (values.length - 1)) * (w - pad * 2), h - pad - ((v - lo) / span) * (h - pad * 2)]);
 }
-const sparkSvg = (values, color) => { const d = sparkPath(values, 120, 24); return `<svg viewBox="0 0 120 24" preserveAspectRatio="none" aria-hidden="true">${d ? `<path d="${d}" fill="none" stroke="${color}" stroke-width="1.4" vector-effect="non-scaling-stroke"/>` : ""}</svg>`; };
+// blød kurve gennem punkterne (Catmull-Rom → Bézier)
+function smooth(p) {
+  if (p.length < 2) return "";
+  let d = `M${p[0][0].toFixed(1)},${p[0][1].toFixed(1)}`;
+  for (let i = 0; i < p.length - 1; i++) {
+    const p0 = p[i - 1] || p[i], p1 = p[i], p2 = p[i + 1], p3 = p[i + 2] || p2;
+    const c1 = [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6], c2 = [p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6];
+    d += ` C${c1[0].toFixed(1)},${c1[1].toFixed(1)} ${c2[0].toFixed(1)},${c2[1].toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`;
+  }
+  return d;
+}
+const mini = (values, color) => { const d = smooth(pts(values, 84, 30, 2)); return `<svg viewBox="0 0 84 30" preserveAspectRatio="none" aria-hidden="true">${d ? `<path d="${d}" fill="none" stroke="${color}" stroke-width="1.6" stroke-linecap="round" vector-effect="non-scaling-stroke"/>` : ""}</svg>`; };
 
-// tema: mørkt som standard
-(function () {
-  let saved = null; try { saved = localStorage.getItem("desk-theme"); } catch (e) {}
-  document.documentElement.dataset.theme = saved === "light" ? "light" : "dark";
-  $("theme").onclick = () => {
-    const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
-    document.documentElement.dataset.theme = next; try { localStorage.setItem("desk-theme", next); } catch (e) {}
-  };
-})();
+// tema og lyd (gemmes på enheden)
+function setTheme(light) { document.documentElement.dataset.theme = light ? "light" : "dark"; $("theme-toggle").checked = light; try { localStorage.setItem("desk-theme", light ? "light" : "dark"); } catch (e) {} }
+try { setTheme(localStorage.getItem("desk-theme") === "light"); } catch (e) { setTheme(false); }
+$("theme-toggle").onchange = (e) => setTheme(e.target.checked);
+let soundOn = false, audio = null;
+try { soundOn = localStorage.getItem("desk-sound") === "1"; } catch (e) {}
+function setSound(on) { soundOn = on; $("sound-toggle").checked = on; try { localStorage.setItem("desk-sound", on ? "1" : "0"); } catch (e) {} }
+setSound(soundOn);
+$("sound-toggle").onchange = (e) => { setSound(e.target.checked); if (soundOn) chime(true); };
+function chime(good) {
+  if (!soundOn) return;
+  try {
+    audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+    const t = audio.currentTime;
+    (good ? [880, 1318.5] : [440, 349.2]).forEach((f, i) => {
+      const o = audio.createOscillator(), g = audio.createGain();
+      o.type = "sine"; o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t + i * 0.09); g.gain.exponentialRampToValueAtTime(0.08, t + i * 0.09 + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + i * 0.09 + 0.35);
+      o.connect(g).connect(audio.destination); o.start(t + i * 0.09); o.stop(t + i * 0.09 + 0.4);
+    });
+    if (navigator.vibrate) navigator.vibrate(good ? [30, 40, 30] : [110]);
+  } catch (e) {}
+}
 
 // faner
-$("tabs").innerHTML = TABS.map(([k, t, d]) => `<button role="tab" data-tab="${k}" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg><span>${t}</span>${k === "home" ? '<span class="badge" id="badge" hidden>0</span>' : ""}</button>`).join("");
+$("tabs").innerHTML = TABS.map(([k, t, d]) => `<button type="button" role="tab" data-tab="${k}" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg><span>${t}</span>${k === "home" ? '<span class="badge" id="badge" hidden>0</span>' : ""}</button>`).join("");
 function showTab(name) {
   tab = name;
   document.querySelectorAll("#tabs button").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === name)));
@@ -608,12 +593,18 @@ function showTab(name) {
   if (state) renderTab(true);
   if (name === "learn") loadCompare();
   if (name === "chat") scrollDown(true);
+  else scrollTo(0, 0);
 }
 $("tabs").onclick = (e) => { const b = e.target.closest("button[data-tab]"); if (b) showTab(b.dataset.tab); };
-document.addEventListener("click", (e) => { const g = e.target.closest("[data-goto]"); if (g) showTab(g.dataset.goto); });
-
-$("mentions").innerHTML = `<button class="mention" style="--c:var(--down)" type="button" data-say="Stop nu">STOP NU</button>` +
-  ORDER.map((k) => `<button class="mention" style="--c:${BOT[k].c}" type="button" data-at="${BOT[k].name}">@${BOT[k].name}</button>`).join("");
+$("wl-seg").onclick = (e) => {
+  const b = e.target.closest("button[data-view]"); if (!b) return;
+  wlView = b.dataset.view;
+  document.querySelectorAll("#wl-seg button").forEach((x) => x.setAttribute("aria-selected", String(x === b)));
+  $("wl-list").hidden = wlView !== "list"; $("wl-radar").hidden = wlView !== "radar";
+  try { localStorage.setItem("desk-wl", wlView); } catch (e) {}
+  scopeKey = ""; if (state) renderWatch(state);
+};
+$("mentions").innerHTML = ORDER.map((k) => `<button class="mention" style="--c:${BOT[k].c}" type="button" data-at="${BOT[k].name}">@${BOT[k].name}</button>`).join("") + `<button class="mention" style="--c:var(--down)" type="button" data-say="Stop nu">Stop nu</button>`;
 $("mentions").onclick = (e) => {
   const b = e.target.closest("button"); if (!b) return;
   const input = $("text");
@@ -621,7 +612,7 @@ $("mentions").onclick = (e) => {
   input.value = `@${b.dataset.at} ` + input.value.replace(/^@\w+\s*/, ""); input.focus();
 };
 
-// ---------- chat ----------
+// ---------- gruppen ----------
 const nearBottom = () => innerHeight + scrollY >= document.body.scrollHeight - 160;
 const scrollDown = (force) => { if (force || nearBottom()) requestAnimationFrame(() => scrollTo(0, document.body.scrollHeight)); };
 function approvalButtons(pid) {
@@ -632,11 +623,11 @@ function renderMessage(m) {
   const who = BOT[m.author] || BOT.system;
   let body = esc(m.text);
   const url = m.data && safeUrl(m.data.source_url);
-  if (m.kind === "news" && url) body += `<br><a class="source" href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(m.data.source_title || "Kilde")} ↗</a>`;
+  if (m.kind === "news" && url) body += `<br><a class="source" href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(m.data.source_title || "Kilde")} ›</a>`;
   if (m.kind === "approval") body += `<div data-slot="${m.proposal_id}">${approvalButtons(m.proposal_id)}</div>`;
-  if (m.author === "system") return `<div class="msg sys ${m.kind === "error" ? "error" : ""}"><span>${body}</span></div>`;
-  if (m.author === "me") return `<div class="msg me"><div><div class="mh"><time>${hhmm(m.ts)}</time><b style="color:var(--signal)">DIG</b></div><div class="mt">${body}</div></div></div>`;
-  return `<div class="msg kind-${esc(m.kind)}" style="--c:${who.c}"><span class="cs">${who.i}</span><div><div class="mh"><b>${who.name}</b><time>${hhmm(m.ts)}</time></div><div class="mt">${body}</div></div></div>`;
+  if (m.author === "system") return `<div class="msg sys ${m.kind === "error" ? "error" : ""}">${body}</div>`;
+  if (m.author === "me") return `<div class="msg me"><div class="bub">${body}<time>${hhmm(m.ts)}</time></div></div>`;
+  return `<div class="msg kind-${esc(m.kind)}" style="--c:${who.c}"><span class="av">${who.i}</span><div style="min-width:0"><div class="who">${who.name}</div><div class="bub">${body}<time>${hhmm(m.ts)}</time></div></div></div>`;
 }
 function renderChat(fresh) {
   const box = $("chat");
@@ -647,281 +638,313 @@ function renderChat(fresh) {
   box.querySelectorAll("[data-slot]").forEach((s) => { s.innerHTML = approvalButtons(Number(s.dataset.slot)); });
   if (follow && tab === "chat") scrollDown(true);
 }
-// "SKEPTIC skriver …", indtil svaret kommer
 let typing = [];
 function renderTyping() {
   typing = typing.filter((t) => Date.now() - t.since < 90000);
-  $("typing").innerHTML = typing.map((t) => `<div class="typing"><span class="cs" style="--c:${BOT[t.key].c}">${BOT[t.key].i}</span>${BOT[t.key].name} skriver <span><i></i><i></i><i></i></span></div>`).join("");
+  $("typing").innerHTML = typing.map((t) => `<div class="typing" style="--c:${BOT[t.key].c}"><span class="av">${BOT[t.key].i}</span><div class="bub" aria-label="${BOT[t.key].name} skriver"><i></i><i></i><i></i></div></div>`).join("");
 }
 
-// ---------- overblik ----------
-function chainCard(p) {
-  const f = p.flag || {}, n = p.news || {}, s = p.skeptic || {}, z = p.size || {};
-  const url = safeUrl(n.source_url);
-  return `<article class="panel" style="border-color:color-mix(in srgb, var(--signal) 45%, transparent)">
-    <div class="ph"><span class="no">!</span><span class="pt">Godkendelse: ${esc(p.symbol)}</span><span class="meta"><span class="countdown" data-expires="${esc(p.expires_at || "")}"></span></span></div>
-    <div class="levels"><div><div class="label">Indgang</div><div class="v">${price(p.entry)}</div></div><div><div class="label">Stop</div><div class="v down">${price(p.stop)}</div></div><div><div class="label">Mål</div><div class="v up">${price(p.target)}</div></div></div>
-    <div class="step" style="--c:var(--scout)"><div class="n">SCOUT</div><div>${f.move_pct !== undefined ? `${pct(f.move_pct)} på ${f.window_minutes} min · ${f.volume_x}x volumen` : "–"}</div></div>
-    <div class="step" style="--c:var(--news)"><div class="n">NEWS</div><div>${esc(n.reason || "–")}${url ? ` <a href="${esc(url)}" target="_blank" rel="noopener noreferrer">kilde ↗</a>` : ""}</div></div>
-    <div class="step" style="--c:var(--skeptic)"><div class="n">SKEPTIC</div><div>${(s.reasons || []).map((r, i) => `${i + 1}) ${esc(r)}`).join("<br>") || "–"}</div></div>
-    <div class="step" style="--c:var(--sizer)"><div class="n">SIZER</div><div>${z.qty ? `${z.qty} aktier · ${money(z.notional)} USD · største tab ${money(z.max_loss)} USD` : esc(z.reason || "–")}</div></div>
-    <div class="actions"><button class="btn primary" data-approve="${p.id}">Godkend køb</button><button class="btn" data-reject="${p.id}">Afvis</button></div></article>`;
+// ---------- kontokort med graf ----------
+let chartData = null, chartKey = "";
+function heroSeries(d) {
+  const curve = d.equity_curve || [];
+  if (curve.length >= 2) return { values: curve, label: "Bordets resultat efter hver lukket handel", fmt: (v) => `${money(v, true)} $`, up: curve[curve.length - 1] >= 0 };
+  const spy = ((d.quotes || {}).items || []).find((x) => x.symbol === "SPY");
+  if (spy && spy.spark && spy.spark.length >= 2) {
+    const snap = (d.quotes || {}).mode === "snapshot";
+    return { values: spy.spark, label: `S&P 500 ${snap ? "de sidste 20 dage" : "i dag"} · bordet har ingen lukkede handler endnu`, fmt: (v) => price(v), up: (spy.day_pct || 0) >= 0 };
+  }
+  return null;
 }
-function stages(p) {
-  if (!p) return ORDER.map(() => ["off", "venter på første markering"]);
-  const f = p.flag || {}, n = p.news || {}, c = p.chart || {}, z = p.size || {}, s = p.skeptic || {};
-  const out = [["good", `${pct(f.move_pct)} på ${f.window_minutes || 60} min · ${f.volume_x ?? "–"}x volumen`]];
-  out.push(p.news ? [n.has_reason ? "good" : "bad", n.has_reason ? (n.reason || "grund fundet") : "ingen klar grund"] : ["off", "–"]);
-  out.push(p.chart ? [c.setup ? "good" : "bad", c.setup ? `ind ${price(c.entry)} · stop ${price(c.stop)} · mål ${price(c.target)}` : (c.reason || "ingen setup")] : ["off", "–"]);
-  out.push(p.ruling ? [p.ruling === "BUY" ? "good" : p.ruling === "WAIT" ? "mid" : "bad", `${p.ruling}${s.summary ? " · " + s.summary : ""}`] : ["off", "–"]);
-  out.push(p.size ? [z.qty ? "good" : "bad", z.qty ? `${z.qty} aktier · ${money(z.notional)} USD` : (z.reason || "0")] : ["off", "–"]);
-  const ex = { placed: ["good", "købt på papirkontoen"], closed: [p.pnl >= 0 ? "good" : "bad", `lukket · ${money(p.pnl, true)} USD`], awaiting: ["mid", "venter på din godkendelse"], expired: ["bad", "udløbet"], rejected: ["bad", "afvist af dig"], failed: ["bad", "ordren fejlede"], sized_zero: ["bad", "ingen ordre"] }[p.status];
-  out.push(ex || ["off", "–"]);
-  return out;
+function drawChart(d) {
+  const s = heroSeries(d);
+  $("chart").hidden = !s; $("chart-label").parentElement.hidden = !s;
+  if (!s) return;
+  const key = s.values.join(",") + document.documentElement.dataset.theme;
+  $("chart-label").textContent = s.label;
+  if (key === chartKey) return;
+  chartKey = key;
+  const W = 600, H = 170, p = pts(s.values, W, H, 6), col = s.up ? "var(--up)" : "var(--down)";
+  const line = smooth(p);
+  $("chart-svg").innerHTML = `<defs><linearGradient id="hg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${col}" stop-opacity="0.28"/><stop offset="1" stop-color="${col}" stop-opacity="0"/></linearGradient></defs>
+    <path class="area" d="${line} L${p[p.length - 1][0].toFixed(1)},${H} L${p[0][0].toFixed(1)},${H} Z" fill="url(#hg)"/>
+    <path class="ln" d="${line}" stroke="${col}"/>`;
+  const ln = $("chart-svg").querySelector(".ln");
+  try { ln.style.setProperty("--len", ln.getTotalLength()); if (!reduced) ln.classList.add("draw"); } catch (e) {}
+  chartData = { p, values: s.values, fmt: s.fmt, col, W, H };
 }
+// træk fingeren hen over grafen for at se værdien
+function scrubAt(clientX) {
+  if (!chartData) return;
+  const box = $("chart").getBoundingClientRect();
+  const x = Math.min(1, Math.max(0, (clientX - box.left) / box.width));
+  const i = Math.round(x * (chartData.values.length - 1)), pt = chartData.p[i];
+  const left = (pt[0] / chartData.W) * box.width, top = (pt[1] / chartData.H) * box.height;
+  $("scrub").style.left = `${left}px`; $("scrub-dot").style.left = `${left}px`; $("scrub-dot").style.top = `${top}px`; $("scrub-dot").style.setProperty("--c", chartData.col);
+  $("scrub-tip").style.left = `${Math.min(box.width - 40, Math.max(40, left))}px`; $("scrub-tip").textContent = chartData.fmt(chartData.values[i]);
+  ["scrub", "scrub-dot", "scrub-tip"].forEach((id) => ($(id).hidden = false));
+}
+const endScrub = () => ["scrub", "scrub-dot", "scrub-tip"].forEach((id) => ($(id).hidden = true));
+$("chart").addEventListener("pointermove", (e) => scrubAt(e.clientX));
+$("chart").addEventListener("pointerdown", (e) => scrubAt(e.clientX));
+$("chart").addEventListener("pointerleave", endScrub);
+$("chart").addEventListener("pointerup", (e) => { if (e.pointerType !== "mouse") endScrub(); });
 
-let curveKey = "";
-function renderAccount(d) {
+function renderHero(d) {
   const acc = d.account;
   $("acct-off").hidden = !!acc;
+  $("equity-wrap").hidden = !acc;
   tween($("equity"), acc ? acc.equity : null, (v) => (v === null ? "–" : nf2.format(v)));
-  const pnl = $("pnl");
-  tween(pnl, d.kpis.pnl, (v) => (v === null ? "–" : `${money(v, true)} USD`));
-  pnl.className = d.kpis.pnl > 0 ? "up" : d.kpis.pnl < 0 ? "down" : "";
-  $("pnl-n").textContent = `· ${d.kpis.trades} lukkede handler`;
-  const curve = d.equity_curve || [];
-  $("curve").toggleAttribute("hidden", curve.length < 2);
-  $("curve-empty").hidden = curve.length >= 2 || !acc;
-  const key = curve.join(",");
-  if (key === curveKey) return;
-  curveKey = key;
-  const col = (curve[curve.length - 1] || 0) >= 0 ? "var(--up)" : "var(--down)";
-  const path = sparkPath(curve, 300, 70, 3);
-  if (!path) { $("curve").innerHTML = ""; return; }
-  const zeroY = (() => { const lo = Math.min(...curve), hi = Math.max(...curve), span = hi - lo || 1; return (70 - 3 - ((0 - lo) / span) * 64).toFixed(1); })();
-  $("curve").innerHTML = `<line x1="0" x2="300" y1="${zeroY}" y2="${zeroY}" stroke="var(--line-2)" stroke-width="1" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/><path d="${path} L297,70 L3,70 Z" fill="${col}" opacity="0.08"/><path class="ln" d="${path}" fill="none" stroke="${col}" stroke-width="1.8" vector-effect="non-scaling-stroke"/>`;
-  const ln = $("curve").querySelector(".ln");
-  try { const len = ln.getTotalLength(); ln.style.setProperty("--len", len); if (!reduced) ln.classList.add("draw"); } catch (e) {}
-}
-
-function renderKpis(d) {
-  const sk = d.skeptic, l = d.learning || {}, ai = d.ai || {};
-  $("k-flags").textContent = `${d.today.flags}/${d.today.max_flags}`; segs("k-flags-s", d.today.flags, d.today.max_flags, "sig");
-  $("k-open").textContent = `${d.today.open}/${d.today.max_open}`; segs("k-open-s", d.today.open, d.today.max_open, "sig");
-  $("k-win").textContent = d.kpis.win_rate === null ? "–" : `${Math.round(d.kpis.win_rate * 100)} %`; segs("k-win-s", (d.kpis.win_rate || 0) * 10, 10);
-  const no = sk.rulings ? sk.refused / sk.rulings : null;
-  $("k-no").textContent = no === null ? "–" : `${Math.round(no * 100)} %`; segs("k-no-s", (no || 0) * 10, 10, sk.too_soft ? "dn" : "on");
-  const active = (l.rules || []).filter((r) => r.active).length;
-  $("k-rules").textContent = `${active} af ${(l.rules || []).length}`; segs("k-rules-s", active, (l.rules || []).length || 6, "sig");
-  $("k-ai").textContent = ai.configured ? `${money(ai.spent_today_usd)} $` : "fra"; segs("k-ai-s", ai.budget_usd ? (ai.spent_today_usd / ai.budget_usd) * 10 : 0, 10);
+  const pnl = d.kpis.pnl || 0, base = acc ? acc.equity - pnl : 0;
+  const pctv = base ? (pnl / base) * 100 : 0;
+  $("delta").hidden = !acc;
+  const cls = pnl > 0 ? "up" : pnl < 0 ? "down" : "muted", arrow = pnl > 0 ? "▲ " : pnl < 0 ? "▼ " : "";
+  $("delta").innerHTML = `<span class="${cls}">${arrow}${money(Math.abs(pnl))} $ (${nf2.format(Math.abs(pctv))} %)</span><span class="cap">bordets resultat · ${d.kpis.trades} ${d.kpis.trades === 1 ? "handel" : "handler"}</span>`;
+  drawChart(d);
+  $("k-flags").textContent = `${d.today.flags} af ${d.today.max_flags}`;
+  $("k-open").textContent = `${d.today.open} af ${d.today.max_open}`;
+  $("k-win").textContent = d.kpis.win_rate === null ? "–" : `${Math.round(d.kpis.win_rate * 100)} %`;
 }
 
 // ---------- børsen: rigtig nedtælling ----------
 function fmtLocal(iso, withDay) {
   const d = new Date(iso); if (isNaN(d)) return "";
-  const today = new Date(), tomorrow = new Date(Date.now() + 86400000);
   const same = (a, b) => a.toDateString() === b.toDateString();
-  const day = same(d, today) ? "i dag" : same(d, tomorrow) ? "i morgen" : d.toLocaleDateString("da-DK", { weekday: "long" });
+  const day = same(d, new Date()) ? "i dag" : same(d, new Date(Date.now() + 86400000)) ? "i morgen" : d.toLocaleDateString("da-DK", { weekday: "long" });
   return `${withDay ? day + " " : ""}kl. ${d.toLocaleTimeString("da-DK", { hour: "2-digit", minute: "2-digit" })}`;
 }
-let refreshedAtZero = 0;
+let zeroAt = 0;
 function tickClock() {
   if (!state) return;
   const m = state.market || {};
-  document.querySelectorAll("#phases span").forEach((s) => s.classList.toggle("on", s.dataset.p === m.phase));
-  $("clock-src").textContent = m.source === "alpaca" ? "ur: alpaca" : "ur: kalender";
+  const labels = { open: "Åben", pre: "Før åbning", after: "Efter lukning", closed: "Lukket" };
+  const pill = $("mk-pill"); pill.textContent = labels[m.phase] || "–"; pill.className = `pill right ${m.phase || ""}`;
   const target = m.is_open ? m.next_close : m.next_open;
-  $("clock-label").textContent = m.is_open ? "Lukker om" : "Åbner om";
   let left = target ? Math.floor((new Date(target) - Date.now()) / 1000) : NaN;
-  if (isNaN(left)) { $("clock").textContent = "--:--:--"; return; }
-  if (left <= 0) { left = 0; if (Date.now() - refreshedAtZero > 15000) { refreshedAtZero = Date.now(); refresh(); } }
+  if (isNaN(left)) { $("clock").textContent = "–"; return; }
+  if (left <= 0) { left = 0; if (Date.now() - zeroAt > 15000) { zeroAt = Date.now(); refresh(); } }
   const dd = Math.floor(left / 86400), h = Math.floor((left % 86400) / 3600), mi = Math.floor((left % 3600) / 60), se = left % 60;
-  const txt = `${pad(h)}:${pad(mi)}:${pad(se)}`;
-  const el = $("clock");
-  if (el._t !== `${dd}|${txt}`) { el._t = `${dd}|${txt}`; el.innerHTML = dd ? `<span class="d">${dd}d</span>${txt}` : txt; }
-  // dagens (eller næste) handelsdag som bjælke med lokale klokkeslæt
-  const open = new Date(m.is_open || m.phase === "after" || m.phase === "pre" ? (m.session_open || m.next_open) : m.next_open);
-  const close = new Date(m.is_open || m.phase === "after" || m.phase === "pre" ? (m.session_close || m.next_close) : m.next_close);
-  const span = close - open;
-  const frac = span > 0 ? Math.min(1, Math.max(0, (Date.now() - open) / span)) : 0;
-  $("sess-fill").style.width = `${(m.phase === "after" ? 1 : m.is_open ? frac : 0) * 100}%`;
-  const now = $("sess-now"); now.hidden = !m.is_open; if (m.is_open) now.style.left = `${frac * 100}%`;
-  const key = `${open.getTime()}|${close.getTime()}`;
-  if ($("sess-ticks")._k !== key && !isNaN(open) && !isNaN(close)) {
-    $("sess-ticks")._k = key;
-    const mid = new Date(open.getTime() + span / 2);
-    $("sess-ticks").innerHTML = [open, mid, close].map((t) => `<span>${t.toLocaleTimeString("da-DK", { hour: "2-digit", minute: "2-digit" })}</span>`).join("");
-  }
+  const t = dd ? `${dd}d ${h}t` : h ? `${h}:${pad(mi)}:${pad(se)}` : `${mi}:${pad(se)}`;
+  if ($("clock").textContent !== t) $("clock").textContent = t;
+  $("clock-s").textContent = m.is_open ? "til lukning" : "til åbning";
+  // ringen: hvor langt handelsdagen er, eller hvor tæt vi er på åbning (inden for 24 timer)
+  let frac;
+  if (m.is_open) { const o = new Date(m.session_open || 0), c = new Date(m.next_close); frac = c > o ? (Date.now() - o) / (c - o) : 0; }
+  else frac = 1 - Math.min(1, left / 86400);
+  $("ring").classList.toggle("open", !!m.is_open);
+  $("ring-bar").style.strokeDashoffset = (326.7 * (1 - Math.min(1, Math.max(0, frac)))).toFixed(1);
+  const head = m.is_open ? `Lukker ${fmtLocal(m.next_close)}` : `Åbner ${fmtLocal(m.next_open, true)}`;
   let sub;
-  if (m.is_open) sub = `Handelsdagen lukker ${fmtLocal(m.next_close)} din tid${m.early_close ? ` (halv dag: ${m.early_close})` : ""}.`;
-  else if (m.phase === "pre") sub = `Før åbning i New York. Åbner ${fmtLocal(m.next_open, true)} din tid.`;
-  else if (m.phase === "after") sub = `Efter lukketid. Næste handelsdag åbner ${fmtLocal(m.next_open, true)} din tid.`;
-  else sub = `${m.holiday ? `Børsen holder lukket i dag (${m.holiday}). ` : m.weekend ? "Weekend i New York. " : ""}Åbner ${fmtLocal(m.next_open, true)} din tid.`;
-  if ($("clock-sub")._s !== sub) { $("clock-sub")._s = sub; $("clock-sub").textContent = sub; }
+  if (m.is_open) sub = `Bordet handler nu. Alt lukkes ti minutter før børsen lukker.${m.early_close ? ` Halv dag: ${m.early_close}.` : ""}`;
+  else if (m.holiday) sub = `Børsen holder lukket i dag (${m.holiday}).`;
+  else if (m.weekend) sub = "Weekend i New York.";
+  else if (m.phase === "pre") sub = "Før åbning i New York.";
+  else if (m.phase === "after") sub = "Efter lukketid i New York.";
+  else sub = "Børsen er lukket.";
+  sub += " Tider i din tid.";
+  if ($("mk-head").textContent !== head) $("mk-head").textContent = head;
+  if ($("mk-sub").textContent !== sub) $("mk-sub").textContent = sub;
 }
 
-// ---------- radar ----------
-function heatOf(x, p, snapshot) {
-  if (snapshot || x.move_pct === null || x.move_pct === undefined) return Math.min(1, Math.abs(x.day_pct || 0) / p.move_pct);
-  return Math.min(1, Math.max(Math.abs(x.move_pct) / p.move_pct, x.volume_x / p.volume_x));
-}
-let scopeKey = "";
-function sweepPhase(P) {
-  // Strålens faktiske tid, så prikkerne lyser op præcis, når den passerer (også efter pause og fanehop).
-  try { const a = $("sweep").getAnimations()[0]; if (a && a.currentTime !== null) return (a.currentTime / 1000) % P; } catch (e) {}
-  return 0;
-}
-function renderScope(d) {
-  const q = d.quotes || {}, items = (q.items || []).filter((x) => x.symbol !== "SPY"), p = d.params, snap = q.mode === "snapshot";
-  $("scope-ts").textContent = items.length ? `${snap ? "lukket marked" : "live"} · ${hhmm(q.ts)}` : "slukket";
-  $("scope-legend").textContent = snap ? "Afstand = dagens bevægelse" : "Midten = SCOUT markerer";
-  const key = `${q.ts}|${p.move_pct}|${p.volume_x}|${items.map((x) => (x.flagged ? 1 : 0)).join("")}`;
-  if (key === scopeKey) return;
-  scopeKey = key;
-  const P = 6, t0 = sweepPhase(P);
-  $("blips").innerHTML = items.map((x, i) => {
-    const heat = heatOf(x, p, snap), beta = (i * 137.508) % 360;
-    // Prikker ved grænsen spredes lidt, så navnene ikke dækker hinanden.
-    const r = 6 + (1 - heat) * 39 + (heat > 0.92 ? (i % 3) * 3.2 : 0);
-    const rad = (beta * Math.PI) / 180, left = 50 + r * Math.sin(rad), top = 50 - r * Math.cos(rad);
-    let delay = ((beta / 360) * P - t0) % P; if (delay > 0) delay -= P;
-    const c = (x.day_pct || 0) >= 0 ? "var(--up)" : "var(--down)";
-    return `<button class="blip ${x.flagged ? "flag" : ""}" style="left:${left.toFixed(1)}%;top:${top.toFixed(1)}%;--bc:${c};--d:${delay.toFixed(2)}s" data-ticker="${esc(x.symbol)}" aria-label="${esc(x.symbol)} ${pct(x.day_pct)}"><i>${esc(x.symbol)}</i></button>`;
-  }).join("") || "";
+// ---------- godkendelser ----------
+function approvalCard(p) {
+  const f = p.flag || {}, n = p.news || {}, s = p.skeptic || {}, z = p.size || {};
+  const url = safeUrl(n.source_url);
+  const line = (k, text) => `<div><span class="av" style="--c:${BOT[k].c}">${BOT[k].i}</span><span>${text}</span></div>`;
+  return `<article class="card approve">
+    <div class="card-h"><h2>Køb ${esc(p.symbol)}?</h2><span class="expires right" data-expires="${esc(p.expires_at || "")}"></span></div>
+    <div class="levels"><div><div class="cap">Indgang</div><div class="v">${price(p.entry)}</div></div><div><div class="cap">Stop</div><div class="v down">${price(p.stop)}</div></div><div><div class="cap">Mål</div><div class="v up">${price(p.target)}</div></div></div>
+    <div class="why">
+      ${line("scout", f.move_pct !== undefined ? `${pct(f.move_pct)} på ${f.window_minutes} min med ${f.volume_x}x volumen` : "–")}
+      ${line("news", `${esc(n.reason || "–")}${url ? ` <a href="${esc(url)}" target="_blank" rel="noopener noreferrer">Kilde ›</a>` : ""}`)}
+      ${line("skeptic", (s.reasons || []).map(esc).join("<br>") || "–")}
+      ${line("sizer", z.qty ? `${z.qty} aktier for ${money(z.notional)} $. Største tab ved stop ${money(z.max_loss)} $.` : esc(z.reason || "–"))}
+    </div>
+    <div class="actions"><button class="btn primary big" data-approve="${p.id}">Godkend køb</button><button class="btn big" data-reject="${p.id}">Afvis</button></div></article>`;
 }
 
-// ---------- systemer ----------
-function renderSystems(d) {
-  const m = d.market || {}, ai = d.ai || {}, sys = d.systems || {}, err = (d.engine || {}).last_error;
-  const q = d.quotes || {};
-  const rules = ((d.learning || {}).rules || []).filter((r) => r.active).length;
-  const rows = [
-    ["ALPACA", !d.keys_present ? "bad" : err ? "bad" : "on", !d.keys_present ? "mangler nøgler" : err ? err : "forbundet til papirkontoen"],
-    ["BØRSEN", m.is_open ? "on" : "", m.label || "–"],
-    ["KURSER", q.ts ? "on" : "warn", q.ts ? `${q.mode === "live" ? "live" : "sidste handelsdag"} · ${ago(q.ts)}` : "ingen endnu"],
-    ["SCOUT", d.paused ? "warn" : sys.last_scan ? "on" : "", d.paused ? "på pause" : sys.last_scan ? `kiggede ${ago(sys.last_scan)}` : m.is_open ? "venter på første scan" : "kigger, når børsen åbner"],
-    ["CLAUDE", ai.configured ? "on" : "warn", ai.configured ? `${money(ai.spent_today_usd)} af ${money(ai.budget_usd)} USD i dag` : "kun faste regler"],
-    ["AUTOPILOT", d.params.auto_approve ? "on" : "warn", d.params.auto_approve ? "køber selv på papir" : "du godkender hver ordre"],
-    ["LÆRING", rules ? "on" : "", rules ? `${rules} regel${rules > 1 ? "er" : ""} aktiv` : "samler data"],
-    ["TELEGRAM", sys.telegram ? "on" : "", sys.telegram ? "beskeder til telefonen" : "ikke sat op"],
-  ];
-  $("sys").innerHTML = rows.map(([n, c, v]) => `<div><span class="led ${c === "on" ? "on" : c}" style="${c === "on" ? "animation:none" : ""}"></span><span class="nm">${n}</span><span class="val" title="${esc(v)}">${esc(v)}</span></div>`).join("");
-  $("sys-ts").textContent = sys.last_tick ? `puls ${hhmm(sys.last_tick)}` : "";
+// ---------- bordet lige nu ----------
+function stages(p) {
+  if (!p) return null;
+  const n = p.news || {}, c = p.chart || {}, z = p.size || {};
+  const out = ["good"];
+  out.push(p.news ? (n.has_reason ? "good" : "bad") : "");
+  out.push(p.chart ? (c.setup ? "good" : "bad") : "");
+  out.push(p.ruling ? (p.ruling === "BUY" ? "good" : p.ruling === "WAIT" ? "mid" : "bad") : "");
+  out.push(p.size ? (z.qty ? "good" : "bad") : "");
+  out.push({ placed: "good", closed: (p.pnl || 0) >= 0 ? "good" : "bad", awaiting: "mid", expired: "bad", rejected: "bad", failed: "bad", sized_zero: "bad" }[p.status] || "");
+  return out;
 }
-
-// ---------- seneste forslag ----------
-function renderChain(d) {
-  const latest = (d.proposals || [])[0];
-  $("chain-title").textContent = latest ? `${latest.symbol} · ${hhmm(latest.created_at)}` : "ingen endnu";
-  const st = stages(latest);
-  const recent = (k) => messages.some((m) => m.author === k && Date.now() - new Date(m.ts) < 120000);
-  $("chain").innerHTML = ORDER.map((k, i) => {
-    const [cls, text] = st[i], off = cls === "off";
-    return `<li class="${cls}" style="--c:${BOT[k].c}"><span class="cs ${!off && recent(k) ? "act" : ""}">${BOT[k].i}</span><div class="tx"><b>${BOT[k].name}</b>${text !== "–" ? `<span title="${esc(text)}">${esc(text)}</span>` : ""}</div></li>`;
-  }).join("");
+function story(p) {
+  const n = p.news || {}, c = p.chart || {}, s = p.skeptic || {}, z = p.size || {}, sym = `<b>${esc(p.symbol)}</b>`;
+  const f = p.flag || {};
+  const start = `SCOUT markerede ${sym} (${pct(f.move_pct)} på en time).`;
+  if (p.status === "closed") return `${start} Bordet købte og lukkede handlen med <b class="${(p.pnl || 0) >= 0 ? "up" : "down"}">${money(p.pnl, true)} $</b>.`;
+  if (p.status === "placed") return `${start} Bordet har købt ${z.qty || p.qty} aktier. Stop og mål ligger hos Alpaca.`;
+  if (p.status === "awaiting") return `${start} SKEPTIC sagde BUY, og bordet venter på din godkendelse.`;
+  if (p.ruling && p.ruling !== "BUY") return `${start} SKEPTIC sagde <b>${esc(p.ruling)}</b>${s.summary ? `: ${esc(s.summary)}` : "."}`;
+  if (p.chart && !c.setup) return `${start} CHART fandt ingen setup: ${esc(c.reason || "")}`;
+  if (p.news && !n.has_reason) return `${start} NEWS fandt ingen klar grund, så bordet springer over.`;
+  if (p.status === "sized_zero") return `${start} SIZER satte beløbet til nul: ${esc(z.reason || "")}`;
+  if (p.status === "expired") return `${start} Godkendelsen udløb, så der blev ikke købt.`;
+  if (p.status === "rejected") return `${start} Du afviste købet.`;
+  return `${start} Bordet arbejder på det.`;
 }
+let lastStepKey = "";
+function renderNow(d) {
+  const p = (d.proposals || [])[0], st = stages(p);
+  $("now-more").hidden = !p;
+  if (!p) {
+    $("steps").innerHTML = ORDER.map((k) => `<div class="st" style="--c:${BOT[k].c}"><span class="ic">${BOT[k].i}</span><span class="nm">${BOT[k].name}</span></div>`).join("");
+    $("now-tx").textContent = "Ingen markeringer endnu. Når en aktie på watchlisten bevæger sig nok, går den igennem de seks trin her.";
+    return;
+  }
+  const key = `${p.id}|${st.join(",")}`, fresh = key !== lastStepKey;
+  lastStepKey = key;
+  const icon = (cls, k) => cls === "good" ? "✓" : cls === "bad" ? "✕" : cls === "mid" ? "…" : BOT[k].i;
+  $("steps").innerHTML = ORDER.map((k, i) => `<div class="st ${st[i]} ${st[i] && i > 0 && st[i - 1] ? "done" : ""} ${fresh && st[i] && !reduced ? "now" : ""}" style="--c:${BOT[k].c};--c-prev:${BOT[ORDER[Math.max(0, i - 1)]].c};animation-delay:${i * 60}ms"><span class="ic" style="animation-delay:${i * 70}ms">${icon(st[i], k)}</span><span class="nm">${BOT[k].name}</span></div>`).join("");
+  $("now-tx").innerHTML = story(p);
+}
+$("now-more").onclick = () => {
+  const p = ((state || {}).proposals || [])[0]; if (!p) return;
+  const f = p.flag || {}, n = p.news || {}, c = p.chart || {}, s = p.skeptic || {}, z = p.size || {};
+  const row = (k, text) => `<div><span class="av" style="--c:${BOT[k].c}">${BOT[k].i}</span><span><b style="font-weight:600">${BOT[k].name}</b><br>${text}</span></div>`;
+  openSheet(`<h2>${esc(p.symbol)}</h2><p class="cap" style="margin:4px 0 14px">${esc(p.status_label)} · ${hhmm(p.created_at)}</p>
+    <div class="why">
+      ${row("scout", `${pct(f.move_pct)} på ${f.window_minutes || 60} min med ${f.volume_x ?? "–"}x volumen.`)}
+      ${row("news", p.news ? esc(n.reason || "–") : "–")}
+      ${row("chart", p.chart ? (c.setup ? `Indgang ${price(c.entry)}, stop ${price(c.stop)}, mål ${price(c.target)}.` : esc(c.reason || "Ingen setup.")) : "–")}
+      ${row("skeptic", p.ruling ? `${(s.reasons || []).map(esc).join("<br>")}<br><b>${esc(p.ruling)}</b>` : "–")}
+      ${row("sizer", p.size ? (z.qty ? `${z.qty} aktier for ${money(z.notional)} $.` : esc(z.reason || "0")) : "–")}
+      ${row("executor", esc(p.status_label))}
+    </div>`);
+};
 
-// ---------- åbne positioner ----------
+// ---------- åbne handler ----------
 const quoteMap = () => Object.fromEntries((((state || {}).quotes || {}).items || []).map((x) => [x.symbol, x]));
-function renderLive(d) {
+function renderTrades(d) {
   const open = d.open || [], q = quoteMap();
-  $("live-panel").hidden = !open.length;
+  $("trades-card").hidden = !open.length;
   if (!open.length) return;
-  $("pos-list").innerHTML = open.map((p) => {
+  $("trades").innerHTML = open.map((p) => {
     const fill = p.fill_price || p.entry, now = (q[p.symbol] || {}).price || fill;
     const span = p.target - p.stop || 1, at = (v) => Math.min(100, Math.max(0, ((v - p.stop) / span) * 100));
-    const pnl = (now - fill) * (p.qty || 0);
-    return `<div class="pos"><div class="pos-h"><b>${esc(p.symbol)} <span class="muted small mono">${p.qty} stk · nu ${price(now)}</span></b><b class="mono ${pnl >= 0 ? "up" : "down"}">${money(pnl, true)} USD</b></div>
-      <div class="traj"><span class="entry" style="left:${at(fill).toFixed(1)}%"></span><span class="mk" style="left:${at(now).toFixed(1)}%"></span>
-      <span class="tk l">STOP ${price(p.stop)}</span><span class="tk c" style="left:${at(fill).toFixed(1)}%">IND ${price(fill)}</span><span class="tk r">MÅL ${price(p.target)}</span></div></div>`;
+    const pnl = (now - fill) * (p.qty || 0), e = at(fill), n = at(now);
+    const lo = Math.min(e, n), w = Math.abs(n - e);
+    return `<div class="trade"><div class="trade-h"><span class="av lg" style="--c:var(--executor)">${esc(p.symbol.slice(0, 2))}</span><div class="nm"><b>${esc(p.symbol)}</b><span class="cap">${p.qty} aktier · nu ${price(now)}</span></div><span class="pill ${pnl >= 0 ? "up" : "down"}">${money(pnl, true)} $</span></div>
+      <div class="track"><span class="fillbar" style="left:${lo.toFixed(1)}%;width:${w.toFixed(1)}%;background:${pnl >= 0 ? "var(--up)" : "var(--down)"}"></span><span class="ent" style="left:${e.toFixed(1)}%"></span><span class="dot" style="left:${n.toFixed(1)}%"></span></div>
+      <div class="track-l"><span>Stop ${price(p.stop)}</span><span>Købt ${price(fill)}</span><span>Mål ${price(p.target)}</span></div></div>`;
   }).join("");
 }
 
-// ---------- watchlist med blink ved kursændring ----------
-let lastPrices = {}, wlKey = "";
+// ---------- watchlist: liste og radar ----------
+function heatOf(x, p, snap) {
+  if (snap || x.move_pct === null || x.move_pct === undefined) return Math.min(1, Math.abs(x.day_pct || 0) / p.move_pct);
+  return Math.min(1, Math.max(Math.abs(x.move_pct) / p.move_pct, x.volume_x / p.volume_x));
+}
+let lastPx = {}, wlKey = "", scopeKey = "";
 function renderWatch(d) {
   const q = d.quotes || {}, p = d.params, snap = q.mode === "snapshot";
   const items = (q.items || []).filter((x) => x.symbol !== "SPY");
-  $("radar-ts").textContent = items.length ? (snap ? `sidste handelsdag · ${hhmm(q.ts)}` : `live · ${hhmm(q.ts)}`) : "";
-  const box = $("radar");
+  $("wl-src").textContent = items.length ? (snap ? `Børsen er lukket · kurser fra sidste handelsdag · ${ago(q.ts)}` : `Live · opdateret ${ago(q.ts)}`) : "";
   if (!items.length) {
-    box.innerHTML = `<div class="empty">${d.keys_present ? "Henter kurser hos Alpaca …" : "Ingen kurser uden forbindelse til Alpaca."}${d.keys_present ? "" : ' <button class="btn" type="button" data-goto="bots">Forbind under Bots</button>'}</div>`;
-    wlKey = ""; return;
+    $("wl-list").innerHTML = `<div class="empty">${d.keys_present ? "Henter kurser …" : 'Kurserne vises, når bordet er forbundet til Alpaca.<br><button class="btn plain" type="button" data-goto="bots">Forbind nu</button>'}</div>`;
+    $("blips").innerHTML = ""; wlKey = ""; return;
   }
   const key = `${q.ts}|${p.move_pct}|${p.volume_x}`;
-  if (key === wlKey) return;
-  wlKey = key;
-  box.innerHTML = `<div class="wl-row head"><span class="label">Ticker</span><span class="label" style="text-align:right">Kurs</span><span class="label" style="text-align:right">I dag</span><span class="label c-spark">${snap ? "20 dage" : "Kurve"}</span><span class="label">${snap ? "Bevægelse" : "Til SCOUT"}</span><span class="label c-vol" style="text-align:right">Vol</span></div>` +
-    items.map((x) => {
-      const heat = heatOf(x, p, snap), hot = heat >= 0.7, color = (x.day_pct || 0) >= 0 ? "var(--up)" : "var(--down)";
-      return `<button class="wl-row" type="button" data-ticker="${esc(x.symbol)}" data-px="${x.price}"><span class="sym">${esc(x.symbol)}${x.flagged ? '<span class="flag-mark" title="Markeret i dag"></span>' : ""}</span><span class="n">${price(x.price)}</span><span class="n ${(x.day_pct || 0) >= 0 ? "up" : "down"}">${pct(x.day_pct)}</span><span class="c-spark">${sparkSvg(x.spark, color)}</span>
-        <span><div class="meter ${hot ? "hot" : ""}"><i style="width:${Math.round(heat * 100)}%"></i></div><div class="meter-l"><span>${snap ? "" : `1t ${pct(x.move_pct)}`}</span><span>${Math.round(heat * 100)} %</span></div></span><span class="n c-vol">${x.volume_x}x</span></button>`;
+  if (key !== wlKey) {
+    wlKey = key;
+    $("wl-list").innerHTML = items.map((x) => {
+      const up = (x.day_pct || 0) >= 0;
+      const sub = x.flagged ? "Markeret i dag" : snap ? `${x.volume_x}x normal volumen` : `1 time ${pct(x.move_pct)} · ${x.volume_x}x volumen`;
+      return `<button class="stock" type="button" data-ticker="${esc(x.symbol)}"><span style="min-width:0"><span class="sym">${esc(x.symbol)}</span>${x.flagged ? '<span class="flag"></span>' : ""}<div class="sub">${esc(sub)}</div></span>${mini(x.spark, up ? "var(--up)" : "var(--down)")}<span class="px">${price(x.price)}<br><span class="chg ${up ? "" : "dn"}" data-sym="${esc(x.symbol)}">${pct(x.day_pct)}</span></span></button>`;
     }).join("");
-  box.querySelectorAll(".wl-row[data-ticker]").forEach((row) => {
-    const sym = row.dataset.ticker, px = Number(row.dataset.px), before = lastPrices[sym];
-    if (before !== undefined && px !== before) flash(row, px > before);
-    lastPrices[sym] = px;
-  });
+    items.forEach((x) => {
+      const before = lastPx[x.symbol];
+      if (before !== undefined && before !== x.price) { const el = $("wl-list").querySelector(`.chg[data-sym="${CSS.escape(x.symbol)}"]`); if (el) el.classList.add("blink"); }
+      lastPx[x.symbol] = x.price;
+    });
+  }
+  if (wlView !== "radar") return;
+  $("radar-cap").textContent = snap ? "Børsen er lukket: afstanden viser dagens bevægelse. Tryk på en prik for at se aktien." : "Jo tættere på midten, jo tættere er aktien på at blive markeret af SCOUT.";
+  const sk = `${key}|${items.map((x) => (x.flagged ? 1 : 0)).join("")}`;
+  if (sk === scopeKey) return;
+  scopeKey = sk;
+  const P = 6;
+  let t0 = 0; try { const a = $("sweep").getAnimations()[0]; if (a && a.currentTime !== null) t0 = (a.currentTime / 1000) % P; } catch (e) {}
+  $("blips").innerHTML = items.map((x, i) => {
+    const heat = heatOf(x, p, snap), beta = (i * 137.508) % 360;
+    const r = 6 + (1 - heat) * 38 + (heat > 0.92 ? (i % 3) * 3.2 : 0);
+    const rad = (beta * Math.PI) / 180, left = 50 + r * Math.sin(rad), top = 50 - r * Math.cos(rad);
+    let delay = ((beta / 360) * P - t0) % P; if (delay > 0) delay -= P;
+    return `<button class="blip" style="left:${left.toFixed(1)}%;top:${top.toFixed(1)}%;--bc:${(x.day_pct || 0) >= 0 ? "var(--up)" : "var(--down)"};--d:${delay.toFixed(2)}s" data-ticker="${esc(x.symbol)}" aria-label="${esc(x.symbol)} ${pct(x.day_pct)}"><i>${esc(x.symbol)}</i></button>`;
+  }).join("");
 }
 
-// ---------- kursbånd ----------
-let tapeTs = "";
-function renderTape(d) {
-  const items = (d.quotes || {}).items || [];
-  $("tape-wrap").hidden = !items.length;
-  if (!items.length || d.quotes.ts === tapeTs) return;
-  tapeTs = d.quotes.ts;
-  const one = items.map((x) => `<span><b>${esc(x.symbol === "SPY" ? "S&P 500" : x.symbol)}</b><span class="px">${price(x.price)}</span><span class="${(x.day_pct || 0) >= 0 ? "up" : "down"}">${(x.day_pct || 0) >= 0 ? "▲" : "▼"} ${pct(x.day_pct)}</span></span>`).join("");
-  $("tape").innerHTML = one + one;
-}
-
-// ---------- detaljekort ----------
+// ---------- ark ----------
+function openSheet(html) { $("sheet").innerHTML = `<div class="grab"></div>${html}`; $("sheet-bg").hidden = false; }
+const closeOverlays = () => { $("sheet-bg").hidden = true; $("pal-bg").hidden = true; };
 function openTicker(sym) {
   const x = quoteMap()[sym], snap = ((state || {}).quotes || {}).mode === "snapshot";
-  const props = ((state || {}).proposals || []).filter((p) => p.symbol === sym).slice(0, 6);
-  const col = x && (x.day_pct || 0) >= 0 ? "var(--up)" : "var(--down)";
-  const path = x ? sparkPath(x.spark, 300, 90, 4) : "";
+  const props = ((state || {}).proposals || []).filter((p) => p.symbol === sym).slice(0, 5);
+  const up = x && (x.day_pct || 0) >= 0, col = up ? "var(--up)" : "var(--down)";
+  const p = x ? pts(x.spark, 520, 120, 4) : [], line = smooth(p);
   const heat = x ? heatOf(x, state.params, snap) : 0;
-  $("sheet").innerHTML = `<div class="row" style="justify-content:space-between"><div class="ph" style="margin:0"><span class="no">TICKER</span><span class="pt" style="font-size:18px">${esc(sym)}</span></div><button class="icon" data-close aria-label="Luk">✕</button></div>
-    ${x ? `<div class="row" style="margin-top:6px"><span class="dots px-big">${price(x.price)}</span><span class="mono ${(x.day_pct || 0) >= 0 ? "up" : "down"}">${pct(x.day_pct)} ${snap ? "sidste handelsdag" : "i dag"}</span>${x.flagged ? '<span class="tag sig">markeret i dag</span>' : ""}</div>
-    <svg class="big-spark" viewBox="0 0 300 90" preserveAspectRatio="none">${path ? `<path d="${path}" fill="none" stroke="${col}" stroke-width="1.8" vector-effect="non-scaling-stroke"/>` : ""}</svg>
-    <div class="facts"><div><span class="label">1 time</span><b class="${(x.move_pct || 0) >= 0 ? "up" : "down"}">${x.move_pct === null ? "–" : pct(x.move_pct)}</b></div><div><span class="label">Volumen</span><b>${x.volume_x}x</b></div><div><span class="label">Mod VWAP</span><b>${x.vs_vwap_pct === null ? "–" : pct(x.vs_vwap_pct)}</b></div></div>
-    <div class="meter ${heat >= 0.7 ? "hot" : ""}" style="margin-top:12px"><i style="width:${Math.round(heat * 100)}%"></i></div>
-    <div class="small muted" style="margin-top:5px">${snap ? `Børsen er lukket. Bjælken viser dagens bevægelse mod SCOUT's grænse på ${state.params.move_pct} %.` : `${Math.round(heat * 100)} % af vejen til SCOUT's grænse (${state.params.move_pct} % på en time eller ${state.params.volume_x}x volumen).`}</div>` : `<p class="muted">Ingen kurs endnu.</p>`}
-    <div class="ph" style="margin:18px 0 6px"><span class="pt">Bordets forslag i ${esc(sym)}</span></div>
-    <div class="list small">${props.length ? props.map((p) => `<div class="row" style="justify-content:space-between"><span class="mono">${esc(p.trading_day.slice(5))}</span>${p.ruling ? `<span class="tag ${esc(p.ruling)}">${esc(p.ruling)}</span>` : ""}<span>${esc(p.status_label)}</span><span class="mono ${(p.pnl || 0) >= 0 ? "up" : "down"}">${p.pnl !== null && p.pnl !== undefined ? money(p.pnl, true) : ""}</span></div>`).join("") : '<div class="muted">Ingen endnu.</div>'}</div>
-    <div class="actions"><button class="btn primary" data-ask="SKEPTIC" data-sym="${esc(sym)}">Spørg SKEPTIC</button><button class="btn" data-ask="NEWS" data-sym="${esc(sym)}">Spørg NEWS</button></div>`;
-  $("sheet-bg").hidden = false;
+  openSheet(`<div class="row" style="justify-content:space-between"><h2>${esc(sym)}</h2>${x && x.flagged ? '<span class="pill" style="background:var(--accent-bg);color:var(--accent)">Markeret i dag</span>' : ""}</div>
+    ${x ? `<div class="value" style="font-size:34px;margin-top:6px">${price(x.price)}<small>$</small></div><div class="delta"><span class="${up ? "up" : "down"}">${up ? "▲" : "▼"} ${nf2.format(Math.abs(x.day_pct || 0))} %</span><span class="cap">${snap ? "sidste handelsdag" : "i dag"}</span></div>
+    <svg viewBox="0 0 520 120" preserveAspectRatio="none" style="width:100%;height:120px;display:block;margin:14px 0">${line ? `<defs><linearGradient id="sg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${col}" stop-opacity="0.25"/><stop offset="1" stop-color="${col}" stop-opacity="0"/></linearGradient></defs><path d="${line} L${p[p.length - 1][0]},120 L${p[0][0]},120 Z" fill="url(#sg)"/><path d="${line}" fill="none" stroke="${col}" stroke-width="2.2" stroke-linecap="round" vector-effect="non-scaling-stroke"/>` : ""}</svg>
+    <div class="facts"><div><span class="cap">1 time</span><b>${x.move_pct === null ? "–" : pct(x.move_pct)}</b></div><div><span class="cap">Volumen</span><b>${x.volume_x}x</b></div><div><span class="cap">Mod VWAP</span><b>${x.vs_vwap_pct === null ? "–" : pct(x.vs_vwap_pct)}</b></div></div>
+    <div style="margin-top:16px"><div class="row" style="justify-content:space-between;margin-bottom:6px"><span class="cap">${snap ? "Dagens bevægelse mod SCOUT's grænse" : "Vejen til SCOUT's grænse"}</span><b class="num">${Math.round(heat * 100)} %</b></div><div class="meter ${heat >= 0.7 ? "hot" : ""}"><i style="width:${Math.round(heat * 100)}%"></i></div></div>` : `<p class="muted">Ingen kurs endnu.</p>`}
+    <div class="card-h" style="margin:20px 0 4px"><h2 style="font-size:16px">Bordets forslag</h2></div>
+    <div class="list">${props.length ? props.map((pp) => `<div class="row" style="justify-content:space-between"><span class="cap">${esc(pp.trading_day.slice(5))}</span>${pp.ruling ? `<span class="tag ${esc(pp.ruling)}">${esc(pp.ruling)}</span>` : ""}<span>${esc(pp.status_label)}</span><span class="num ${(pp.pnl || 0) >= 0 ? "up" : "down"}">${pp.pnl !== null && pp.pnl !== undefined ? money(pp.pnl, true) + " $" : ""}</span></div>`).join("") : '<div class="muted">Ingen endnu.</div>'}</div>
+    <div class="actions"><button class="btn primary" data-ask="SKEPTIC" data-sym="${esc(sym)}">Spørg SKEPTIC</button><button class="btn" data-ask="NEWS" data-sym="${esc(sym)}">Spørg NEWS</button></div>`);
 }
-const closeOverlays = () => { $("sheet-bg").hidden = true; $("pal-bg").hidden = true; };
+
+// ---------- status ----------
+function systems(d) {
+  const m = d.market || {}, ai = d.ai || {}, sys = d.systems || {}, err = (d.engine || {}).last_error, q = d.quotes || {};
+  const rules = ((d.learning || {}).rules || []).filter((r) => r.active).length;
+  return [
+    ["Alpaca", !d.keys_present || err ? "bad" : "ok", !d.keys_present ? "Mangler nøgler" : err ? err : "Forbundet til papirkontoen"],
+    ["Børsen", m.is_open ? "ok" : "", m.label || "–"],
+    ["Kurser", q.ts ? "ok" : "warn", q.ts ? `${q.mode === "live" ? "Live" : "Sidste handelsdag"}, ${ago(q.ts)}` : "Ingen endnu"],
+    ["SCOUT", d.paused ? "warn" : sys.last_scan ? "ok" : "", d.paused ? "På pause" : sys.last_scan ? `Kiggede ${ago(sys.last_scan)}` : m.is_open ? "Venter på første scan" : "Kigger, når børsen åbner"],
+    ["Claude", ai.configured ? "ok" : "warn", ai.configured ? `${money(ai.spent_today_usd)} af ${money(ai.budget_usd)} $ brugt i dag` : "Ikke sat op, faste regler bruges"],
+    ["Autopilot", d.params.auto_approve ? "ok" : "warn", d.params.auto_approve ? "Køber selv på papir" : "Du godkender hver ordre"],
+    ["Læring", rules ? "ok" : "", rules ? `${rules} regel${rules > 1 ? "er" : ""} aktiv` : "Samler data"],
+    ["Telegram", sys.telegram ? "ok" : "", sys.telegram ? "Sender beskeder" : "Ikke sat op"],
+  ];
+}
+const sysHtml = (d) => systems(d).map(([n, c, v]) => `<div><span class="d ${c}"></span><span class="n">${n}</span><span class="v" title="${esc(v)}">${esc(v)}</span></div>`).join("");
+$("status").onclick = () => { if (state) openSheet(`<h2>Status</h2><p class="cap" style="margin:4px 0 8px">Opdateret ${ago(new Date(lastOk).toISOString())}</p><div class="sysl">${sysHtml(state)}</div><div class="actions"><button class="btn" data-goto="bots" data-close>Åbn Bots</button></div>`); };
 
 // ---------- handler, læring, bots ----------
-function renderTrades(d) {
+function renderTradesTab(d) {
   $("open-list").innerHTML = (d.open || []).length
-    ? d.open.map((p) => `<div class="row small"><b>${esc(p.symbol)}</b><span class="mono">${p.qty} stk · købt ${price(p.fill_price || p.entry)} · stop ${price(p.stop)} · mål ${price(p.target)}</span></div>`).join("")
-    : `<div class="muted small">Ingen åbne positioner. Bordet lukker alt ti minutter før børsen lukker.</div>`;
+    ? d.open.map((p) => `<div class="row" style="justify-content:space-between"><b>${esc(p.symbol)}</b><span class="num cap">${p.qty} stk · købt ${price(p.fill_price || p.entry)} · stop ${price(p.stop)} · mål ${price(p.target)}</span></div>`).join("")
+    : `<div class="muted">Ingen åbne positioner. Bordet lukker alt ti minutter før børsen lukker.</div>`;
   $("proposals").innerHTML = (d.proposals || []).map((p) => {
     const sh = p.shadow;
     const shadow = sh ? `<span class="${sh.result === "loss" ? "up" : "down"}">${sh.result === "loss" ? "ville tabe" : "ville vinde"} ${pct(sh.pct)}</span>` : "";
     const res = p.pnl !== null && p.pnl !== undefined ? `<span class="${p.pnl >= 0 ? "up" : "down"}">${money(p.pnl, true)}</span>` : "";
-    return `<tr><td class="mono">${esc(p.trading_day.slice(5))}</td><td><b>${esc(p.symbol)}</b></td><td>${p.ruling ? `<span class="tag ${esc(p.ruling)}">${esc(p.ruling)}</span>` : ""}</td><td>${esc(p.status_label)}</td><td class="n">${price(p.entry)}</td><td class="n">${price(p.stop)}</td><td class="n">${price(p.target)}</td><td class="n">${p.qty || ""}</td><td class="n">${res}</td><td>${shadow}</td></tr>`;
+    return `<tr><td class="cap">${esc(p.trading_day.slice(5))}</td><td><b>${esc(p.symbol)}</b></td><td>${p.ruling ? `<span class="tag ${esc(p.ruling)}">${esc(p.ruling)}</span>` : ""}</td><td>${esc(p.status_label)}</td><td class="n">${price(p.entry)}</td><td class="n">${price(p.stop)}</td><td class="n">${price(p.target)}</td><td class="n">${p.qty || ""}</td><td class="n">${res}</td><td>${shadow}</td></tr>`;
   }).join("") || `<tr><td colspan="10" class="muted">Ingen forslag endnu.</td></tr>`;
 }
 function renderLearn(d) {
-  const l = d.learning || {};
+  const l = d.learning || {}, sk = d.skeptic;
   $("learn-min").textContent = l.min_trades || 3;
-  $("learn-rules").innerHTML = (l.rules || []).map((r) => `<div class="row" style="flex-wrap:nowrap;align-items:flex-start"><span class="tag ${r.active ? "on" : ""}" style="flex:none;min-width:66px;text-align:center">${r.active ? "AKTIV" : "SLUKKET"}</span><div><b style="font-weight:500">${esc(r.label)}</b><div class="muted small">${r.n ? `${r.wins} af ${r.n} vandt · snit ${pct(r.avg_pct)}` : "Ingen handler af den slags endnu"}</div></div></div>`).join("");
+  $("skeptic-card").innerHTML = `<div class="kv"><div><div class="cap">Afgørelser</div><div class="big">${sk.rulings}</div></div><div><div class="cap">BUY</div><div class="big up">${sk.buy}</div></div><div><div class="cap">Nej</div><div class="big down">${sk.refused}</div></div><div><div class="cap">Nej med rette</div><div class="big">${sk.refusals_checked ? `${sk.refusals_right}/${sk.refusals_checked}` : "–"}</div></div></div><p class="${sk.too_soft ? "down" : "muted"}" style="margin:10px 0 0">${esc(sk.verdict)}</p>`;
+  $("learn-rules").innerHTML = (l.rules || []).map((r) => `<div class="row" style="flex-wrap:nowrap;align-items:flex-start"><span class="tag ${r.active ? "on" : ""}" style="flex:none;min-width:64px;text-align:center">${r.active ? "Aktiv" : "Slukket"}</span><div><div>${esc(r.label)}</div><div class="cap">${r.n ? `${r.wins} af ${r.n} vandt · snit ${pct(r.avg_pct)}` : "Ingen handler af den slags endnu"}</div></div></div>`).join("");
   const lessons = l.lessons || [];
-  $("lessons").innerHTML = lessons.length ? lessons.map((x) => `<div><span class="label">${esc(x.day.slice(5))}</span> ${esc(x.text)}</div>`).join("") : `<div class="muted">Ingen lektioner endnu. Efter hver handelsdag skriver bordet her, hvad det lærte.</div>`;
+  $("lessons").innerHTML = lessons.length ? lessons.map((x) => `<div><span class="cap">${esc(x.day.slice(5))}</span><br>${esc(x.text)}</div>`).join("") : `<div class="muted">Ingen lektioner endnu. Efter hver handelsdag skriver bordet her, hvad det lærte.</div>`;
 }
 let paramsFilled = false;
 function renderBots(d) {
-  const sk = d.skeptic;
-  $("skeptic-card").innerHTML = `<div class="row" style="gap:24px"><div><div class="label">Afgørelser</div><div class="big">${sk.rulings}</div></div><div><div class="label">Buy</div><div class="big up">${sk.buy}</div></div><div><div class="label">Nej</div><div class="big down">${sk.refused}</div></div><div><div class="label">Nej med rette</div><div class="big">${sk.refusals_checked ? `${sk.refusals_right}/${sk.refusals_checked}` : "–"}</div></div></div><p class="${sk.too_soft ? "down" : "muted"}" style="margin:8px 0 0">${esc(sk.verdict)}</p>`;
-  $("bots").innerHTML = d.bots.map((b) => `<article class="panel" style="--c:${BOT[b.key].c}"><div class="bot-head"><span class="cs">${BOT[b.key].i}</span><div><div class="name">${esc(b.name)}</div><div class="small muted">${esc(b.job)}</div></div><span class="tag" style="margin-left:auto">${b.engine === "Claude" ? "CLAUDE" : "KODE"}</span></div><div class="rules">${esc(b.rules)}</div></article>`).join("");
+  $("sys").innerHTML = sysHtml(d);
+  $("bots").innerHTML = d.bots.map((b) => `<article class="card"><div class="bot-h"><span class="av lg" style="--c:${BOT[b.key].c}">${BOT[b.key].i}</span><div><b>${esc(b.name)}</b><span class="cap">${esc(b.job)}</span></div><span class="tag">${b.engine === "Claude" ? "Claude" : "Kode"}</span></div><div class="bot-rules">${esc(b.rules)}</div></article>`).join("");
   $("keys-forget").hidden = !d.keys_saved_on_page;
   const p = d.params, form = $("params");
-  $("hard").textContent = `Lofter: ${p.hard.position_pct} % pr. handel, ${p.hard.max_open} åbne, stop ${p.hard.stop_max_pct} %, mål mindst ${p.hard.reward_risk_min}x.`;
+  $("hard").textContent = `Lofter: ${p.hard.position_pct} % pr. handel, ${p.hard.max_open} åbne, stop ${p.hard.stop_max_pct} %.`;
   if (paramsFilled && form.contains(document.activeElement)) return;
   form.watchlist.value = p.watchlist.join(", ");
   ["move_pct", "volume_x", "max_flags_per_day", "scan_minutes", "stop_max_pct", "reward_risk", "position_pct", "max_open"].forEach((k) => { form[k].value = p[k]; });
@@ -934,34 +957,38 @@ function renderBots(d) {
 function renderTab(force) {
   const d = state;
   if (tab === "home") {
-    if (force) { scopeKey = ""; wlKey = ""; curveKey = ""; }
-    const count = (d.approvals || []).length;
-    $("approvals").hidden = !count;
-    $("approvals").innerHTML = count ? d.approvals.map(chainCard).join("") : "";
-    renderAccount(d); renderKpis(d); tickClock(); renderScope(d); renderSystems(d); renderChain(d); renderLive(d); renderWatch(d);
-  } else if (tab === "trades") renderTrades(d);
+    if (force) { wlKey = ""; scopeKey = ""; chartKey = ""; }
+    const n = (d.approvals || []).length;
+    $("approvals").hidden = !n; $("approvals").innerHTML = n ? d.approvals.map(approvalCard).join("") : "";
+    renderHero(d); tickClock(); renderNow(d); renderTrades(d); renderWatch(d);
+  } else if (tab === "trades") renderTradesTab(d);
   else if (tab === "learn") renderLearn(d);
   else if (tab === "bots") renderBots(d);
 }
+function renderStatus(d) {
+  const sys = systems(d), bad = sys.find((s) => s[1] === "bad"), m = d.market || {};
+  const el = $("status");
+  el.className = `status ${d.paused ? "warn" : bad ? "bad" : "ok"} ${!d.paused && !bad && m.is_open ? "live" : ""}`;
+  $("status-t").textContent = d.paused ? "På pause" : bad ? `${bad[0]} mangler` : m.is_open ? "Handler nu" : "Alt kører";
+  const issue = bad ? { level: "error", title: bad[0] === "Alpaca" ? "Alpaca er ikke forbundet" : `${bad[0]}: ${bad[2]}`, text: bad[0] === "Alpaca" ? "Uden forbindelse kan bordet ikke se saldo, kurser eller handle. Det tager et minut at ordne." : bad[2] } : null;
+  $("issue").innerHTML = issue ? `<div class="issue ${issue.level}"><span class="ic">!</span><div class="tx"><b>${esc(issue.title)}</b>${esc(issue.text)}</div><button class="btn primary" type="button" data-goto="bots">Løs</button></div>` : "";
+}
 function render(d, fresh) {
   state = d;
-  const m = d.market || {};
-  $("sub").textContent = `${d.paused ? "På pause" : m.label || "–"} · ${d.params.auto_approve ? "autopilot" : "du godkender"} · papirpenge`;
-  const pb = $("pause-btn"); pb.textContent = d.paused ? "Start igen" : "Stop nu"; pb.className = "btn " + (d.paused ? "resume" : "danger");
-  $("alerts").innerHTML = (d.alerts || []).filter((a) => !/^Autopilot er slået til/.test(a.text)).map((a) => {
-    const fix = /Alpaca|nøgle/i.test(a.text) && a.level !== "info" ? `<button class="btn act" type="button" data-goto="bots">Løs</button>` : "";
-    return `<div class="alert ${esc(a.level)}"><span>${esc(a.text)}</span>${fix}</div>`;
-  }).join("");
+  const pb = $("pause-btn"); pb.textContent = d.paused ? "Start" : "Stop"; pb.className = "btn " + (d.paused ? "resume" : "danger");
+  pb.title = d.paused ? "Start bordet igen" : "Sæt alt på pause";
+  renderStatus(d);
   const count = (d.approvals || []).length;
   $("badge").hidden = !count; $("badge").textContent = count;
   notifyApprovals(d.approvals || []);
   renderChat(fresh);
-  renderTape(d);
   renderTab();
 }
 
-// ---------- knapper ----------
+// ---------- handlinger ----------
 document.addEventListener("click", async (e) => {
+  const g = e.target.closest("[data-goto]");
+  if (g) { closeOverlays(); showTab(g.dataset.goto); return; }
   const tick = e.target.closest("[data-ticker]");
   if (tick) { openTicker(tick.dataset.ticker); return; }
   if (e.target.closest("[data-close]") || e.target === $("sheet-bg") || e.target === $("pal-bg")) { closeOverlays(); return; }
@@ -974,7 +1001,7 @@ document.addEventListener("click", async (e) => {
   if (!a && !r) return;
   const id = Number((a || r).dataset.approve || (a || r).dataset.reject);
   (a || r).disabled = true;
-  try { if (a) { await post("/api/desk/approve", { id }); toast("Godkendt. EXECUTOR lægger ordren på papirkontoen."); } else { await post("/api/desk/reject", { id }); toast("Afvist. Ingen ordre."); } }
+  try { if (a) { await post("/api/desk/approve", { id }); toast("Godkendt. EXECUTOR lægger ordren."); } else { await post("/api/desk/reject", { id }); toast("Afvist. Ingen ordre."); } }
   catch (err) { toast(err.message); }
   refresh();
 });
@@ -992,33 +1019,34 @@ $("send").onsubmit = async (e) => {
   input.value = "";
   if (!(await sendText(text))) input.value = text;
 };
-$("pause-btn").onclick = async () => { if (!state) return; try { await post("/api/desk/pause", { paused: !state.paused }); } catch (err) { toast(err.message); } refresh(); };
+$("pause-btn").onclick = async () => { if (!state) return; try { await post("/api/desk/pause", { paused: !state.paused }); toast(state.paused ? "Bordet arbejder igen." : "Alt er sat på pause."); } catch (err) { toast(err.message); } refresh(); };
 async function action(url, done) { try { toast(done(await post(url))); } catch (err) { toast(err.message); } refresh(); }
-$("scan-btn").onclick = () => action("/api/desk/scan", () => "SCOUT kigger nu. Svarene kommer i gruppen.");
-$("log-btn").onclick = () => action("/api/desk/log", () => "Dagsloggen er skrevet i gruppen.");
+$("scan-btn").onclick = () => action("/api/desk/scan", () => "SCOUT kigger nu. Svarene kommer i Gruppen.");
+$("log-btn").onclick = () => action("/api/desk/log", () => "Dagsloggen er skrevet i Gruppen.");
 $("close-btn").onclick = () => { if (confirm("Luk alle bordets positioner nu?")) action("/api/desk/close-all", (r) => `${r.closed} position(er) lukket.`); };
 $("params").onsubmit = async (e) => {
   e.preventDefault();
   const f = e.target, body = { watchlist: f.watchlist.value, auto_approve: f.auto_approve.checked };
   ["move_pct", "volume_x", "max_flags_per_day", "scan_minutes", "stop_max_pct", "reward_risk", "position_pct", "max_open"].forEach((k) => { body[k] = f[k].value; });
-  try { await post("/api/desk/params", body); paramsFilled = false; toast("Reglerne er gemt."); refresh(); } catch (err) { toast(err.message); }
+  try { await post("/api/desk/params", body); paramsFilled = false; toast("Gemt."); refresh(); } catch (err) { toast(err.message); }
 };
+$("params").auto_approve.onchange = async (e) => { try { await post("/api/desk/params", { auto_approve: e.target.checked }); toast(e.target.checked ? "Autopilot er slået til." : "Du godkender nu hver ordre."); refresh(); } catch (err) { toast(err.message); } };
 $("reset-params").onclick = async () => { try { await post("/api/desk/params", { reset: true }); paramsFilled = false; toast("Tilbage til standard."); refresh(); } catch (err) { toast(err.message); } };
 $("diag-btn").onclick = async () => {
-  const btn = $("diag-btn"); btn.disabled = true; $("diag").textContent = "Tester …";
+  const btn = $("diag-btn"); btn.disabled = true; $("diag").innerHTML = '<span class="muted">Tester …</span>';
   try {
     const r = await post("/api/desk/diagnose"), k = r.keys || {};
-    const rows = (r.checks || []).map((c) => `<div class="row" style="flex-wrap:nowrap;align-items:flex-start"><b class="${c.ok ? "up" : "down"} mono" style="width:18px;flex:none">${c.ok ? "OK" : "!!"}</b><div><b style="font-weight:500">${esc(c.name)}</b><div class="muted">${esc(c.detail)}</div></div></div>`).join("");
-    const hints = (k.hints || []).map((h) => `<div class="alert warning" style="margin-top:8px">${esc(h)}</div>`).join("");
-    $("diag").innerHTML = `<div class="muted">Key fra <b>${esc(k.key_source)}</b> (starter med ${esc(k.key_start || "–")}, ${k.key_length} tegn) · Secret fra <b>${esc(k.secret_source)}</b> (${k.secret_length} tegn)</div>${hints}<div class="list" style="margin-top:8px">${rows}</div><p class="${r.ok ? "up" : "down"}" style="margin:10px 0 0;font-weight:500">${esc(r.text)}</p>`;
+    const rows = (r.checks || []).map((c) => `<div><span class="d ${c.ok ? "ok" : "bad"}"></span><span class="n">${esc(c.name)}</span><span class="v" title="${esc(c.detail)}">${esc(c.detail)}</span></div>`).join("");
+    const hints = (k.hints || []).map((h) => `<div class="issue" style="margin:10px 0 0;box-shadow:none;background:var(--card-2)"><span class="ic">!</span><div class="tx">${esc(h)}</div></div>`).join("");
+    $("diag").innerHTML = `<p class="cap" style="margin:0 0 6px">Key fra ${esc(k.key_source)} (starter med ${esc(k.key_start || "–")}, ${k.key_length} tegn) · Secret fra ${esc(k.secret_source)} (${k.secret_length} tegn)</p>${hints}<div class="sysl" style="margin-top:6px">${rows}</div><p class="${r.ok ? "up" : "down"}" style="margin:10px 0 0;font-weight:600">${esc(r.text)}</p>`;
   } catch (err) { $("diag").textContent = err.message; }
   btn.disabled = false; refresh();
 };
 async function sendKeys(save) {
-  const f = $("keys-form"); $("keys-result").textContent = "Spørger Alpaca …";
+  const f = $("keys-form"); $("keys-result").innerHTML = '<span class="muted">Spørger Alpaca …</span>';
   try {
     const r = await post("/api/desk/keys", { key: f.key.value, secret: f.secret.value, code: f.code.value, save });
-    $("keys-result").innerHTML = `<p class="${r.ok ? "up" : "down"}" style="margin:0 0 4px;font-weight:500">${esc(r.text)}</p><div class="muted">Key starter med ${esc(r.key_start)} og er ${r.key_length} tegn · Secret er ${r.secret_length} tegn.</div>${r.hint ? `<div class="alert warning" style="margin-top:8px">${esc(r.hint)}</div>` : ""}`;
+    $("keys-result").innerHTML = `<p class="${r.ok ? "up" : "down"}" style="margin:0 0 4px;font-weight:600">${esc(r.text)}</p><div class="cap">Key starter med ${esc(r.key_start)} og er ${r.key_length} tegn · Secret er ${r.secret_length} tegn.</div>${r.hint ? `<div class="issue" style="margin:10px 0 0;box-shadow:none;background:var(--card-2)"><span class="ic">!</span><div class="tx">${esc(r.hint)}</div></div>` : ""}`;
     if (r.ok && r.saved) { f.key.value = ""; f.secret.value = ""; f.code.value = ""; }
   } catch (err) { $("keys-result").innerHTML = `<p class="down" style="margin:0">${esc(err.message)}</p>`; }
   refresh();
@@ -1030,65 +1058,42 @@ async function loadCompare() {
   try {
     const c = await (await fetch("/api/desk/compare", { cache: "no-store", credentials: "same-origin" })).json();
     if (!c.started) { $("compare").textContent = c.text; return; }
-    const cell = (k, v, cls = "") => `<div><div class="label">${k}</div><div class="big ${cls}">${v}</div></div>`;
-    $("compare").innerHTML = `<div class="row" style="gap:24px">${cell("Bordet", pct(c.desk_pct), c.desk_pct >= 0 ? "up" : "down")}${cell("S&P 500", c.spy_pct === null ? "–" : pct(c.spy_pct))}${cell("Handler", c.trades)}${cell("Vindere", c.win_rate === null ? "–" : Math.round(c.win_rate * 100) + " %")}${cell("Dage", c.days + 1)}</div><p style="margin:10px 0 0;color:var(--text)">${esc(c.text)}</p>`;
+    const cell = (k, v, cls = "") => `<div><div class="cap">${k}</div><div class="big ${cls}">${v}</div></div>`;
+    $("compare").innerHTML = `<div class="kv">${cell("Bordet", pct(c.desk_pct), c.desk_pct >= 0 ? "up" : "down")}${cell("S&P 500", c.spy_pct === null ? "–" : pct(c.spy_pct))}${cell("Handler", c.trades)}${cell("Dage", c.days + 1)}</div><p style="margin:12px 0 0;color:var(--text-2)">${esc(c.text)}</p>`;
   } catch (err) { $("compare").textContent = "Kunne ikke hente sammenligningen."; }
 }
 const seen = new Set();
 function notifyApprovals(list) {
   for (const p of list) {
     if (seen.has(p.id)) continue; seen.add(p.id);
-    if (lastId && "Notification" in window && Notification.permission === "granted") { try { new Notification("Godkendelse nødvendig", { body: `KØB ${p.qty} ${p.symbol} til ca. ${price(p.entry)}` }); } catch (e) {} }
+    if (lastId && "Notification" in window && Notification.permission === "granted") { try { new Notification("Godkendelse nødvendig", { body: `Køb ${p.qty} ${p.symbol} til ca. ${price(p.entry)}` }); } catch (e) {} }
   }
 }
 document.addEventListener("click", () => { if ("Notification" in window && Notification.permission === "default") Notification.requestPermission().catch(() => {}); }, { once: true });
-
-// ---------- lyd og vibration ----------
-let soundOn = false, audio = null;
-try { soundOn = localStorage.getItem("desk-sound") === "1"; } catch (e) {}
-function setSound(on) {
-  soundOn = on; $("sound-btn").setAttribute("aria-pressed", String(on)); $("sound-wave").style.opacity = on ? 1 : 0.2;
-  try { localStorage.setItem("desk-sound", on ? "1" : "0"); } catch (e) {}
-}
-function beep(good) {
-  if (!soundOn) return;
-  try {
-    audio = audio || new (window.AudioContext || window.webkitAudioContext)();
-    const t = audio.currentTime;
-    [good ? 660 : 330, good ? 990 : 247].forEach((f, i) => {
-      const o = audio.createOscillator(), g = audio.createGain();
-      o.type = "triangle"; o.frequency.value = f;
-      g.gain.setValueAtTime(0.0001, t + i * 0.11); g.gain.exponentialRampToValueAtTime(0.1, t + i * 0.11 + 0.015); g.gain.exponentialRampToValueAtTime(0.0001, t + i * 0.11 + 0.18);
-      o.connect(g).connect(audio.destination); o.start(t + i * 0.11); o.stop(t + i * 0.11 + 0.2);
-    });
-    if (navigator.vibrate) navigator.vibrate(good ? [35, 45, 35] : [130]);
-  } catch (e) {}
-}
-setSound(soundOn);
-$("sound-btn").onclick = () => { setSound(!soundOn); if (soundOn) beep(true); toast(soundOn ? "Lyd og vibration ved køb og salg er slået til." : "Lyd er slået fra."); };
 function onFresh(list) {
   for (const m of list) {
-    if (m.kind === "fill") beep(true);
-    if (m.kind === "close") beep(((m.data || {}).pnl || 0) >= 0);
+    if (m.kind === "fill") chime(true);
+    if (m.kind === "close") chime(((m.data || {}).pnl || 0) >= 0);
     typing = typing.filter((t) => t.key !== m.author);
   }
   renderTyping();
 }
 
-// ---------- kommandolinje (⌘K) ----------
+// ---------- søg og kommandoer (⌘K) ----------
 function commands(q) {
   const s = q.trim().toLowerCase();
   const list = [
-    ["Stop nu – sæt alt på pause", "", () => post("/api/desk/pause", { paused: true }).then(refresh)],
-    ["Start igen", "", () => post("/api/desk/pause", { paused: false }).then(refresh)],
+    ["Stop – sæt alt på pause", "", () => post("/api/desk/pause", { paused: true }).then(refresh)],
+    ["Start bordet igen", "", () => post("/api/desk/pause", { paused: false }).then(refresh)],
     ["Lad SCOUT kigge nu", "", () => action("/api/desk/scan", () => "SCOUT kigger nu.")],
-    ["Skriv dagslog", "", () => action("/api/desk/log", () => "Dagsloggen er skrevet i gruppen.")],
+    ["Skriv dagslog", "", () => action("/api/desk/log", () => "Dagsloggen er skrevet i Gruppen.")],
     ["Test Alpaca-forbindelsen", "", () => { showTab("bots"); $("diag-btn").click(); }],
+    ["Vis status", "", () => $("status").click()],
     ...TABS.map(([k, t], i) => [`Gå til ${t}`, String(i + 1), () => showTab(k)]),
-    ["Skift tema", "", () => $("theme").click()],
-    [`Lyd ${soundOn ? "fra" : "til"}`, "", () => $("sound-btn").click()],
+    [`${document.documentElement.dataset.theme === "light" ? "Mørkt" : "Lyst"} tema`, "", () => setTheme(document.documentElement.dataset.theme !== "light")],
+    [`Lyd ${soundOn ? "fra" : "til"}`, "", () => { setSound(!soundOn); toast(soundOn ? "Lyd og vibration er slået til." : "Lyd er slået fra."); if (soundOn) chime(true); }],
   ];
-  const tickers = (((state || {}).params || {}).watchlist || []).filter((t) => s && t.toLowerCase().startsWith(s.replace(/^\$/, ""))).map((t) => [`Vis ${t}`, "", () => openTicker(t)]);
+  const tickers = (((state || {}).params || {}).watchlist || []).filter((t) => s && t.toLowerCase().startsWith(s.replace(/^\$/, ""))).map((t) => [`${t}`, "aktie", () => openTicker(t)]);
   const out = [...tickers, ...list.filter(([t]) => !s || t.toLowerCase().includes(s))];
   if (s && (s.startsWith("@") || s.startsWith("spørg") || !out.length)) out.unshift([`Send til gruppen: ${q.trim()}`, "↵", () => { showTab("chat"); sendText(q.trim()); }]);
   return out.slice(0, 9);
@@ -1097,7 +1102,7 @@ let palSel = 0, palItems = [];
 function drawPal() {
   palItems = commands($("pal-input").value);
   palSel = Math.min(palSel, Math.max(0, palItems.length - 1));
-  $("pal-list").innerHTML = palItems.map(([t, k], i) => `<button type="button" class="${i === palSel ? "sel" : ""}" data-pal="${i}"><span>${esc(t)}</span>${k ? `<span class="k">${esc(k)}</span>` : ""}</button>`).join("") || '<div class="muted small" style="padding:10px 12px">Ingen kommandoer.</div>';
+  $("pal-list").innerHTML = palItems.map(([t, k], i) => `<button type="button" class="${i === palSel ? "sel" : ""}" data-pal="${i}"><span>${esc(t)}</span>${k ? `<span class="k">${esc(k)}</span>` : ""}</button>`).join("") || '<div class="muted" style="padding:12px">Ingen resultater.</div>';
 }
 function openPal() { $("pal-bg").hidden = false; $("pal-input").value = ""; palSel = 0; drawPal(); $("pal-input").focus(); }
 function runPal(i) { const c = palItems[i]; closeOverlays(); if (c) Promise.resolve(c[2]()).catch((err) => toast(err.message)); }
@@ -1116,56 +1121,41 @@ document.addEventListener("keydown", (e) => {
   const n = Number(e.key);
   if (n >= 1 && n <= TABS.length) showTab(TABS[n - 1][0]);
   else if (e.key === "/") { e.preventDefault(); showTab("chat"); $("text").focus(); }
-  else if (e.key.toLowerCase() === "k") openPal();
 });
 
-// ---------- hvert sekund: ur, friskhed og udløb ----------
+// ---------- hvert sekund ----------
 function everySecond() {
   if (document.hidden) return;
   if (tab === "home") tickClock();
-  const live = $("live"), s = lastOk ? Math.round((Date.now() - lastOk) / 1000) : null;
-  if (failed) { live.className = "live lost"; $("led").className = "led bad"; $("fresh").textContent = "AFBRUDT"; }
-  else if (s === null) { $("fresh").textContent = "FORBINDER"; }
-  else { live.className = "live" + (s > 30 ? " stale" : ""); $("led").className = "led " + (s > 30 ? "warn" : "on"); $("fresh").textContent = `LIVE · ${s} S`; }
   document.querySelectorAll("[data-expires]").forEach((el) => {
     const t = Math.floor((new Date(el.dataset.expires) - Date.now()) / 1000);
-    el.textContent = isNaN(t) ? "" : t > 0 ? `udløber om ${Math.floor(t / 60)}:${pad(t % 60)}` : "udløbet";
+    el.textContent = isNaN(t) ? "" : t > 0 ? `Udløber om ${Math.floor(t / 60)}:${pad(t % 60)}` : "Udløbet";
   });
+  if (failed && lastOk && Date.now() - lastOk > 20000) { $("status").className = "status bad"; $("status-t").textContent = "Ingen forbindelse"; }
   if (typing.length) renderTyping();
 }
 setInterval(everySecond, 1000);
 document.addEventListener("visibilitychange", () => { document.body.classList.toggle("idle", document.hidden); if (!document.hidden) { refresh(); everySecond(); } });
-
-// ---------- første kontakt: en ægte statuslinje, ikke et show ----------
-function firstNotice(d) {
-  const m = d.market || {}, parts = [];
-  parts.push(d.keys_present && !(d.engine || {}).last_error ? "Alpaca forbundet" : "Alpaca ikke forbundet");
-  parts.push(m.is_open ? "børsen er åben" : `børsen ${m.phase === "pre" ? "åbner snart" : "er lukket"}`);
-  parts.push(d.params.auto_approve ? "autopilot til" : "du godkender");
-  const n = $("notice");
-  n.innerHTML = `<span class="sig">›</span><span>${esc(parts.join(" · "))}</span>`;
-  n.hidden = false;
-  setTimeout(() => n.classList.add("fade"), 5000);
-  setTimeout(() => (n.hidden = true), 5500);
-}
 
 async function refresh() {
   if (busy) return; busy = true;
   try {
     const r = await fetch(`/api/desk/status?after=${lastId}`, { cache: "no-store", credentials: "same-origin" });
     if (r.status === 401) { location.href = "/login"; return; }
-    if (!r.ok) { const d = await r.json().catch(() => ({})); failed = true; $("alerts").innerHTML = `<div class="alert error">${esc(d.detail || "Handelsbordet svarer ikke.")}</div>`; return; }
-    const d = await r.json(), first = lastId === 0 && !state;
+    if (!r.ok) { failed = true; return; }
+    const d = await r.json(), first = !state;
     const fresh = d.messages.filter((m) => m.id > lastId);
     messages.push(...fresh); if (messages.length > 400) messages.splice(0, messages.length - 400);
     lastId = d.last_message_id || lastId;
     lastOk = Date.now(); failed = false;
     if (!first) onFresh(fresh);
     render(d, first ? null : fresh);
-    if (first) { $("loadbar").hidden = true; firstNotice(d); }
   } catch (err) { failed = true; }
-  finally { busy = false; everySecond(); }
+  finally { busy = false; }
 }
+try { wlView = localStorage.getItem("desk-wl") === "radar" ? "radar" : "list"; } catch (e) {}
+document.querySelectorAll("#wl-seg button").forEach((x) => x.setAttribute("aria-selected", String(x.dataset.view === wlView)));
+$("wl-list").hidden = wlView !== "list"; $("wl-radar").hidden = wlView !== "radar";
 let start = "home";
 try { const t = localStorage.getItem("desk-tab"); if (t && document.getElementById("tab-" + t)) start = t; } catch (e) {}
 showTab(start);
