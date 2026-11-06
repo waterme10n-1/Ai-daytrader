@@ -718,10 +718,13 @@ $("chart").addEventListener("pointerleave", endScrub);
 $("chart").addEventListener("pointerup", (e) => { if (e.pointerType !== "mouse") endScrub(); });
 
 function renderHero(d) {
-  const acc = d.account;
-  $("acct-off").hidden = !!acc;
-  $("equity-wrap").hidden = !acc;
-  tween($("equity"), acc ? acc.equity : null, (v) => (v === null ? "–" : nf2.format(v)));
+  const acc = d.account, err = (d.engine || {}).last_error;
+  // Nøglerne er sat, men kontoen er ikke hentet endnu (lige efter start): vis indlæsning, ikke "ikke forbundet".
+  const waiting = !acc && d.keys_present && !err;
+  $("acct-off").hidden = !!acc || waiting;
+  $("equity-wrap").hidden = !acc && !waiting;
+  if (waiting) { if (!$("equity").querySelector(".sk")) $("equity").innerHTML = '<span class="sk" style="width:min(260px,70%);height:38px"></span>'; $("equity")._v = undefined; }
+  else tween($("equity"), acc ? acc.equity : null, (v) => (v === null ? "–" : nf2.format(v)));
   const pnl = d.kpis.pnl || 0, base = acc ? acc.equity - pnl : 0;
   const pctv = base ? (pnl / base) * 100 : 0;
   $("delta").hidden = !acc;
@@ -983,17 +986,24 @@ function renderBots(d) {
   paramsFilled = true;
 }
 
+// Hver del tegnes for sig: går én galt, bliver resten vist, og fejlen står på siden.
+const pageErrors = new Map();
+function safe(name, fn) {
+  try { fn(); pageErrors.delete(name); }
+  catch (err) { console.error(name, err); pageErrors.set(name, `${name}: ${err && err.message ? err.message : err}`); }
+}
 // Kun den fane, du kigger på, bliver tegnet.
 function renderTab(force) {
   const d = state;
   if (tab === "home") {
     if (force) { wlKey = ""; scopeKey = ""; chartKey = ""; }
-    const n = (d.approvals || []).length;
-    $("approvals").hidden = !n; $("approvals").innerHTML = n ? d.approvals.map(approvalCard).join("") : "";
-    renderHero(d); tickClock(); renderNow(d); renderTrades(d); renderWatch(d);
-  } else if (tab === "trades") renderTradesTab(d);
-  else if (tab === "learn") renderLearn(d);
-  else if (tab === "bots") renderBots(d);
+    safe("godkendelser", () => { const n = (d.approvals || []).length; $("approvals").hidden = !n; $("approvals").innerHTML = n ? d.approvals.map(approvalCard).join("") : ""; });
+    safe("konto", () => renderHero(d)); safe("børsen", tickClock); safe("bordet lige nu", () => renderNow(d));
+    safe("åbne handler", () => renderTrades(d)); safe("watchlist", () => renderWatch(d));
+  } else if (tab === "trades") safe("handler", () => renderTradesTab(d));
+  else if (tab === "learn") safe("læring", () => renderLearn(d));
+  else if (tab === "bots") safe("bots", () => renderBots(d));
+  showProblem();
 }
 function renderStatus(d) {
   const sys = systems(d), bad = sys.find((s) => s[1] === "bad"), m = d.market || {};
@@ -1001,18 +1011,22 @@ function renderStatus(d) {
   el.className = `status ${d.paused ? "warn" : bad ? "bad" : "ok"} ${!d.paused && !bad && m.is_open ? "live" : ""}`;
   $("status-t").textContent = d.paused ? "På pause" : bad ? `${bad[0]} mangler` : m.is_open ? "Handler nu" : "Alt kører";
   const issue = bad ? { level: "error", title: bad[0] === "Alpaca" ? "Alpaca er ikke forbundet" : `${bad[0]}: ${bad[2]}`, text: bad[0] === "Alpaca" ? "Uden forbindelse kan bordet ikke se saldo, kurser eller handle. Det tager et minut at ordne." : bad[2] } : null;
+  $("issue").dataset.kind = issue ? "status" : "";
   $("issue").innerHTML = issue ? `<div class="issue ${issue.level}"><span class="ic">!</span><div class="tx"><b>${esc(issue.title)}</b>${esc(issue.text)}</div><button class="btn primary" type="button" data-goto="bots">Løs</button></div>` : "";
 }
 function render(d, fresh) {
   state = d;
+  safe("topbjælke", () => renderTop(d));
+  safe("gruppen", () => renderChat(fresh));
+  renderTab();
+}
+function renderTop(d) {
   const pb = $("pause-btn"); pb.textContent = d.paused ? "Start" : "Stop"; pb.className = "btn " + (d.paused ? "resume" : "danger");
   pb.title = d.paused ? "Start bordet igen" : "Sæt alt på pause";
   renderStatus(d);
   const count = (d.approvals || []).length;
   $("badge").hidden = !count; $("badge").textContent = count;
   notifyApprovals(d.approvals || []);
-  renderChat(fresh);
-  renderTab();
 }
 
 // ---------- handlinger ----------
@@ -1189,27 +1203,54 @@ function everySecond() {
     const t = Math.floor((new Date(el.dataset.expires) - Date.now()) / 1000);
     el.textContent = isNaN(t) ? "" : t > 0 ? `Udløber om ${Math.floor(t / 60)}:${pad(t % 60)}` : "Udløbet";
   });
-  if (failed && lastOk && Date.now() - lastOk > 20000) { $("status").className = "status bad"; $("status-t").textContent = "Ingen forbindelse"; }
+  if (failed && failCount >= 2) { $("status").className = "status bad"; $("status-t").textContent = "Ingen forbindelse"; }
+  if (!state) showProblem();
   if (typing.length) renderTyping();
 }
 setInterval(everySecond, 1000);
 document.addEventListener("visibilitychange", () => { document.body.classList.toggle("idle", document.hidden); if (!document.hidden) { refresh(); everySecond(); } });
 
+// Når serveren ikke svarer, siger siden hvorfor i stedet for at blive ved med at indlæse.
+let loadProblem = "", failCount = 0;
+const firstLoad = Date.now();
+function showProblem() {
+  if (state && !loadProblem && !pageErrors.size) { if ($("issue").dataset.kind === "load") { $("issue").innerHTML = ""; $("issue").dataset.kind = ""; } return; }
+  const slow = !state && !loadProblem && Date.now() - firstLoad > 6000;
+  if (!loadProblem && !pageErrors.size && !slow) return;
+  const title = !state ? (slow ? "Det tager længere end normalt" : "Handelsbordet kan ikke hentes lige nu") : pageErrors.size ? "En del af siden kunne ikke vises" : "Forbindelsen til serveren er afbrudt";
+  const why = loadProblem || (pageErrors.size ? [...pageErrors.values()].join(" · ") : "Serveren har ikke svaret endnu.");
+  $("issue").dataset.kind = "load";
+  $("issue").innerHTML = `<div class="issue error"><span class="ic">!</span><div class="tx"><b>${esc(title)}</b>${esc(why)}<br><span class="cap">Siden prøver igen af sig selv hvert 5. sekund.</span></div><button class="btn primary" type="button" id="retry">Prøv igen</button></div>`;
+  $("retry").onclick = () => { $("retry").disabled = true; refresh(); };
+}
+window.addEventListener("error", (e) => { pageErrors.set("side", `side: ${e.message}`); showProblem(); });
+window.addEventListener("unhandledrejection", (e) => { pageErrors.set("side", `side: ${(e.reason && e.reason.message) || e.reason}`); showProblem(); });
 async function refresh() {
   if (busy) return; busy = true;
+  const ctrl = new AbortController(), timer = setTimeout(() => ctrl.abort(), 12000);
   try {
-    const r = await fetch(`/api/desk/status?after=${lastId}`, { cache: "no-store", credentials: "same-origin" });
+    const r = await fetch(`/api/desk/status?after=${lastId}`, { cache: "no-store", credentials: "same-origin", signal: ctrl.signal });
     if (r.status === 401) { location.href = "/login"; return; }
-    if (!r.ok) { failed = true; return; }
+    if (!r.ok) {
+      const body = await r.json().catch(() => ({}));
+      failed = true; failCount += 1;
+      loadProblem = r.status === 404 ? (body.detail || "Handelsbordet er ikke startet på serveren. Tjek, at DESK_ENABLED ikke er sat til false i Railway.")
+        : r.status >= 500 && r.status !== 500 ? `Serveren svarer ikke (fejl ${r.status}). Den er måske ved at genstarte efter en ny version.`
+        : `Serveren svarede med fejl ${r.status}${body.detail ? ": " + body.detail : "."}`;
+      return;
+    }
     const d = await r.json(), first = !state;
     const fresh = d.messages.filter((m) => m.id > lastId);
     messages.push(...fresh); if (messages.length > 400) messages.splice(0, messages.length - 400);
     lastId = d.last_message_id || lastId;
-    lastOk = Date.now(); failed = false;
+    lastOk = Date.now(); failed = false; failCount = 0; loadProblem = "";
     if (!first) onFresh(fresh);
     render(d, first ? null : fresh);
-  } catch (err) { failed = true; }
-  finally { busy = false; }
+  } catch (err) {
+    failed = true; failCount += 1;
+    loadProblem = err && err.name === "AbortError" ? "Serveren svarede ikke inden for 12 sekunder." : "Ingen forbindelse til serveren. Tjek internettet, eller om Railway kører.";
+  }
+  finally { clearTimeout(timer); busy = false; showProblem(); }
 }
 try { wlView = localStorage.getItem("desk-wl") === "radar" ? "radar" : "list"; } catch (e) {}
 document.querySelectorAll("#wl-seg button").forEach((x) => x.setAttribute("aria-selected", String(x.dataset.view === wlView)));

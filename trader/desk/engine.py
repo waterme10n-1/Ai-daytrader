@@ -305,6 +305,10 @@ class DeskEngine:
         self._expire(now)
         clock = broker.get_clock()
         self._cache["clock"] = (self._now().timestamp(), clock)
+        try:
+            self._cache["account"] = (self._now().timestamp(), broker.get_account())
+        except Exception as exc:  # kontoen er pænt at have, ikke nødvendig for resten af runden
+            logger.info("Kontoen kunne ikke hentes: %s", exc)
         day = now.date().isoformat()
         if clock.is_open:
             self._mark_open_day(day, broker, now)
@@ -1065,20 +1069,19 @@ class DeskEngine:
     def _market(self) -> dict:
         """Børsens fase og næste tider. Den lokale kalender giver altid et svar; Alpacas ur vinder, når det svarer."""
         out: dict[str, Any] = {**calendar.schedule(self._now()), "source": "kalender"}
-        if self.keys_present:
-            try:
-                clock = self._cached("clock", lambda: self.broker().get_clock())
-            except Exception as exc:
-                out["error"] = str(exc)
-            else:
-                if clock.is_open != out["is_open"]:
-                    out["phase"] = "open" if clock.is_open else ("closed" if out["phase"] == "open" else out["phase"])
-                out["is_open"] = clock.is_open
-                if clock.next_open:
-                    out["next_open"] = clock.next_open.astimezone(ET).isoformat(timespec="seconds")
-                if clock.next_close:
-                    out["next_close"] = clock.next_close.astimezone(ET).isoformat(timespec="seconds")
-                out["source"] = "alpaca"
+        # Status må aldrig vente på Alpaca: uret kommer fra baggrundstråden, der henter det hvert minut.
+        hit = self._cache.get("clock") if self.keys_present else None
+        # Højst to minutter gammelt, så åbning og lukning ikke halter; ellers bruges kalenderen.
+        clock = hit[1] if hit and self._now().timestamp() - hit[0] < 120 else None
+        if clock is not None:
+            if clock.is_open != out["is_open"]:
+                out["phase"] = "open" if clock.is_open else ("closed" if out["phase"] == "open" else out["phase"])
+            out["is_open"] = clock.is_open
+            if clock.next_open:
+                out["next_open"] = clock.next_open.astimezone(ET).isoformat(timespec="seconds")
+            if clock.next_close:
+                out["next_close"] = clock.next_close.astimezone(ET).isoformat(timespec="seconds")
+            out["source"] = "alpaca"
         labels = {"open": "Åbent", "pre": "Før åbning", "after": "Efter lukning", "closed": "Lukket"}
         out["label"] = labels.get(out["phase"], "Lukket")
         if out.get("holiday") and not out["is_open"]:
@@ -1086,12 +1089,13 @@ class DeskEngine:
         return out
 
     def _account(self) -> dict | None:
+        """Kontoen, som baggrundstråden sidst hentede. Ingen netværkskald her, så siden altid svarer hurtigt."""
         if not self.keys_present:
             return None
-        try:
-            account = self._cached("account", lambda: self.broker().get_account())
-        except Exception:
+        hit = self._cache.get("account")
+        if not hit or self._now().timestamp() - hit[0] > 600:
             return None
+        account = hit[1]
         return {"equity": account.equity, "buying_power": account.buying_power}
 
     def status(self, after: int = 0) -> dict:

@@ -655,3 +655,32 @@ def test_claude_problems_are_explained_and_fallback_answers_are_useful(tmp_path)
     desk.brain = brain
     status = desk.status()
     assert "401" in status["ai"]["reason"] and any("Claude" in a["text"] for a in status["alerts"])
+
+
+def test_status_never_waits_for_alpaca(tmp_path):
+    broker = FakeBroker({"NVDA": ramp_bars()})
+    desk, _ = make_desk(tmp_path, broker)
+    desk.tick()
+    calls = []
+
+    def slow(*args, **kwargs):
+        calls.append(1)
+        raise AssertionError("status må ikke kalde Alpaca")
+
+    broker.get_clock = broker.get_account = broker.get_positions = slow
+    status = desk.status()
+    assert calls == [] and status["account"]["equity"] == 100_000.0 and status["market"]["source"] == "alpaca"
+    # Uden et frisk ur bruges kalenderen, stadig uden netværk.
+    desk._cache.pop("clock")
+    assert desk.status()["market"]["source"] == "kalender" and calls == []
+
+
+def test_status_errors_come_back_as_readable_json(tmp_path):
+    settings = _settings(tmp_path)
+    desk, _ = make_desk(tmp_path, FakeBroker({}))
+    desk.start = lambda: None
+    desk.status = lambda after=0: (_ for _ in ()).throw(RuntimeError("database er låst"))
+    with TestClient(create_app(settings=settings, meme_engine=quiet_engine(), desk_engine=desk)) as client:
+        assert _login(client).status_code == 303
+        response = client.get("/api/desk/status")
+        assert response.status_code == 500 and "database er låst" in response.json()["detail"]
