@@ -261,7 +261,7 @@ RugCheck og DexScreener har samme beskyttelse:
 
 # Handelsbordet (seks bots, én gruppechat)
 
-Bygget efter guiden "How to build a trading desk in one group chat", men på Claude og Alpaca i stedet for Grok Bot og TradingView. Bordet kører i samme proces som memebotten, har sin egen side på `/desk` (skifteren øverst på siden) og handler **kun på papirpenge**. Der findes ingen kodevej til rigtige penge for bordet.
+Bygget efter guiden "How to build a trading desk in one group chat", men på Claude og Alpaca i stedet for Grok Bot og TradingView. Bordet kører i samme proces som memebotten og har sin egen side på `/desk` (skifteren øverst på siden). Det handler **kun på papirpenge**: amerikanske aktier hos Alpaca og danske aktier på sin egen papirkonto (se *Københavns børs*). Der findes ingen kodevej til rigtige penge for bordet.
 
 ## De seks bots
 
@@ -321,3 +321,34 @@ Fra 9:45 til 11:00 ET markerer SCOUT et gap, der stadig er oppe mindst 3 % og li
 Kurserne før åbning kommer fra IEX og kan være tynde. Slå det fra under **Bots → Indstillinger → Før åbning** eller med `DESK_PREMARKET=false`.
 
 Hver markering koster typisk to Claude-kald (NEWS og SKEPTIC), og hvert gap før åbning ét. Vil du have et loft over udgiften, så sæt `DESK_AI_DAILY_BUDGET_USD`.
+
+## Københavns børs
+
+Bordet handler også danske aktier på Nasdaq Copenhagen, side om side med New York. Skift mellem **USA** og **Danmark** øverst på siden. Siden husker dit valg. Hver børs har sin egen chat, sine egne handler, sin egen læring og sin egen database (`desk_dk.db`), men de samme seks bots og regler.
+
+Alpaca handler kun amerikanske aktier, så København kører på **bordets egen papirkonto** i kroner:
+
+- Kontoen starter med 100.000 kr. (`DESK_DK_START_CASH`).
+- Kurserne kommer fra Yahoo Finance. Det er gratis og kræver ingen nøgle, men kurserne er uofficielle og kan være lidt forsinkede.
+- Et køb fyldes til seneste kurs. Kurtagen (0,1 % pr. handel, `DESK_DK_FEE_PCT`) er trukket fra i købs- og salgskursen, så resultatet er efter kurtage.
+- Bordet tjekker selv stop og mål mod hvert nyt minut, præcis som en bracket-ordre. Stop vinder, hvis begge rammes i samme minut.
+
+Tiderne følger børsen:
+
+| | New York | København |
+|---|---|---|
+| Åben | 9:30–16:00 ET (15:30–22:00 dansk tid) | 9:00–17:00 |
+| SCOUT kigger | 9:45–15:30 ET | 9:15–16:30 |
+| Gaps ved åbningen | til 11:00 ET | til 10:30 |
+| Alt lukkes | 15:50 ET | 16:50 |
+| Dagslog | 16:15 ET | 17:15 |
+
+Halve dage i New York flytter tiderne med.
+
+København er lukket på danske helligdage: nytår, skærtorsdag, langfredag, 2. påskedag, Kristi himmelfart og dagen efter, 2. pinsedag, grundlovsdag, juleaften, juledag, 2. juledag og nytårsaften.
+
+Der er ingen handel før åbning i København, så kortet **Før åbning** findes kun for New York. Gaps ved åbningen gælder begge steder.
+
+Watchlisten er 16 likvide C25-aktier: NOVO-B, DSV, DANSKE, ORSTED, VWS, GMAB, PNDORA, CARL-B, COLO-B, NSIS-B, DEMANT, GN, NKT, BAVA, ZEAL og AMBU-B. Skriv tickers, som Yahoo skriver dem, uden `.CO` (fx `NOVO-B`). Bordet måles mod C25-indekset.
+
+`DESK_DK_ENABLED=false` slår København fra.

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -37,7 +37,28 @@ RETIRED_DEFAULTS: dict[str, object] = {
     "watchlist": ["NVDA", "AAPL", "MSFT", "AMZN", "META", "GOOGL", "TSLA", "AMD", "AVGO", "NFLX", "PLTR", "COIN"],
 }
 TICKER = re.compile(r"^[A-Z]{1,5}(\.[A-Z])?$")
+# Københavns børs: NOVO-B, MAERSK-B, NDA-DK, GN, ROCK-B (som hos Yahoo, uden .CO).
+DK_TICKER = re.compile(r"^(?=[A-Z0-9-]*[A-Z])[A-Z0-9]{1,8}(-[A-Z]{1,3})?$")
 MAX_WATCHLIST = 30
+# Likvide C25-aktier, der flytter sig nok til at være interessante, og som koster under 5 % af kontoen pr. aktie.
+DK_WATCHLIST: tuple[str, ...] = (
+    "NOVO-B",
+    "DSV",
+    "DANSKE",
+    "ORSTED",
+    "VWS",
+    "GMAB",
+    "PNDORA",
+    "CARL-B",
+    "COLO-B",
+    "NSIS-B",
+    "DEMANT",
+    "GN",
+    "NKT",
+    "BAVA",
+    "ZEAL",
+    "AMBU-B",
+)
 
 # Lofter, som hverken .env eller dashboardet kan gå ud over.
 HARD_MAX_POSITION_PCT = 10.0
@@ -68,15 +89,18 @@ def key_problem(api_key: str) -> str:
     return ""
 
 
-def parse_watchlist(raw: str | list[str] | tuple[str, ...] | None) -> list[str]:
+def parse_watchlist(raw: str | list[str] | tuple[str, ...] | None, market: str = "us") -> list[str]:
     """Store bogstaver, ingen dubletter, kun gyldige tickers. Ugyldige ignoreres."""
     if raw is None:
         return []
     items = raw if isinstance(raw, (list, tuple)) else re.split(r"[\s,;]+", raw)
+    pattern = DK_TICKER if market == "dk" else TICKER
     seen: list[str] = []
     for item in items:
         ticker = str(item).strip().upper().lstrip("$")
-        if ticker and TICKER.match(ticker) and ticker not in seen:
+        if market == "dk":
+            ticker = ticker.removesuffix(".CO").replace(".", "-").replace("_", "-")
+        if ticker and pattern.match(ticker) and ticker not in seen:
             seen.append(ticker)
     return seen[:MAX_WATCHLIST]
 
@@ -84,6 +108,9 @@ def parse_watchlist(raw: str | list[str] | tuple[str, ...] | None) -> list[str]:
 @dataclass(frozen=True)
 class DeskSettings:
     enabled: bool = True
+    market: str = "us"  # "us" = New York via Alpaca, "dk" = København på bordets egen papirkonto
+    start_cash: float = 100_000.0  # kun den danske papirkonto (DKK)
+    fee_pct: float = 0.1  # kurtage pr. handel på den danske papirkonto, i % af beløbet
     watchlist: tuple[str, ...] = DEFAULT_WATCHLIST
     move_pct: float = 2.0
     volume_x: float = 2.0
@@ -155,4 +182,24 @@ class DeskSettings:
             ai_fallbacks=(os.getenv("ANTHROPIC_FALLBACKS") or "default").strip(),
             max_chat_per_day=max(0, min(500, _int(os.getenv("DESK_MAX_CHAT_PER_DAY"), 40))),
             db_path=os.getenv("DESK_DB_PATH", "").strip() or default_db,
+        )
+
+    @classmethod
+    def from_env_dk(cls) -> DeskSettings:
+        """Københavns børs: samme regler for SCOUT, CHART og SIZER, men bordets egen papirkonto i kroner."""
+        base = cls.from_env()
+        default_db = str(Path(base.db_path).expanduser().parent / "desk_dk.db") if base.db_path != ":memory:" else ":memory:"
+        watch = parse_watchlist(os.getenv("DESK_DK_WATCHLIST"), "dk") or list(DK_WATCHLIST)
+        return replace(
+            base,
+            enabled=_flag(os.getenv("DESK_DK_ENABLED"), True),
+            market="dk",
+            watchlist=tuple(watch),
+            start_cash=min(10_000_000.0, max(10_000.0, _float(os.getenv("DESK_DK_START_CASH"), 100_000.0))),
+            fee_pct=min(1.0, max(0.0, _float(os.getenv("DESK_DK_FEE_PCT"), 0.1))),
+            alpaca_api_key="",
+            alpaca_secret_key="",
+            key_source="",
+            secret_source="",
+            db_path=os.getenv("DESK_DK_DB_PATH", "").strip() or default_db,
         )

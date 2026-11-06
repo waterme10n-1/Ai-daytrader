@@ -39,19 +39,23 @@ class Flag:
     ts: str
     by_gap: bool = False
     gap_pct: float | None = None  # siden gårsdagens lukkekurs
+    to_close_min: int | None = None  # minutter til børsen lukker, da SCOUT markerede
 
     def to_dict(self) -> dict:
         return asdict(self)
 
 
-def normal_volume_per_minute(daily: list[Bar]) -> float:
+def normal_volume_per_minute(daily: list[Bar], session_minutes: int = 390) -> float:
+    """Gennemsnitlig dagsvolumen fordelt på børsens handelsminutter (New York 390, København 480)."""
     volumes = [bar.volume for bar in daily if bar.volume > 0]
     if not volumes:
         return 0.0
-    return (sum(volumes) / len(volumes)) / 390.0
+    return (sum(volumes) / len(volumes)) / float(session_minutes)
 
 
-def _read(symbol: str, intraday: list[Bar], daily: list[Bar], now: datetime) -> tuple[Flag, float, float, float | None] | None:
+def _read(
+    symbol: str, intraday: list[Bar], daily: list[Bar], now: datetime, session_minutes: int = 390
+) -> tuple[Flag, float, float, float | None] | None:
     """Tallene SCOUT ser på: (flag uden afgørelse, bevægelse på en time, volumen i gange normal, gap siden i går)."""
     bars = completed(intraday, now)
     if len(bars) < MIN_BARS:
@@ -64,7 +68,7 @@ def _read(symbol: str, intraday: list[Bar], daily: list[Bar], now: datetime) -> 
         return None
     move = (last.close - ref) / ref * 100.0
     minutes = max(1, len(window))
-    per_minute = normal_volume_per_minute(daily)
+    per_minute = normal_volume_per_minute(daily, session_minutes)
     ratio = (sum(bar.volume for bar in window) / minutes) / per_minute if per_minute > 0 else 0.0
     prev = daily[-1].close if daily and daily[-1].close > 0 else None
     gap = (last.close - prev) / prev * 100.0 if prev else None
@@ -87,9 +91,18 @@ def _read(symbol: str, intraday: list[Bar], daily: list[Bar], now: datetime) -> 
     return flag, move, ratio, gap
 
 
-def scout(symbol: str, intraday: list[Bar], daily: list[Bar], now: datetime, *, move_pct: float, volume_x: float) -> Flag | None:
+def scout(
+    symbol: str,
+    intraday: list[Bar],
+    daily: list[Bar],
+    now: datetime,
+    *,
+    move_pct: float,
+    volume_x: float,
+    session_minutes: int = 390,
+) -> Flag | None:
     """Flag ved bevægelse på mindst move_pct på en time eller volumen på mindst volume_x gange det normale."""
-    read = _read(symbol, intraday, daily, now)
+    read = _read(symbol, intraday, daily, now, session_minutes)
     if read is None:
         return None
     flag, move, ratio, _gap = read
@@ -98,15 +111,25 @@ def scout(symbol: str, intraday: list[Bar], daily: list[Bar], now: datetime, *, 
     return flag if flag.by_move or flag.by_volume else None
 
 
-def gap_flag(symbol: str, intraday: list[Bar], daily: list[Bar], now: datetime, *, gap_pct: float, volume_x: float) -> Flag | None:
-    """Gap ved åbningen: steget mindst gap_pct siden i går og stadig over VWAP. Kun til kl. 11 ET.
+def gap_flag(
+    symbol: str,
+    intraday: list[Bar],
+    daily: list[Bar],
+    now: datetime,
+    *,
+    gap_pct: float,
+    volume_x: float,
+    gap_until: tuple[int, int] = GAP_UNTIL,
+    session_minutes: int = 390,
+) -> Flag | None:
+    """Gap ved åbningen: steget mindst gap_pct siden i går og stadig over VWAP. Kun den første halvanden time.
 
     En aktie, der åbner 4 % højere og holder sig over VWAP, har købere med fra start, selv om den har ligget
     stille det første kvarter og derfor ikke har flyttet sig move_pct på en time.
     """
-    if (now.hour, now.minute) >= GAP_UNTIL:
+    if (now.hour, now.minute) >= gap_until:
         return None
-    read = _read(symbol, intraday, daily, now)
+    read = _read(symbol, intraday, daily, now, session_minutes)
     if read is None:
         return None
     flag, _move, ratio, gap = read
@@ -188,13 +211,14 @@ def chart(
     *,
     stop_max_pct: float,
     reward_risk: float,
+    latest_entry: tuple[int, int] = LATEST_ENTRY,
 ) -> ChartPlan:
     """Indgang, mål og stop for et køb. Stoppet er højst stop_max_pct under indgangen, målet mindst reward_risk gange så langt væk."""
     bars = completed(intraday, now)
     if len(bars) < MIN_BARS:
         return ChartPlan(False, reason="For få minutter med data til et chart.")
-    if (now.hour, now.minute) >= LATEST_ENTRY:
-        return ChartPlan(False, reason="For sent på dagen. Alt lukkes kl. 15:50, så der er ikke tid til målet.")
+    if (now.hour, now.minute) >= latest_entry:
+        return ChartPlan(False, reason="For sent på dagen. Alt lukkes ti minutter før børsen lukker, så der er ikke tid til målet.")
     price = bars[-1].close
     level = vwap(bars) or price
     rising = flag.gap_pct if flag.by_gap and flag.gap_pct is not None else flag.move_pct
@@ -303,17 +327,19 @@ def size(
     )
 
 
-def size_text(symbol: str, sized: Size) -> str:
+def size_text(symbol: str, sized: Size, currency: str = "USD") -> str:
     if sized.qty < 1:
         return f"{symbol}: 0. {sized.reason}"
     return (
-        f"{symbol}: {sized.qty} aktier for {sized.notional:,.0f} USD ({sized.pct:.1f}% af kontoen). "
-        f"Største tab ved stop: {sized.max_loss:,.0f} USD. Åbne handler efter denne: {sized.open_after} af {sized.max_open}."
+        f"{symbol}: {sized.qty} aktier for {sized.notional:,.0f} {currency} ({sized.pct:.1f}% af kontoen). "
+        f"Største tab ved stop: {sized.max_loss:,.0f} {currency}. Åbne handler efter denne: {sized.open_after} af {sized.max_open}."
     )
 
 
 # ---------------------------------------------------------------------- SKEPTIC uden Claude
-def rules_skeptic(flag: dict, news: dict, plan: dict, now: datetime, *, stop_max_pct: float) -> dict:
+def rules_skeptic(
+    flag: dict, news: dict, plan: dict, now: datetime, *, stop_max_pct: float, late_from: tuple[int, int] = (15, 0)
+) -> dict:
     """Reserve når Claude ikke er sat op. Den er strengere end Claude, ikke mildere."""
     reasons: list[str] = []
     move = float(flag.get("move_pct") or 0)
@@ -329,14 +355,14 @@ def rules_skeptic(flag: dict, news: dict, plan: dict, now: datetime, *, stop_max
         reasons.append(f"Kursen ligger {vs_vwap:.1f}% over VWAP. Et helt normalt tilbagefald rammer stoppet.")
     else:
         reasons.append("Et udbrud midt på dagen fader ofte, når de første købere tager gevinst.")
-    if (now.hour, now.minute) >= (15, 0):
-        reasons.append("Under en time til lukning. Målet når måske ikke at blive ramt før 15:50.")
+    if (now.hour, now.minute) >= late_from:
+        reasons.append("Under en time til lukning. Målet når måske ikke at blive ramt, før bordet lukker alt.")
     else:
-        reasons.append("Holdetiden er kort: alt lukkes kl. 15:50, uanset hvor kursen står.")
+        reasons.append("Holdetiden er kort: alt lukkes ti minutter før børsen lukker, uanset hvor kursen står.")
     if not news.get("has_reason"):
         ruling = "SKIP"
         summary = "Ingen klar grund fra NEWS. SKIP."
-    elif not flag.get("by_move") or vs_vwap > stop_max_pct or (now.hour, now.minute) >= (15, 0):
+    elif not flag.get("by_move") or vs_vwap > stop_max_pct or (now.hour, now.minute) >= late_from:
         ruling = "WAIT"
         summary = "Grunden er der, men opstillingen er ikke god nok. WAIT."
     else:
@@ -372,7 +398,9 @@ def shadow_outcome(entry: float, stop: float, target: float, bars: list[Bar], si
 
 
 # ---------------------------------------------------------------------- radar
-def quotes(symbols: list[str], intraday: dict, daily: dict, now: datetime, flagged: list[str], points: int = 24) -> list[dict]:
+def quotes(
+    symbols: list[str], intraday: dict, daily: dict, now: datetime, flagged: list[str], points: int = 24, *, session_minutes: int = 390
+) -> list[dict]:
     """Kurs, dagens bevægelse, timens bevægelse, volumen og en lille kurve pr. ticker. Kun fra barer, vi allerede har."""
     out = []
     for symbol in symbols:
@@ -386,7 +414,7 @@ def quotes(symbols: list[str], intraday: dict, daily: dict, now: datetime, flagg
         start = last.ts - timedelta(minutes=60)
         window = [bar for bar in bars if bar.ts > start]
         ref = window[0].open if window else bars[0].open
-        per_minute = normal_volume_per_minute(daily.get(symbol, []))
+        per_minute = normal_volume_per_minute(daily.get(symbol, []), session_minutes)
         vol_x = (sum(bar.volume for bar in window) / max(1, len(window))) / per_minute if per_minute > 0 else 0.0
         level = vwap(bars) or last.close
         step = max(1, len(bars) // points)

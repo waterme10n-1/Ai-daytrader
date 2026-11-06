@@ -71,7 +71,8 @@ def test_memebot_and_desk_link_to_each_other(tmp_path):
             page = client.get(path).text
             nav = page[page.index('<nav class="appnav"'):]
             nav = nav[: nav.index("</nav>")]
-            assert 'href="/meme"' in nav and 'href="/desk"' in nav, path
+            # Handelsbordet kan have én fane pr. børs (/desk?m=us og /desk?m=dk).
+            assert 'href="/meme"' in nav and 'href="/desk' in nav, path
             assert nav.count('aria-current="page"') == 1, path
 
 

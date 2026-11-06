@@ -1,7 +1,10 @@
-"""New York-børsens åbningstider, regnet ud lokalt, så nedtællingen virker, også når Alpaca ikke svarer.
+"""Børsernes åbningstider, regnet ud lokalt, så nedtællingen virker, også når mægleren ikke svarer.
 
-Helligdage og halve dage følger NYSE's faste regler. Alpacas ur vinder, når det er tilgængeligt, fordi børsen
-i sjældne tilfælde lukker ekstraordinært (fx nationale sørgedage), og det kan en kalender ikke vide på forhånd.
+New York følger NYSE's faste regler for helligdage og halve dage. Alpacas ur vinder, når det er tilgængeligt,
+fordi børsen i sjældne tilfælde lukker ekstraordinært (fx nationale sørgedage), og det kan en kalender ikke vide
+på forhånd. København følger Nasdaq Copenhagens faste lukkedage.
+
+Funktionerne tager en børs (se markets.py). Uden børs gælder New York.
 """
 
 from __future__ import annotations
@@ -89,46 +92,85 @@ def early_closes(year: int) -> dict[date, str]:
     return out
 
 
-def is_trading_day(day: date) -> bool:
-    return day.weekday() < 5 and day not in holidays(day.year)
+@lru_cache(maxsize=16)
+def dk_holidays(year: int) -> dict[date, str]:
+    """Nasdaq Copenhagens lukkedage. Store bededag er afskaffet fra 2024."""
+    easter = _easter(year)
+    days = {
+        date(year, 1, 1): "Nytårsdag",
+        easter - timedelta(days=3): "Skærtorsdag",
+        easter - timedelta(days=2): "Langfredag",
+        easter + timedelta(days=1): "2. påskedag",
+        easter + timedelta(days=39): "Kristi himmelfartsdag",
+        easter + timedelta(days=40): "Dagen efter Kristi himmelfart",
+        easter + timedelta(days=50): "2. pinsedag",
+        date(year, 6, 5): "Grundlovsdag",
+        date(year, 12, 24): "Juleaften",
+        date(year, 12, 25): "Juledag",
+        date(year, 12, 26): "2. juledag",
+        date(year, 12, 31): "Nytårsaften",
+    }
+    if year < 2024:
+        days[easter + timedelta(days=26)] = "Store bededag"
+    return dict(sorted(days.items()))
 
 
-def session(day: date) -> tuple[datetime, datetime] | None:
-    """Åbning og lukning for en handelsdag (ET), eller None."""
-    if not is_trading_day(day):
+def dk_early_closes(year: int) -> dict[date, str]:
+    """København har ingen faste halve dage."""
+    return {}
+
+
+def _market(market):
+    if market is None:
+        from trader.desk.markets import US
+
+        return US
+    return market
+
+
+def is_trading_day(day: date, market=None) -> bool:
+    market = _market(market)
+    return day.weekday() < 5 and day not in market.holidays(day.year)
+
+
+def session(day: date, market=None) -> tuple[datetime, datetime] | None:
+    """Åbning og lukning for en handelsdag i børsens egen tid, eller None."""
+    market = _market(market)
+    if not is_trading_day(day, market):
         return None
-    close = EARLY_CLOSE if day in early_closes(day.year) else CLOSE
-    return datetime.combine(day, OPEN, tzinfo=ET), datetime.combine(day, close, tzinfo=ET)
+    close = market.early_close if day in market.early_closes(day.year) else market.close
+    return datetime.combine(day, market.open, tzinfo=market.tz), datetime.combine(day, close, tzinfo=market.tz)
 
 
-def _next_session(after: date) -> tuple[datetime, datetime]:
+def _next_session(after: date, market=None) -> tuple[datetime, datetime]:
     day = after
     for _ in range(15):
         day += timedelta(days=1)
-        found = session(day)
+        found = session(day, market)
         if found:
             return found
     raise RuntimeError("Ingen handelsdag fundet inden for 15 dage.")
 
 
-def schedule(now: datetime) -> dict:
-    """Markedets fase lige nu og de næste tidspunkter. Alle tider er ET."""
-    now = now.astimezone(ET)
+def schedule(now: datetime, market=None) -> dict:
+    """Markedets fase lige nu og de næste tidspunkter, i børsens egen tid."""
+    market = _market(market)
+    now = now.astimezone(market.tz)
     today = now.date()
-    todays = session(today)
-    holiday = holidays(today.year).get(today)
-    early = early_closes(today.year).get(today)
+    todays = session(today, market)
+    holiday = market.holidays(today.year).get(today)
+    early = market.early_closes(today.year).get(today)
     if todays and todays[0] <= now < todays[1]:
         phase, is_open = "open", True
-        next_open, next_close = _next_session(today)[0], todays[1]
+        next_open, next_close = _next_session(today, market)[0], todays[1]
     else:
         is_open = False
         if todays and now < todays[0]:
             next_open, next_close = todays
-            phase = "pre" if now.time() >= PRE_OPEN else "closed"
+            phase = "pre" if now.time() >= market.pre_open else "closed"
         else:
-            next_open, next_close = _next_session(today)
-            phase = "after" if todays and now.time() < AFTER_CLOSE else "closed"
+            next_open, next_close = _next_session(today, market)
+            phase = "after" if todays and now.time() < market.after_close else "closed"
     if not todays:
         phase = "closed"
     return {

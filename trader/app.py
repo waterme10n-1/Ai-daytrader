@@ -114,6 +114,8 @@ def create_app(
     meme_settings: MemeSettings | None = None,
     desk_engine=None,
     desk_settings: DeskSettings | None = None,
+    desk_dk_engine=None,
+    desk_dk_settings: DeskSettings | None = None,
 ) -> FastAPI:
     """Byg appen. I produktion startes memebotten selv; tests sprøjter en motor med falske kilder ind."""
     chosen = settings or Settings.from_env()
@@ -144,6 +146,17 @@ def create_app(
         app.state.desk = desk
         if desk is not None:
             desk.start()
+        # Københavns børs: sin egen motor og database, samme bots. Startes som New York-bordet.
+        desk_dk = desk_dk_engine
+        if desk_dk is None and (desk_dk_settings is not None or (not injected and desk_settings is None)):
+            dk_cfg = desk_dk_settings or DeskSettings.from_env_dk()
+            if dk_cfg.enabled:
+                from trader.desk.engine import DeskEngine
+
+                desk_dk = DeskEngine(dk_cfg, holder["settings"])
+        app.state.desk_dk = desk_dk
+        if desk_dk is not None:
+            desk_dk.start()
         bot = None
         if meme is not None:
             meme.start()
@@ -162,6 +175,8 @@ def create_app(
                 meme.stop()
             if desk is not None:
                 desk.stop()
+            if desk_dk is not None:
+                desk_dk.stop()
 
     app = FastAPI(title="Memebot", lifespan=lifespan)
     app.state.settings = chosen
@@ -454,11 +469,26 @@ def create_app(
             raise HTTPException(status_code=400, detail=message)
         return {"ok": True, "message": message, "status": meme().status()}
 
-    def desk():
+    def desk(market: str = "us"):
+        if (market or "us").lower() == "dk":
+            engine_ = getattr(app.state, "desk_dk", None)
+            if engine_ is None:
+                raise HTTPException(status_code=404, detail="Københavns børs er slået fra (DESK_DK_ENABLED=false).")
+            return engine_
         engine_ = getattr(app.state, "desk", None)
         if engine_ is None:
             raise HTTPException(status_code=404, detail="Handelsbordet er slået fra (DESK_ENABLED=false).")
         return engine_
+
+    @app.get("/api/desk/markets")
+    def desk_markets() -> dict:
+        """Hvilke børser bordet kører på, så siden kun viser skiftet, når der er to."""
+        out = []
+        for key, name in (("us", "desk"), ("dk", "desk_dk")):
+            engine_ = getattr(app.state, name, None)
+            if engine_ is not None:
+                out.append({"key": key, "name": engine_.market.name, "country": engine_.market.country, "currency": engine_.market.currency})
+        return {"markets": out}
 
     @app.get("/desk")
     def desk_page() -> FileResponse:
@@ -469,8 +499,8 @@ def create_app(
         )
 
     @app.get("/api/desk/status")
-    def desk_status(after: int = 0) -> dict:
-        engine_ = desk()
+    def desk_status(after: int = 0, market: str = "us") -> dict:
+        engine_ = desk(market)
         try:
             return engine_.status(after=max(0, after))
         except Exception as exc:  # siden skal kunne vise, hvad der gik galt, i stedet for at hænge
@@ -478,49 +508,49 @@ def create_app(
             raise HTTPException(status_code=500, detail=f"Handelsbordet fejlede: {exc.__class__.__name__}: {exc}") from exc
 
     @app.post("/api/desk/message")
-    def desk_message(body: MessageBody) -> dict:
+    def desk_message(body: MessageBody, market: str = "us") -> dict:
         try:
-            result = desk().post_message(body.text)
+            result = desk(market).post_message(body.text)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         return {"ok": True, **result}
 
     @app.post("/api/desk/approve")
-    def desk_approve(body: IdBody) -> dict:
+    def desk_approve(body: IdBody, market: str = "us") -> dict:
         try:
-            desk().approve(body.id)
+            desk(market).approve(body.id)
         except ValueError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
         return {"ok": True}
 
     @app.post("/api/desk/reject")
-    def desk_reject(body: IdBody) -> dict:
+    def desk_reject(body: IdBody, market: str = "us") -> dict:
         try:
-            desk().reject(body.id)
+            desk(market).reject(body.id)
         except ValueError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
         return {"ok": True}
 
     @app.post("/api/desk/pause")
-    def desk_pause(body: PauseBody) -> dict:
-        desk().pause(body.paused)
+    def desk_pause(body: PauseBody, market: str = "us") -> dict:
+        desk(market).pause(body.paused)
         return {"ok": True}
 
     @app.post("/api/desk/params")
-    async def desk_params(request: Request) -> dict:
+    async def desk_params(request: Request, market: str = "us") -> dict:
         try:
             body = await request.json()
         except ValueError as exc:
             raise HTTPException(status_code=400, detail="Ugyldig JSON.") from exc
         try:
-            desk().update_params(body if isinstance(body, dict) else {})
+            desk(market).update_params(body if isinstance(body, dict) else {})
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         return {"ok": True}
 
     @app.post("/api/desk/scan")
-    def desk_scan() -> dict:
-        engine_ = desk()
+    def desk_scan(market: str = "us") -> dict:
+        engine_ = desk(market)
         if not engine_.keys_present:
             raise HTTPException(status_code=409, detail="Mangler Alpaca-papirnøgler.")
         market = engine_._market()
@@ -534,50 +564,50 @@ def create_app(
         return {"ok": True}
 
     @app.post("/api/desk/close-all")
-    def desk_close_all() -> dict:
+    def desk_close_all(market: str = "us") -> dict:
         try:
-            closed = desk().close_all()
+            closed = desk(market).close_all()
         except DeskBrokerError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
         return {"ok": True, "closed": closed}
 
     @app.post("/api/desk/log")
-    def desk_log() -> dict:
+    def desk_log(market: str = "us") -> dict:
         try:
-            text = desk().day_log()
+            text = desk(market).day_log()
         except DeskBrokerError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
         return {"ok": True, "text": text}
 
     @app.post("/api/desk/keys")
-    async def desk_keys(request: Request) -> dict:
+    async def desk_keys(request: Request, market: str = "us") -> dict:
         try:
             body = await request.json()
         except ValueError as exc:
             raise HTTPException(status_code=400, detail="Ugyldig JSON.") from exc
         body = body if isinstance(body, dict) else {}
         if body.get("forget"):
-            desk().forget_keys()
+            desk(market).forget_keys()
             return {"ok": True, "text": "Slettet. Bordet bruger igen nøglerne fra Railway."}
         save = bool(body.get("save"))
         if save:
             require_code(request, str(body.get("code") or ""))
         try:
-            return desk().test_keys(str(body.get("key") or ""), str(body.get("secret") or ""), save=save)
+            return desk(market).test_keys(str(body.get("key") or ""), str(body.get("secret") or ""), save=save)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     @app.post("/api/desk/claude-test")
-    def desk_claude_test() -> dict:
-        return desk().test_claude()
+    def desk_claude_test(market: str = "us") -> dict:
+        return desk(market).test_claude()
 
     @app.post("/api/desk/diagnose")
-    def desk_diagnose() -> dict:
-        return desk().diagnose()
+    def desk_diagnose(market: str = "us") -> dict:
+        return desk(market).diagnose()
 
     @app.get("/api/desk/compare")
-    def desk_compare() -> dict:
-        return desk().compare()
+    def desk_compare(market: str = "us") -> dict:
+        return desk(market).compare()
 
     @app.post("/api/meme/paper")
     def meme_paper() -> dict:
