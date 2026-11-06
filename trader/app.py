@@ -470,7 +470,12 @@ def create_app(
 
     @app.get("/api/desk/status")
     def desk_status(after: int = 0) -> dict:
-        return desk().status(after=max(0, after))
+        engine_ = desk()
+        try:
+            return engine_.status(after=max(0, after))
+        except Exception as exc:  # siden skal kunne vise, hvad der gik galt, i stedet for at hænge
+            logger.exception("Handelsbordets status fejlede")
+            raise HTTPException(status_code=500, detail=f"Handelsbordet fejlede: {exc.__class__.__name__}: {exc}") from exc
 
     @app.post("/api/desk/message")
     def desk_message(body: MessageBody) -> dict:
