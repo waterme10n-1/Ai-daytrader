@@ -324,6 +324,81 @@ def test_max_flags_and_max_open_are_respected(tmp_path):
     assert sum(1 for r in rows if r["status"] == "sized_zero") == 2
 
 
+def loud_flat(volume: float = 3000.0) -> list[Bar]:
+    """Handler tre gange normal volumen hele dagen, men kursen står næsten stille."""
+    return ramp_bars(end=100.5, volume=volume, ramp_volume=volume)
+
+
+def test_volume_only_flags_do_not_use_up_the_daily_quota(tmp_path):
+    loud = ["V1", "V2", "V3", "V4", "V5", "V6"]
+    data = {name: loud_flat() for name in loud} | {"M": ramp_bars()}
+    broker = FakeBroker(data, news={name: fresh_news(name) for name in [*loud, "M"]})
+    desk, clock = make_desk(tmp_path, broker, watchlist=(*loud, "M"), max_flags_per_day=5)
+    clock["now"] = at(10, 15)
+    assert desk.scan() == 5  # første time: alt handler tungt, men kun volumen-kvoten bliver brugt
+    flags = desk.flags_on(DAY.isoformat())
+    assert len(flags["volume"]) == 5 and flags["move"] == [] and "V6" not in flags["all"]
+    clock["now"] = at(10, 16)
+    assert desk.scan() == 0  # samme aktier markeres ikke igen på volumen
+    clock["now"] = at(11, 30)
+    assert desk.scan() == 1  # M flytter sig, og der er stadig plads, selv om fem er markeret på volumen
+    flags = desk.flags_on(DAY.isoformat())
+    assert flags["move"] == ["M"]
+    status = desk.status()
+    assert status["today"]["flags"] == 1 and status["today"]["volume_flags"] == 5
+
+
+def test_a_volume_flag_can_be_followed_by_a_real_move(tmp_path):
+    broker = FakeBroker({"NVDA": ramp_bars(volume=3000.0)}, news={"NVDA": fresh_news("NVDA")})
+    desk, clock = make_desk(tmp_path, broker, watchlist=("NVDA",))
+    clock["now"] = at(10, 15)
+    assert desk.scan() == 1
+    clock["now"] = at(11, 30)
+    assert desk.scan() == 1
+    rows = desk.store.proposals_on(DAY.isoformat())
+    assert [bool(row["flag"]["by_move"]) for row in rows] == [False, True]
+    clock["now"] = at(11, 45)
+    assert desk.scan() == 0  # markeret på kursbevægelse: ikke igen samme dag
+
+
+def test_move_quota_still_caps_real_moves(tmp_path):
+    names = ["A", "B", "C"]
+    broker = FakeBroker({n: ramp_bars() for n in names}, news={n: fresh_news(n) for n in names})
+    desk, clock = make_desk(tmp_path, broker, watchlist=tuple(names), max_flags_per_day=2)
+    assert desk.scan() == 2
+    assert desk.scan() == 0
+    assert len(desk.flags_on(DAY.isoformat())["move"]) == 2
+
+
+def test_new_scout_defaults():
+    from trader.desk.config import DEFAULT_WATCHLIST
+
+    assert DeskSettings().move_pct == 2.0
+    assert {"SMCI", "MSTR", "SOFI", "RIVN"} <= set(DEFAULT_WATCHLIST) and len(DEFAULT_WATCHLIST) == 16
+
+
+def test_old_saved_defaults_give_way_to_the_new_ones(tmp_path):
+    from trader.desk.config import DEFAULT_WATCHLIST, RETIRED_DEFAULTS
+
+    broker = FakeBroker({})
+    store = DeskStore(str(tmp_path / "desk.db"))
+    store.set_state("welcome", "1")
+    store.set_json("params", {"move_pct": 3.0, "watchlist": list(RETIRED_DEFAULTS["watchlist"]), "position_pct": 3.0})
+    desk, _ = make_desk(tmp_path, broker, watchlist=DEFAULT_WATCHLIST)
+    assert desk.cfg.move_pct == 2.0 and desk.cfg.watchlist == DEFAULT_WATCHLIST and desk.cfg.position_pct == 3.0
+    assert "SCOUT er opdateret" in desk.store.messages(limit=5)[-1]["text"]
+    # Kun én gang: vælger man selv 3 % bagefter, bliver det ved med at gælde.
+    desk.update_params({"move_pct": 3})
+    again, _ = make_desk(tmp_path, broker, watchlist=DEFAULT_WATCHLIST)
+    assert again.cfg.move_pct == 3.0
+
+
+def test_saving_the_defaults_does_not_pin_them(tmp_path):
+    desk, _ = make_desk(tmp_path, FakeBroker({}))
+    desk.update_params({"move_pct": desk.base.move_pct, "watchlist": ",".join(desk.base.watchlist), "auto_approve": desk.base.auto_approve, "max_open": 2})
+    assert desk.store.get_json("params") == {"max_open": 2}
+
+
 def test_mentions_get_an_answer_without_claude(tmp_path):
     desk, _ = make_desk(tmp_path, FakeBroker({}))
     desk.post_message("@skeptic hvordan går det?")

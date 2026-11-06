@@ -24,7 +24,17 @@ DEFAULT_WATCHLIST: tuple[str, ...] = (
     "NFLX",
     "PLTR",
     "COIN",
+    # Mere livlige navne, der oftere flytter sig 2 % på en time.
+    "SMCI",
+    "MSTR",
+    "SOFI",
+    "RIVN",
 )
+# Standarder fra før, der blev gemt på siden, når man trykkede Gem. De flyttes til de nye standarder ved opstart.
+RETIRED_DEFAULTS: dict[str, object] = {
+    "move_pct": 3.0,
+    "watchlist": ["NVDA", "AAPL", "MSFT", "AMZN", "META", "GOOGL", "TSLA", "AMD", "AVGO", "NFLX", "PLTR", "COIN"],
+}
 TICKER = re.compile(r"^[A-Z]{1,5}(\.[A-Z])?$")
 MAX_WATCHLIST = 30
 
@@ -74,7 +84,7 @@ def parse_watchlist(raw: str | list[str] | tuple[str, ...] | None) -> list[str]:
 class DeskSettings:
     enabled: bool = True
     watchlist: tuple[str, ...] = DEFAULT_WATCHLIST
-    move_pct: float = 3.0
+    move_pct: float = 2.0
     volume_x: float = 2.0
     max_flags_per_day: int = 5
     stop_max_pct: float = 2.0
@@ -114,7 +124,7 @@ class DeskSettings:
         return cls(
             enabled=_flag(os.getenv("DESK_ENABLED"), True),
             watchlist=tuple(watch),
-            move_pct=min(20.0, max(0.5, _float(os.getenv("DESK_MOVE_PCT"), 3.0))),
+            move_pct=min(20.0, max(0.5, _float(os.getenv("DESK_MOVE_PCT"), 2.0))),
             volume_x=min(20.0, max(1.2, _float(os.getenv("DESK_VOLUME_X"), 2.0))),
             max_flags_per_day=max(1, min(HARD_MAX_FLAGS, _int(os.getenv("DESK_MAX_FLAGS_PER_DAY"), 5))),
             stop_max_pct=min(HARD_MAX_STOP_PCT, max(0.3, _float(os.getenv("DESK_STOP_MAX_PCT"), 2.0))),

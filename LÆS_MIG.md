@@ -267,7 +267,7 @@ Bygget efter guiden "How to build a trading desk in one group chat", men på Cla
 
 | Bot | Job | Kører på |
 |---|---|---|
-| **SCOUT** | Markerer en ticker på watchlisten, der flytter sig mindst 3 % på en time eller handler mindst 2 gange normal volumen. Højst 5 markeringer om dagen. | fast kode |
+| **SCOUT** | Markerer en ticker på watchlisten, der flytter sig mindst 2 % på en time eller handler mindst 2 gange normal volumen. Højst 5 markeringer om dagen på kursbevægelse; markeringer kun på volumen har deres egen kvote, så de ikke bruger pladserne op i første time. | fast kode |
 | **NEWS** | Finder grunden med websøgning og Alpaca-nyheder og skriver den på to linjer med link. Uden kilde: "Ingen klar grund". | Claude |
 | **CHART** | Sætter indgang, mål og stop. Stoppet er højst 2 % under indgangen, og målet er mindst 2 gange så langt væk. Ellers "Ingen setup". Kun køb, ingen short. | fast kode |
 | **SKEPTIC** | Giver de tre stærkeste grunde til, at handlen fejler, og afgør BUY, WAIT eller SKIP. Uden klar grund fra NEWS er svaret altid SKIP. Det håndhæves i koden, også hvis Claude siger BUY. | Claude |

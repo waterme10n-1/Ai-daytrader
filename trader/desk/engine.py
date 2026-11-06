@@ -24,6 +24,7 @@ from trader.desk.config import (
     HARD_MAX_POSITION_PCT,
     HARD_MAX_STOP_PCT,
     HARD_MIN_REWARD_RISK,
+    RETIRED_DEFAULTS,
     DeskSettings,
     clean_key,
     key_problem,
@@ -106,6 +107,8 @@ class DeskEngine:
         self.scanning = False
         self._quotes: dict = {"ts": None, "mode": None, "items": []}
         self.last_scan: str | None = None
+        existing = self.store.get_state("welcome") is not None
+        self._retire_old_defaults(announce=existing)
         if self.store.get_state("welcome") is None:
             self.store.set_state("welcome", "1")
             self.store.post(
@@ -118,6 +121,30 @@ class DeskEngine:
             )
 
     # ------------------------------------------------------------------ indstillinger
+    def _retire_old_defaults(self, *, announce: bool) -> None:
+        """Én gang: gemte værdier, der bare var de gamle standarder (3 % og 12 aktier), fjernes, så de nye gælder.
+
+        Trykker man Gem regler, gemmes alle felter. Uden det her ville en gammel standard hænge fast for altid.
+        """
+        if self.store.get_state("defaults_v2") == "1":
+            return
+        self.store.set_state("defaults_v2", "1")
+        params = self.store.get_json("params", {}) or {}
+        dropped = [name for name, old in RETIRED_DEFAULTS.items() if name in params and params[name] == old]
+        for name in dropped:
+            params.pop(name)
+        if dropped:
+            self.store.set_json("params", params)
+        if announce:
+            cfg = self.cfg
+            self.store.post(
+                "system",
+                "info",
+                f"SCOUT er opdateret: grænsen er {cfg.move_pct:g} % på en time, watchlisten har {len(cfg.watchlist)} aktier "
+                f"({', '.join(cfg.watchlist)}), og markeringer kun på volumen bruger ikke længere de "
+                f"{cfg.max_flags_per_day} pladser om dagen.",
+            )
+
     @property
     def cfg(self) -> DeskSettings:
         params = self.store.get_json("params", {}) or {}
@@ -173,6 +200,13 @@ class DeskEngine:
         if body.get("reset"):
             params = {}
             changes = ["tilbage til standard"]
+        # Værdier, der er lig standarden, gemmes ikke. Så følger de med, hvis standarden ændres senere.
+        for name in list(params):
+            default = getattr(self.base, name, None)
+            if isinstance(default, tuple):
+                default = list(default)
+            if params[name] == default:
+                params.pop(name)
         self.store.set_json("params", params)
         if changes:
             self.store.post("system", "info", "Indstillinger ændret: " + "; ".join(changes) + ".")
@@ -387,22 +421,27 @@ class DeskEngine:
             now = (now or self._now()).astimezone(ET)
             cfg = self.cfg
             day = now.date().isoformat()
-            flagged = self.store.flagged_today(day)
-            left = cfg.max_flags_per_day - len(flagged)
+            flags = self.flags_on(day)
+            # Kun markeringer på kursbevægelse tæller i dagens kvote. Dem kun på volumen (typisk i første time,
+            # hvor alt handler tungt) har deres egen, så de ikke bruger pladserne op på aktier, der står stille.
+            left_move = cfg.max_flags_per_day - len(flags["move"])
+            left_volume = cfg.max_flags_per_day - len(flags["volume"])
             broker = self.broker()
             # Ét kald for hele watchlisten (+ SPY): giver radaren kurser og SCOUT sine barer.
             everything = list(dict.fromkeys([*cfg.watchlist, "SPY"]))
             intraday = broker.get_intraday(everything, now)
             daily = self._daily(broker, everything, now)
-            self._quotes = {"ts": now.isoformat(timespec="seconds"), "mode": "live", "items": rules.quotes(everything, intraday, daily, now, flagged)}
+            self._quotes = {"ts": now.isoformat(timespec="seconds"), "mode": "live", "items": rules.quotes(everything, intraday, daily, now, flags["all"])}
             self.last_scan = now.isoformat(timespec="seconds")
-            if left <= 0:
+            if left_move <= 0 and left_volume <= 0:
                 return 0
-            symbols = [symbol for symbol in cfg.watchlist if symbol not in flagged]
-            if not symbols:
-                return 0
-            found = []
-            for symbol in symbols:
+            # En ticker, der kun er markeret på volumen, kan markeres igen, når kursen faktisk flytter sig.
+            moved, loud = set(flags["move"]), set(flags["volume"])
+            moves: list[rules.Flag] = []
+            volume_only: list[rules.Flag] = []
+            for symbol in cfg.watchlist:
+                if symbol in moved:
+                    continue
                 flag = rules.scout(
                     symbol,
                     intraday.get(symbol, []),
@@ -411,20 +450,35 @@ class DeskEngine:
                     move_pct=cfg.move_pct,
                     volume_x=cfg.volume_x,
                 )
-                if flag is not None:
-                    found.append(flag)
-            found.sort(key=lambda item: (abs(item.move_pct), item.volume_x), reverse=True)
-            for flag in found[:left]:
+                if flag is None:
+                    continue
+                if flag.by_move:
+                    moves.append(flag)
+                elif symbol not in loud:
+                    volume_only.append(flag)
+            moves.sort(key=lambda item: (abs(item.move_pct), item.volume_x), reverse=True)
+            volume_only.sort(key=lambda item: item.volume_x, reverse=True)
+            chosen = moves[: max(0, left_move)] + volume_only[: max(0, left_volume)]
+            done = 0
+            for flag in chosen:
                 if self.paused:
                     break
                 self._pipeline(flag, intraday.get(flag.symbol, []), now, cfg)
+                done += 1
             marked = set(self.store.flagged_today(day))
             for item in self._quotes["items"]:
                 item["flagged"] = item["symbol"] in marked
-            return min(len(found), left)
+            return done
         finally:
             self.scanning = False
             self._scan_lock.release()
+
+    def flags_on(self, day: str) -> dict[str, list[str]]:
+        """Dagens markeringer delt op: på kursbevægelse (tæller i kvoten) og kun på volumen."""
+        rows = self.store.proposals_on(day)
+        move = [row["symbol"] for row in rows if (row.get("flag") or {}).get("by_move", True)]
+        volume = [row["symbol"] for row in rows if not (row.get("flag") or {}).get("by_move", True)]
+        return {"all": [row["symbol"] for row in rows], "move": move, "volume": volume}
 
     def _daily(self, broker, symbols: list[str], now: datetime) -> dict:
         """Dagsbarer ændrer sig ikke i løbet af dagen. De hentes én gang pr. dag, så SCOUT kan kigge hvert minut."""
@@ -848,7 +902,11 @@ class DeskEngine:
         if key == "sizer":
             return prefix + f"Højst {cfg.position_pct:g} % pr. handel og {cfg.max_open} åbne ad gangen. Lige nu: {context['open']} åbne eller ventende."
         if key == "scout":
-            return prefix + f"I dag: {context['flags_today']} af {cfg.max_flags_per_day} markeringer. Watchlist: {', '.join(cfg.watchlist)}."
+            extra = f" (+{context['volume_flags_today']} kun på volumen)" if context["volume_flags_today"] else ""
+            return prefix + (
+                f"I dag: {context['flags_today']} af {cfg.max_flags_per_day} markeringer på kursbevægelse{extra}. "
+                f"Grænse: {cfg.move_pct:g} % på en time. Watchlist: {', '.join(cfg.watchlist)}."
+            )
         if key == "executor":
             return prefix + f"Åbne handler: {context['open']}. Lukket i alt: {context['closed']} med {_usd(context['pnl'])}."
         return prefix
@@ -860,10 +918,12 @@ class DeskEngine:
     def _chat_context(self) -> dict:
         now = self._now().astimezone(ET)
         trades = self.store.closed_trades()
+        flags = self.flags_on(now.date().isoformat())
         return {
             "time_et": now.isoformat(timespec="minutes"),
             "paused": self.paused,
-            "flags_today": len(self.store.flagged_today(now.date().isoformat())),
+            "flags_today": len(flags["move"]),
+            "volume_flags_today": len(flags["volume"]),
             "open": self._open_count(),
             "closed": len(trades),
             "pnl": round(sum(float(row["pnl"]) for row in trades), 2),
@@ -1102,6 +1162,7 @@ class DeskEngine:
         now = self._now().astimezone(ET)
         cfg = self.cfg
         day = now.date().isoformat()
+        flags = self.flags_on(day)
         proposals = self.store.proposals(120)
         trades = self.store.closed_trades()
         pnl = round(sum(float(row["pnl"]) for row in trades), 2)
@@ -1181,7 +1242,8 @@ class DeskEngine:
             "open": [_proposal(row) for row in self.store.proposals_with_status("placed")],
             "proposals": [_proposal(row) for row in proposals],
             "today": {
-                "flags": len(self.store.flagged_today(day)),
+                "flags": len(flags["move"]),
+                "volume_flags": len(flags["volume"]),
                 "max_flags": cfg.max_flags_per_day,
                 "open": self._open_count(),
                 "max_open": cfg.max_open,
