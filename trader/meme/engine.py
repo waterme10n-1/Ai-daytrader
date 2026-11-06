@@ -2,7 +2,7 @@
 
 Hver runde (MEME_MONITOR_SECONDS): tjek åbne positioner og sælg efter reglerne.
 Hver scanning (MEME_SCAN_SECONDS): find kandidater, filtrér, rug-tjek, score, spørg Claude
-(hvis budgettet tillader det), risikotjek og køb. Efter hver lukket handel lærer botten.
+(hvis Claude er sat op), risikotjek og køb. Efter hver lukket handel lærer botten.
 """
 
 from __future__ import annotations
@@ -257,6 +257,8 @@ class MemeEngine:
         self.store = store or MemeStore(self.settings.db_path)
         self.clients = clients or MemeClients(self.settings)
         self.researcher = researcher or MemeResearcher(self.settings, self.store)
+        stored_ai = self.store.get_json("ai_budget", None) or {}
+        self.researcher.limit_on = bool(stored_ai.get("on", self.settings.ai_budget_limit))
         self._notifier = notifier
         self.params = StrategyParams.from_dict(self.store.get_json("params"))
         self.model = Model.from_dict(self.store.get_json("model"))
@@ -2404,6 +2406,8 @@ class MemeEngine:
         if not isinstance(changes, dict):
             raise ValueError("Ugyldige indstillinger.")
         limits = dict(self.loss_limits)
+        if "ai_budget" in changes:
+            self._set_ai_budget(bool(changes["ai_budget"]))
         for key in ("daily", "drawdown"):
             if key in changes:
                 limits[key] = bool(changes[key])
@@ -2419,6 +2423,14 @@ class MemeEngine:
             self.store.add_event("info", f"Tabsgrænser: dagligt {words[limits['daily']]}, samlet {words[limits['drawdown']]}.")
         self.loss_limits = limits
         self.store.set_json("loss_limits", limits)
+
+    def _set_ai_budget(self, on: bool) -> None:
+        if on != bool(getattr(self.researcher, "limit_on", False)):
+            text = (f"Dagligt AI-loft slået til: Claude stopper for i dag ved {self.settings.ai_daily_budget_usd:.2f} USD." if on
+                    else "Dagligt AI-loft slået fra: Claude tjekker coins hele dagen.")
+            self.store.add_event("info", text)
+        self.researcher.limit_on = on
+        self.store.set_json("ai_budget", {"on": on})
 
     def pause(self, paused: bool) -> None:
         # Ingen lås: pausen skal virke med det samme, også midt i en runde.
@@ -2635,6 +2647,9 @@ class MemeEngine:
                 "daily_usd": round(self.settings.daily_loss_pct * self.settings.bankroll_usd, 2),
                 "drawdown_usd": round(self.settings.max_drawdown_pct * self.settings.bankroll_usd, 2),
                 "bankroll_usd": self.settings.bankroll_usd,
+                "ai_budget": bool(getattr(self.researcher, "limit_on", False)),
+                "ai_budget_usd": self.settings.ai_daily_budget_usd,
+                "ai_configured": self.settings.ai_configured,
             },
             "alerts": self._alerts(),
             "kpis": {
@@ -2652,7 +2667,7 @@ class MemeEngine:
                 "ai_today": self.store.ai_spend_on(today),
                 "ai_month": ai_month,
                 "ai_total": self.store.ai_spend_total(),
-                "ai_budget_left": self.researcher.budget_left() if self.settings.ai_configured else 0.0,
+                "ai_budget_left": self.researcher.budget_left() if self.settings.ai_configured and getattr(self.researcher, "limit_on", False) else None,
                 "net_after_ai": totals["realized"] - self.store.ai_spend_total(),
                 "wins": len(wins),
                 "losses": len(losses),
@@ -2805,7 +2820,7 @@ class MemeEngine:
             alerts.append({"level": "warning", "text": "Drawdown-grænsen er ramt. Tryk Genoptag, når du har set på det."})
         if not self.settings.anthropic_api_key:
             alerts.append({"level": "info", "text": "Ingen ANTHROPIC_API_KEY: ingen Claude-research af X og nyheder. Botten kører på regler og RugCheck."})
-        elif self.settings.ai_configured and self.researcher.budget_left() < 0.1:
+        elif self.settings.ai_configured and getattr(self.researcher, "limit_on", False) and self.researcher.budget_left() < 0.1:
             alerts.append({"level": "info", "text": "Dagens AI-budget er brugt. Resten af dagen kører botten kun på regler."})
         if not self.settings.x_configured and self.settings.anthropic_api_key:
             # Uden Claude dækker beskeden ovenfor allerede X; to beskeder om det samme forvirrer.

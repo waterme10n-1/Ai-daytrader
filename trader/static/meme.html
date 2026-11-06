@@ -1414,14 +1414,15 @@ function renderKpis(data) {
   const pf = k.profit_factor_infinite ? "∞" : (k.profit_factor == null ? "—" : fmtNum.format(k.profit_factor));
   const st = k.streak || {};
   const streak = st.count ? `${st.count} ${st.kind === "win" ? (st.count === 1 ? "gevinst" : "gevinster") : "tab"} i træk` : "ingen handler endnu";
-  const used = s.ai_configured && s.ai_daily_budget_usd ? Math.min(1, (k.ai_today || 0) / s.ai_daily_budget_usd) : 0;
+  const aiCap = s.ai_configured && data.loss_limits && data.loss_limits.ai_budget;
+  const used = aiCap && s.ai_daily_budget_usd ? Math.min(1, (k.ai_today || 0) / s.ai_daily_budget_usd) : 0;
   const tiles = [
     ["Gevinstprocent", k.win_rate == null ? "—" : pct(k.win_rate), `${k.wins} vindere · ${k.losses} tabere`, ""],
     ["Profitfaktor", pf, `bedste ${signed(k.best)} · værste ${signed(k.worst)}`, ""],
     ["Handler", fmtInt.format(k.trades), `${k.open} åbne · ${money(k.deployed)} i spil`, ""],
     ["Gns. holdetid", minutes(k.avg_hold_minutes), streak, ""],
     ["Gebyrer", money4(k.fees_total), "netværk og prioritet", ""],
-    ["AI i dag", money4(k.ai_today), s.ai_configured ? `budget ${money(s.ai_daily_budget_usd)} · netto efter AI ${signed(k.net_after_ai)}` : "Claude er slået fra", s.ai_configured ? `<div class="meter"><i style="width:${(used * 100).toFixed(0)}%"></i></div>` : ""],
+    ["AI i dag", money4(k.ai_today), !s.ai_configured ? "Claude er slået fra" : aiCap ? `loft ${money(s.ai_daily_budget_usd)} · netto efter AI ${signed(k.net_after_ai)}` : `intet loft · denne måned ${money(k.ai_month || 0)}`, aiCap ? `<div class="meter"><i style="width:${(used * 100).toFixed(0)}%"></i></div>` : ""],
   ];
   put("kpis", tiles.map(([l, v, sub, extra]) => `<div class="card kpi"><div class="label">${esc(l)}</div><div class="v display num">${esc(v)}</div><div class="s">${esc(sub)}</div>${extra}</div>`).join(""));
 }
@@ -1780,7 +1781,7 @@ function renderKrav(data) {
     ["SOL-reserve til gebyrer", `${s.sol_reserve} SOL`],
     ["Slippage / prioritetsgebyr", `${s.slippage_bps / 100} % / ${fmtInt.format(s.priority_fee_lamports)} lamports`],
     ["Scanning / overvågning", `hvert ${s.scan_seconds}. / ${s.monitor_seconds}. sekund`],
-    ["Claude", s.ai_configured ? `${s.ai_model} · ${s.ai_effort} · ${money(s.ai_daily_budget_usd)}/dag` : "fra"],
+    ["Claude", s.ai_configured ? `${s.ai_model} · ${s.ai_effort} · ${data.loss_limits && data.loss_limits.ai_budget ? `højst ${money(s.ai_daily_budget_usd)}/dag` : "intet dagligt loft"}` : "fra"],
     ["X API", s.x_configured ? `til · ${s.x_daily_requests} søgninger/dag` : "fra"],
     ["Wallet-nøgle", s.wallet_configured ? "sat" : "ikke sat"],
     ["MEME_ALLOW_LIVE", s.allow_live ? "ja" : "nej"],
@@ -2537,14 +2538,18 @@ function renderLimits(data) {
   const row = (key, label, help) => `<div class="field"><div class="field-top"><span>${esc(label)}</span><button class="switch" type="button" role="switch" aria-checked="${l[key] ? "true" : "false"}" data-limit="${key}" aria-label="${esc(label)}"></button></div><span class="muted small-txt">${esc(help)}</span></div>`;
   put("limits", `<p class="muted" style="margin:0 0 4px;font-size:13.5px">Uanset hvad bruger botten aldrig mere end din bankroll på <b>${esc(money(l.bankroll_usd))}</b>. Det er det mest, den kan tabe. Grænserne herunder stopper den tidligere.</p>`
     + row("daily", "Dagligt tabsstop", `Ingen nye køb resten af dagen, når dagens tab når ${money(l.daily_usd)}.`)
-    + row("drawdown", "Samlet tabsstop", `Sælger alt og stopper, når det samlede tab når ${money(l.drawdown_usd)}, indtil du trykker Genoptag.`));
+    + row("drawdown", "Samlet tabsstop", `Sælger alt og stopper, når det samlede tab når ${money(l.drawdown_usd)}, indtil du trykker Genoptag.`)
+    + (l.ai_configured ? row("ai_budget", "Dagligt AI-loft", l.ai_budget
+      ? `Claude stopper for i dag, når botten har brugt ${money(l.ai_budget_usd)} på Claude. Så handler den kun på regler til næste dag.`
+      : "Fra: Claude tjekker coins hele dagen. Hvert tjek koster ca. 0,15-0,40 USD og betales på din Anthropic-konto.") : ""));
 }
 document.getElementById("limits").addEventListener("click", (ev) => {
   const sw = ev.target.closest("[data-limit]");
   if (!sw || !state || !state.loss_limits) return;
   const key = sw.dataset.limit;
   const on = !state.loss_limits[key];
-  act(() => post("/api/meme/limits", { [key]: on }), `${key === "daily" ? "Dagligt" : "Samlet"} tabsstop er slået ${on ? "til" : "fra"}`);
+  const name = { daily: "Dagligt tabsstop", drawdown: "Samlet tabsstop", ai_budget: "Dagligt AI-loft" }[key] || key;
+  act(() => post("/api/meme/limits", { [key]: on }), `${name} er slået ${on ? "til" : "fra"}`);
 });
 
 /* ---------- Hvad tjener penge? (strategi-vagt) ---------- */

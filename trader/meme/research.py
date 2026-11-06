@@ -1,7 +1,8 @@
 """Claude som research-analytiker: tjekker X, nyheder og fora for et token, og gennemgår dagens fejl.
 
 Hvert kald koster penge. Derfor:
-- Der er et dagligt budget (MEME_AI_DAILY_BUDGET_USD). Er det brugt, kører botten kun på regler.
+- Et dagligt loft (MEME_AI_DAILY_BUDGET_USD) kan slås til. Som standard er det fra, og Claude tjekker hele dagen.
+  Er loftet slået til og brugt, kører botten kun på regler resten af dagen.
 - Claude kaldes kun for kandidater, der allerede har bestået alle hårde filtre og rug-tjek.
 - Prisen for hvert kald gemmes og trækkes fra resultatet i dashboardet.
 """
@@ -149,12 +150,16 @@ class MemeResearcher:
     def __init__(self, settings: MemeSettings, store: MemeStore) -> None:
         self.settings = settings
         self.store = store
+        # Motoren sætter denne ud fra dashboardet. Fra = intet dagligt loft.
+        self.limit_on = settings.ai_budget_limit
 
     def budget_left(self) -> float:
         return max(0.0, self.settings.ai_daily_budget_usd - self.store.ai_spend_on(utc_day()))
 
     def available(self, estimate: float = ESTIMATED_RESEARCH_COST) -> bool:
-        return self.settings.ai_configured and self.budget_left() >= estimate
+        if not self.settings.ai_configured:
+            return False
+        return not self.limit_on or self.budget_left() >= estimate
 
     def _client(self):
         import anthropic

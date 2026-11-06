@@ -18,7 +18,7 @@ python run.py
 
 ## Claude-nøgle (valgfri)
 
-Med `ANTHROPIC_API_KEY` researcher Claude hver kandidat på X og nyheder, før botten køber, og gennemgår dagens fejl. Opret nøglen i [Claude Console](https://console.anthropic.com/). Forbruget betales separat fra et Claude Max-abonnement, og `MEME_AI_DAILY_BUDGET_USD` er et hårdt dagligt loft. Uden nøgle kører botten på regler og RugCheck.
+Med `ANTHROPIC_API_KEY` researcher Claude hver kandidat på X og nyheder, før botten køber, og gennemgår dagens fejl. Opret nøglen i [Claude Console](https://console.anthropic.com/). Forbruget betales separat fra et Claude Max-abonnement. Der er intet dagligt loft som standard, så Claude tjekker coins hele dagen. Hvert tjek koster ca. 0,15-0,40 USD, og du kan følge forbruget under **AI i dag** i dashboardet. Vil du have et loft, slår du **Dagligt AI-loft** til under Mere → Indstillinger → Tabsgrænser. Uden nøgle kører botten på regler og RugCheck.
 
 ## Udgiv på Railway
 
@@ -120,7 +120,7 @@ Hvert minut:
 3. **Rug-tjek** via RugCheck og Jupiter: mint- og freeze authority skal være slået fra, ingen "danger"-risici, begrænset ejerkoncentration, udvikleren må ikke sidde på store beholdninger. Kan RugCheck ikke svare, købes der ikke.
 4. **Exit-tjek**: botten beder Jupiter om en købs- og en salgspris. Kan tokenet ikke sælges igen, eller koster frem og tilbage mere end 8 %, købes der ikke (honeypot- og tynd-pool-filter).
 5. **Score**: en lille læringsmodel vægter signalerne (købspres, likviditet, organisk handel, sociale links, X-omtale, copy-signal, rug-risiko m.fl.).
-6. **Claude** (hvis nøgle og budget er sat) søger på X, nyheder og fora efter røde flag: falske konti, koordineret shill, kopier af kendte tokens, rug-historik. Claude kan kun sige nej. Claude kan aldrig tvinge et køb igennem eller ændre risikogrænserne.
+6. **Claude** (hvis nøglen er sat) søger på X, nyheder og fora efter røde flag: falske konti, koordineret shill, kopier af kendte tokens, rug-historik. Claude kan kun sige nej. Claude kan aldrig tvinge et køb igennem eller ændre risikogrænserne.
 7. **Risiko**: højst `MEME_POSITION_USD` pr. handel, aldrig mere end `MEME_BANKROLL_USD` i alt, højst `MEME_MAX_OPEN` åbne og `MEME_MAX_TRADES_PER_DAY` køb om dagen.
 
 Hvert 15. sekund overvåges åbne positioner: stop-loss (-25 %), halvdelen sælges ved +60 %, trailing stop 25 % fra toppen, salg hvis likviditeten trækkes (rug-alarm), hvis intet sker, eller hvis den fulgte trader sælger. Tomme token-konti lukkes, så rent-depositummet kommer tilbage.
@@ -223,7 +223,7 @@ Botten bruger højst `MEME_BANKROLL_USD` i alt, også hvis du sender flere penge
 
 ## Valgfrie tilføjelser
 
-- **Claude-research**: `ANTHROPIC_API_KEY` og `MEME_AI_DAILY_BUDGET_USD` (standard 0,50 USD om dagen). Standardmodellen er `claude-opus-5-5` med indsats `medium` og websøgning. Er budgettet brugt, kører botten videre på regler. Vil du bruge en billigere model, kan du sætte `MEME_ANTHROPIC_MODEL`. Ældre modeller skal muligvis have `MEME_ANTHROPIC_WEB_SEARCH_TOOL=web_search_20250305`.
+- **Claude-research**: `ANTHROPIC_API_KEY`. Intet dagligt loft som standard. Slå **Dagligt AI-loft** til i dashboardet, eller sæt `MEME_AI_BUDGET_LIMIT=true`, så stopper Claude for i dag ved `MEME_AI_DAILY_BUDGET_USD` (standard 0,50 USD), og botten kører videre på regler. `MEME_AI_DAILY_BUDGET_USD=0` slår Claude helt fra. Standardmodellen er `claude-opus-5-5` med indsats `medium` og websøgning. Vil du bruge en billigere model, kan du sætte `MEME_ANTHROPIC_MODEL`. Ældre modeller skal muligvis have `MEME_ANTHROPIC_WEB_SEARCH_TOOL=web_search_20250305`.
 - **X API**: `X_BEARER_TOKEN` fra developer.x.com (betalt). Botten søger efter kontraktadressen og tickeren og måler, hvor mange forskellige konti der skriver om tokenet. `X_DAILY_REQUESTS` begrænser forbruget.
 - **Copy-trading**: `MEME_COPY_WALLETS=adresse1,adresse2`. Find kandidater på fx GMGN, Birdeye eller Kolscan, og tjek selv deres historik. Første gang botten ser en wallet, husker den kun, hvor den er nået til; gamle handler kopieres aldrig. Et køb fra en fulgt wallet skal stadig bestå alle tjek ovenfor.
 - **Telegram**: sæt `TELEGRAM_BOT_TOKEN` og `TELEGRAM_CHAT_ID`. Du får besked ved køb, salg, tabsgrænser og fejl.
