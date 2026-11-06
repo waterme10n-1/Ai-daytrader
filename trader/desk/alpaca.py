@@ -317,6 +317,36 @@ class AlpacaPaper:
             trimmed[symbol] = prior[-limit:]
         return trimmed
 
+    def get_snapshots(self, symbols: list[str]) -> dict[str, dict]:
+        """Seneste handel og dagens/gårsdagens dagsbar pr. symbol, i ét kald. Virker også, når markedet er lukket."""
+        payload = self._request(
+            "GET",
+            f"{DATA_URL}/v2/stocks/snapshots",
+            params={"symbols": ",".join(symbols), "feed": "iex"},
+        )
+        assert isinstance(payload, dict)
+        rows = payload.get("snapshots") if isinstance(payload.get("snapshots"), dict) else payload
+        out: dict[str, dict] = {}
+        for symbol, snap in rows.items():
+            if not isinstance(snap, dict):
+                continue
+            trade = snap.get("latestTrade") or {}
+            day = snap.get("dailyBar") or {}
+            prev = snap.get("prevDailyBar") or {}
+            minute = snap.get("minuteBar") or {}
+            price = trade.get("p") or minute.get("c") or day.get("c")
+            if not price:
+                continue
+            out[symbol] = {
+                "price": float(price),
+                "prev_close": float(prev["c"]) if prev.get("c") else None,
+                "day_open": float(day["o"]) if day.get("o") else None,
+                "day_volume": float(day.get("v") or 0),
+                "vwap": float(day["vw"]) if day.get("vw") else None,
+                "ts": trade.get("t") or minute.get("t") or day.get("t"),
+            }
+        return out
+
     def get_news(self, symbols: list[str], now: datetime | None = None) -> list[NewsItem]:
         moment = now or datetime.now(ET)
         params = {

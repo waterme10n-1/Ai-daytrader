@@ -16,7 +16,7 @@ from zoneinfo import ZoneInfo
 
 from trader.config import Settings
 from trader.desk.alpaca import ET_NAME, AlpacaPaper, BrokerError
-from trader.desk import learning, rules
+from trader.desk import calendar, learning, rules
 from trader.desk.agents import BOTS, DeskBrain, bot_rules
 from trader.desk.config import (
     HARD_MAX_FLAGS,
@@ -104,7 +104,7 @@ class DeskEngine:
         self._last_error_post = 0.0
         self.last_tick: str | None = None
         self.scanning = False
-        self._quotes: dict = {"ts": None, "items": []}
+        self._quotes: dict = {"ts": None, "mode": None, "items": []}
         self.last_scan: str | None = None
         if self.store.get_state("welcome") is None:
             self.store.set_state("welcome", "1")
@@ -316,12 +316,35 @@ class DeskEngine:
                 return
             if SCAN_START <= (now.hour, now.minute) < SCAN_END and (now.minute % self.cfg.scan_minutes == 0):
                 self.scan(now)
+            self._refresh_quotes(broker, now, max_age=120)
             return
         self._sync(broker, now)
+        self._refresh_quotes(broker, now, max_age=600)
         hh, mm = (int(part) for part in self.base.log_time_et.split(":"))
         if (now.hour, now.minute) >= (hh, mm) and self.store.get_state(f"seen_open:{day}") == "1":
             if self.store.get_state(f"log:{day}") is None:
                 self.day_log(day, now)
+
+    def _refresh_quotes(self, broker, now: datetime, *, max_age: int) -> None:
+        """Kurser til radar og kursbånd, også når SCOUT ikke kigger (lukket marked, pause, før 9:45)."""
+        stamp = _parse_ts(self._quotes.get("ts"))
+        if stamp is not None and (now - stamp).total_seconds() < max_age:
+            return
+        if not hasattr(broker, "get_snapshots"):
+            return
+        everything = list(dict.fromkeys([*self.cfg.watchlist, "SPY"]))
+        try:
+            snaps = broker.get_snapshots(everything)
+            daily = self._daily(broker, everything, now)
+        except Exception as exc:
+            logger.info("Kurser kunne ikke hentes: %s", exc)
+            return
+        flagged = self.store.flagged_today(now.date().isoformat())
+        self._quotes = {
+            "ts": now.isoformat(timespec="seconds"),
+            "mode": "snapshot",
+            "items": rules.snapshot_quotes(everything, snaps, daily, flagged),
+        }
 
     def _mark_open_day(self, day: str, broker, now: datetime) -> None:
         if self.store.get_state(f"seen_open:{day}") == "1":
@@ -367,7 +390,7 @@ class DeskEngine:
             everything = list(dict.fromkeys([*cfg.watchlist, "SPY"]))
             intraday = broker.get_intraday(everything, now)
             daily = self._daily(broker, everything, now)
-            self._quotes = {"ts": now.isoformat(timespec="seconds"), "items": rules.quotes(everything, intraday, daily, now, flagged)}
+            self._quotes = {"ts": now.isoformat(timespec="seconds"), "mode": "live", "items": rules.quotes(everything, intraday, daily, now, flagged)}
             self.last_scan = now.isoformat(timespec="seconds")
             if left <= 0:
                 return 0
@@ -413,6 +436,7 @@ class DeskEngine:
         return {symbol: stored["bars"].get(symbol, []) for symbol in symbols}
 
     def _pipeline(self, flag: rules.Flag, bars: list, now: datetime, cfg: DeskSettings) -> None:
+        self.brain.settings = cfg  # Claude skal kende de regler, der gælder lige nu (også dem ændret på siden).
         day = now.date().isoformat()
         symbol = flag.symbol
         pid = self.store.create_proposal(day, symbol, flag.to_dict())
@@ -785,6 +809,7 @@ class DeskEngine:
 
     def _answer(self, key: str, question: str) -> None:
         try:
+            self.brain.settings = self.cfg
             history = self.store.messages(limit=40)
             answer = self.brain.reply(key, question, history, self._chat_context())
             if answer is None:
@@ -1018,18 +1043,27 @@ class DeskEngine:
 
     # ------------------------------------------------------------------ dashboard
     def _market(self) -> dict:
-        if not self.keys_present:
-            return {"is_open": None, "label": "Ukendt uden nøgler"}
-        try:
-            clock = self._cached("clock", lambda: self.broker().get_clock())
-        except Exception as exc:
-            return {"is_open": None, "label": "Ukendt", "error": str(exc)}
-        return {
-            "is_open": clock.is_open,
-            "label": "Åbent" if clock.is_open else "Lukket",
-            "next_open": clock.next_open.astimezone(ET).isoformat(timespec="minutes") if clock.next_open else None,
-            "next_close": clock.next_close.astimezone(ET).isoformat(timespec="minutes") if clock.next_close else None,
-        }
+        """Børsens fase og næste tider. Den lokale kalender giver altid et svar; Alpacas ur vinder, når det svarer."""
+        out: dict[str, Any] = {**calendar.schedule(self._now()), "source": "kalender"}
+        if self.keys_present:
+            try:
+                clock = self._cached("clock", lambda: self.broker().get_clock())
+            except Exception as exc:
+                out["error"] = str(exc)
+            else:
+                if clock.is_open != out["is_open"]:
+                    out["phase"] = "open" if clock.is_open else ("closed" if out["phase"] == "open" else out["phase"])
+                out["is_open"] = clock.is_open
+                if clock.next_open:
+                    out["next_open"] = clock.next_open.astimezone(ET).isoformat(timespec="seconds")
+                if clock.next_close:
+                    out["next_close"] = clock.next_close.astimezone(ET).isoformat(timespec="seconds")
+                out["source"] = "alpaca"
+        labels = {"open": "Åbent", "pre": "Før åbning", "after": "Efter lukning", "closed": "Lukket"}
+        out["label"] = labels.get(out["phase"], "Lukket")
+        if out.get("holiday") and not out["is_open"]:
+            out["label"] = f"Lukket · {out['holiday']}"
+        return out
 
     def _account(self) -> dict | None:
         if not self.keys_present:

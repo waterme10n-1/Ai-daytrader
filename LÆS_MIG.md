@@ -296,6 +296,14 @@ Bordet starter med det samme, når nøglerne er sat. Der er ingen prøveperiode,
 
 Fanen **Læring** viser reglerne med tal, lektionerne og bordets resultat mod at holde S&P 500 (SPY) siden første dag. SKEPTIC's regnskab står under **Bots**.
 
+## Siden
+
+Forsiden **Overblik** viser papirkontoen, en nedtælling til New York-børsen åbner eller lukker, nøgletal, en radar over watchlisten, systemstatus, seneste forslag trin for trin, åbne positioner og watchlisten med kurver.
+
+- **Nedtællingen virker altid.** Bordet har sin egen kalender over børsens åbningstider med helligdage og halve dage (regnet ud fra NYSE's regler). Svarer Alpaca, bruges Alpacas ur i stedet, fordi det også kender ekstraordinære lukninger.
+- **Kurser hele døgnet.** Når børsen er lukket, henter bordet sidste handelsdags kurser hos Alpaca hvert 10. minut, så radar, kursbånd og watchlist altid har noget at vise.
+- Tryk på en prik i radaren eller en række i watchlisten for at se aktien og spørge SKEPTIC eller NEWS. ⌘K/Ctrl+K åbner kommandolinjen, og tasterne 1–5 skifter fane.
+
 ## Opsætning
 
 1. Opret en papirkonto på [app.alpaca.markets](https://app.alpaca.markets) (kontonavnet øverst til venstre → **Open New Paper Account** → **API Keys → Generate New Keys**) og sæt `DESK_ALPACA_API_KEY` og `DESK_ALPACA_SECRET_KEY` i Railway. Står `ALPACA_API_KEY` og `ALPACA_SECRET_KEY` der allerede, bruges de.
