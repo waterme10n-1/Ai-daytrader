@@ -333,7 +333,7 @@ _LOGIN_HTML = """<!DOCTYPE html>
 <title>Log ind · Memebot</title>
 <link rel="icon" type="image/png" href="/icons/icon-192.png">
 <link rel="manifest" href="/manifest.webmanifest">
-<meta name="theme-color" content="#0b0b0a">
+<meta name="theme-color" content="#05060d">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -341,23 +341,23 @@ _LOGIN_HTML = """<!DOCTYPE html>
 <meta name="apple-mobile-web-app-title" content="Memebot">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@400..700&family=Saira:wght@400..700&display=swap" rel="stylesheet">
 <style>
   :root {
     color-scheme: dark;
-    --bg: #0b0b0a; --surface: #131311; --surface-2: #181815; --raised: #201f1b;
-    --border: rgba(236,231,214,0.085); --border-strong: rgba(236,231,214,0.17);
-    --text: #ece8dc; --muted: #8b877b; --accent: #ffb020; --accent-soft: rgba(255,176,32,0.14); --on-accent: #1d1404;
-    --bad: #ff5a6a; --bad-soft: rgba(255,90,106,0.12);
-    --font: "Archivo", -apple-system, BlinkMacSystemFont, "Helvetica Neue", system-ui, sans-serif;
-    --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+    --bg: #05060d; --surface: #0b0d19; --surface-2: #0f1220; --raised: #161a2c;
+    --border: rgba(120,190,255,0.12); --border-strong: rgba(120,190,255,0.22);
+    --text: #e9f1ff; --muted: #6f7d9e; --accent: #2ee6ff; --accent-soft: rgba(46,230,255,0.14); --on-accent: #03141a;
+    --bad: #ff4d6d; --bad-soft: rgba(255,77,109,0.13);
+    --font: "Saira", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    --mono: "Oxanium", "Saira", system-ui, sans-serif; --dot: rgba(46,230,255,0.09);
   }
   :root[data-theme="light"] {
     color-scheme: light;
-    --bg: #eeeae1; --surface: #f8f6f0; --surface-2: #f2efe7; --raised: #e7e2d6;
-    --border: rgba(26,24,19,0.11); --border-strong: rgba(26,24,19,0.22);
-    --text: #1a1813; --muted: #777266; --accent: #c45c00; --accent-soft: rgba(196,92,0,0.12); --on-accent: #fff8ef;
-    --bad: #c42a3c; --bad-soft: rgba(196,42,60,0.09);
+    --bg: #eaeef5; --surface: #ffffff; --surface-2: #f5f7fb; --raised: #eceff6;
+    --border: rgba(20,30,60,0.08); --border-strong: rgba(20,30,60,0.16);
+    --text: #0d1424; --muted: #6b7690; --accent: #2b5bff; --accent-soft: rgba(43,91,255,0.12); --on-accent: #ffffff;
+    --bad: #e23d4f; --bad-soft: rgba(226,61,79,0.09); --dot: rgba(20,30,60,0.07);
   }
   * { box-sizing: border-box; }
   html { -webkit-text-size-adjust: 100%; }
@@ -369,16 +369,15 @@ _LOGIN_HTML = """<!DOCTYPE html>
   }
   body::before {
     content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
-    background-image: radial-gradient(circle, rgba(236,231,214,0.075) 1px, transparent 1.3px); background-size: 22px 22px;
+    background-image: radial-gradient(circle, var(--dot) 1px, transparent 1.3px); background-size: 22px 22px;
     -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, #000, transparent 75%); mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, #000, transparent 75%);
   }
-  :root[data-theme="light"] body::before { background-image: radial-gradient(circle, rgba(26,24,19,0.1) 1px, transparent 1.3px); }
   main { width: 100%; max-width: 380px; }
   .brand { text-align: center; margin-bottom: 24px; }
   .brand img { width: 72px; height: 72px; border-radius: 18px; display: block; margin: 0 auto 16px; }
-  h1 { margin: 0; font-size: 30px; font-weight: 700; font-stretch: 85%; letter-spacing: -0.02em; }
+  h1 { margin: 0; font: 700 30px var(--mono); letter-spacing: 0.02em; }
   .brand p { margin: 6px 0 0; color: var(--muted); font: 12px var(--mono); letter-spacing: 0.06em; text-transform: uppercase; }
-  form { display: grid; gap: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 22px 20px; }
+  form { display: grid; gap: 14px; background: linear-gradient(180deg, rgba(46,230,255,0.04), transparent 120px), var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 22px 20px; }
   .field { display: grid; gap: 7px; font: 600 10.5px var(--mono); letter-spacing: 0.09em; text-transform: uppercase; color: var(--muted); }
   input {
     height: 52px; padding: 0 16px; border-radius: 10px; border: 1px solid var(--border-strong); background: var(--surface-2);
@@ -388,7 +387,7 @@ _LOGIN_HTML = """<!DOCTYPE html>
   input[name="code"] { letter-spacing: 0.25em; text-align: center; font: 20px var(--mono); }
   button[type="submit"] {
     height: 54px; margin-top: 4px; border: 0; border-radius: 10px; background: var(--accent); color: var(--on-accent);
-    font: 700 16px var(--font); cursor: pointer; box-shadow: inset 0 -2px 0 rgba(0,0,0,0.22); touch-action: manipulation;
+    font: 700 16px var(--mono); letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer; box-shadow: 0 0 22px -6px var(--accent); touch-action: manipulation;
   }
   button[type="submit"]:active { transform: scale(0.985); }
   .error { margin: 0; padding: 12px 14px; border-radius: 10px; background: var(--bad-soft); color: var(--bad); font-size: 14px; font-weight: 550; }
@@ -427,7 +426,7 @@ function applyTheme(theme) {
   try { localStorage.setItem("meme-theme", theme); } catch (e) {}
   document.getElementById("theme").textContent = theme === "dark" ? "Lyst tema" : "Mørkt tema";
   var meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute("content", theme === "dark" ? "#0b0b0a" : "#eeeae1");
+  if (meta) meta.setAttribute("content", theme === "dark" ? "#05060d" : "#eaeef5");
 }
 var stored = null;
 try { stored = localStorage.getItem("meme-theme"); } catch (e) {}

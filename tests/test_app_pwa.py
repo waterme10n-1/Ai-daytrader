@@ -98,3 +98,14 @@ def test_home_counts_down_from_the_engine_clock(tmp_path):
         for marker in ('id="motor"', 'id="lanes"', 'id="clock"', 'id="equity"', "function secondTick", "function jobState"):
             assert marker in page, marker
         assert "#9945ff" not in page.split('<style id="future">')[1]  # ingen lilla neon i det nye tema
+
+
+def test_five_looks_can_be_picked_and_neon_is_default(tmp_path):
+    with _client(tmp_path) as client:
+        assert _login(client).status_code == 303
+        page = client.get("/meme").text
+        assert 'data-skin="neon"' in page.split(">", 2)[1]  # <html ... data-skin="neon">
+        for skin in ("neon", "volt", "is", "rav", "papir"):
+            assert f':root[data-skin="{skin}"]' in page, skin
+        assert 'id="skins"' in page and 'id="skin-fonts"' in page and 'id="reactor"' in page
+        assert "meme-skin" in page.split("</head>")[0]  # valgt udseende sættes, før siden tegnes

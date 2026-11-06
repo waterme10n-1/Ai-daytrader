@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="da" data-theme="dark">
+<html lang="da" data-theme="dark" data-skin="neon">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -7,7 +7,7 @@
 <title>Memebot</title>
 <link rel="icon" type="image/png" href="/icons/icon-192.png">
 <link rel="manifest" href="/manifest.webmanifest">
-<meta name="theme-color" content="#0b0b0a">
+<meta name="theme-color" content="#05060d">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -16,7 +16,8 @@
 <meta name="format-detection" content="telephone=no">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link id="skin-fonts" href="https://fonts.googleapis.com/css2?family=Oxanium:wght@400..700&family=Saira:wght@400..700&family=Red+Hat+Mono:wght@400..600&display=swap" rel="stylesheet">
+<script>(function(){var F={"neon": ["dark", "family=Oxanium:wght@400..700&family=Saira:wght@400..700&family=Red+Hat+Mono:wght@400..600"], "volt": ["dark", "family=Unbounded:wght@500..800&family=Manrope:wght@400..800&family=Red+Hat+Mono:wght@400..600"], "is": ["light", "family=Instrument+Sans:wght@400..700&family=Red+Hat+Mono:wght@400..600"], "rav": ["dark", "family=Archivo:wdth,wght@62..125,400..800&family=IBM+Plex+Mono:wght@400;500;600"], "papir": ["light", "family=Archivo:wdth,wght@62..125,400..800&family=IBM+Plex+Mono:wght@400;500;600"]};var s=null;try{s=localStorage.getItem("meme-skin")||({light:"is"})[localStorage.getItem("meme-theme")]||null}catch(e){}var q=new URLSearchParams(location.search),qs=q.get("skin");if(qs&&F[qs])s=qs;else if(!s&&q.get("theme")==="light")s="is";if(!F[s])s="neon";var d=document.documentElement;d.dataset.skin=s;d.dataset.theme=F[s][0];document.getElementById("skin-fonts").href="https://fonts.googleapis.com/css2?"+F[s][1]+"&display=swap";})();</script>
 <style>
   /* ---------- Farver og mål ---------- */
   :root {
@@ -87,7 +88,7 @@
   /* ---------- Topbjælke ---------- */
   .appbar {
     position: sticky; top: 0; z-index: 40; padding-top: var(--safe-t);
-    background: var(--glass); -webkit-backdrop-filter: saturate(180%) blur(22px); backdrop-filter: saturate(180%) blur(22px);
+    background: var(--glass);
     border-bottom: 1px solid transparent; transition: border-color 0.2s;
   }
   .appbar.scrolled { border-bottom-color: var(--border); }
@@ -115,7 +116,7 @@
     position: fixed; z-index: 45; left: 0; right: 0; bottom: 0;
     display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px;
     padding: 6px max(8px, var(--safe-r)) calc(6px + var(--safe-b)) max(8px, var(--safe-l));
-    background: var(--glass-nav); -webkit-backdrop-filter: saturate(180%) blur(28px); backdrop-filter: saturate(180%) blur(28px);
+    background: var(--glass-nav);
     border-top: 1px solid var(--border);
   }
   .side-brand { display: none; }
@@ -785,6 +786,160 @@
   }
   @media (max-width: 639px) { .more-card { padding: 0; } }
   @media (prefers-reduced-motion: reduce) { .od > span, .ltrack .fill { transition: none !important; } }
+
+  /* ---------- Udseender ----------
+     Fem looks på samme opbygning. Hvert look sætter farver, skrifter og former. Alt er stadig flade flader,
+     og intet bruger sløring eller filtre, så telefonen ikke skal arbejde mere. */
+  :root {
+    --display: var(--font); --label: var(--mono);
+    --accent-2: var(--accent); --accent-3: var(--warn);
+    --mark: var(--accent); --equity-size: clamp(3rem, 15vw, 4.6rem); --equity-stretch: 78%;
+    --equity-glow: none; --num-glow: none; --r-card: 14px; --r-tile: 10px; --r-ctl: 8px;
+    --dot: rgba(236, 231, 214, 0.075);
+  }
+  :root[data-skin="neon"] {
+    --bg: #05060d; --surface: #0b0d19; --surface-2: #0f1220; --raised: #161a2c; --raised-2: #212741;
+    --border: rgba(120, 190, 255, 0.1); --border-strong: rgba(120, 190, 255, 0.2);
+    --text: #e9f1ff; --text-2: #a9b6d3; --muted: #6f7d9e; --faint: #46506e;
+    --accent: #2ee6ff; --accent-soft: rgba(46, 230, 255, 0.12); --on-accent: #03141a;
+    --accent-2: #ff3ec8; --accent-3: #ffe45c;
+    --up: #32f5a5; --up-soft: rgba(50, 245, 165, 0.12); --down: #ff4d6d; --down-soft: rgba(255, 77, 109, 0.13);
+    --warn: #ffb547; --warn-soft: rgba(255, 181, 71, 0.13); --info: #8aa8ff; --info-soft: rgba(138, 168, 255, 0.13);
+    --grad: #2ee6ff; --mark: #ff3ec8;
+    --glass: rgba(5, 6, 13, 0.92); --glass-nav: rgba(11, 13, 25, 0.97); --seg-on: #212741;
+    --font: "Saira", -apple-system, system-ui, sans-serif; --display: "Oxanium", "Saira", system-ui, sans-serif;
+    --mono: "Red Hat Mono", ui-monospace, Menlo, monospace; --label: "Oxanium", "Saira", system-ui, sans-serif;
+    --equity-size: clamp(3rem, 14.5vw, 4.4rem); --equity-stretch: 100%;
+    --equity-glow: none; --num-glow: 0 0 12px rgba(46, 230, 255, 0.32);
+    --r-card: 6px; --r-tile: 4px; --r-ctl: 4px; --dot: rgba(46, 230, 255, 0.09);
+  }
+  :root[data-skin="volt"] {
+    --bg: #0c0d0e; --surface: #141617; --surface-2: #191b1d; --raised: #202325; --raised-2: #2c3033;
+    --border: rgba(230, 240, 220, 0.08); --border-strong: rgba(230, 240, 220, 0.16);
+    --text: #f2f5ee; --text-2: #b9beb3; --muted: #80867c; --faint: #565b53;
+    --accent: #d4ff3a; --accent-soft: rgba(212, 255, 58, 0.12); --on-accent: #0c0d0e;
+    --accent-2: #f2f5ee; --accent-3: #ff7a3d;
+    --up: #c8f53a; --up-soft: rgba(200, 245, 58, 0.12); --down: #ff5a3c; --down-soft: rgba(255, 90, 60, 0.13);
+    --warn: #ffb02e; --warn-soft: rgba(255, 176, 46, 0.13); --info: #9fb4c8; --info-soft: rgba(159, 180, 200, 0.12);
+    --grad: #d4ff3a; --mark: #d4ff3a;
+    --glass: rgba(12, 13, 14, 0.92); --glass-nav: rgba(20, 22, 23, 0.97); --seg-on: #2c3033;
+    --font: "Manrope", -apple-system, system-ui, sans-serif; --display: "Unbounded", "Manrope", system-ui, sans-serif;
+    --mono: "Red Hat Mono", ui-monospace, Menlo, monospace; --label: "Manrope", system-ui, sans-serif;
+    --equity-size: clamp(2.5rem, 12vw, 3.8rem); --equity-stretch: 100%;
+    --r-card: 20px; --r-tile: 14px; --r-ctl: 999px; --dot: rgba(212, 255, 58, 0.06);
+  }
+  :root[data-skin="is"] {
+    --bg: #eaeef5; --surface: #ffffff; --surface-2: #f5f7fb; --raised: #eceff6; --raised-2: #dfe4ee;
+    --border: rgba(20, 30, 60, 0.08); --border-strong: rgba(20, 30, 60, 0.16);
+    --text: #0d1424; --text-2: #3c4760; --muted: #6b7690; --faint: #a6aec0;
+    --accent: #2b5bff; --accent-soft: rgba(43, 91, 255, 0.1); --on-accent: #ffffff;
+    --accent-2: #00b3d6; --accent-3: #ff8a1f;
+    --up: #0b9d6b; --up-soft: rgba(11, 157, 107, 0.1); --down: #e23d4f; --down-soft: rgba(226, 61, 79, 0.09);
+    --warn: #c46a00; --warn-soft: rgba(196, 106, 0, 0.1); --info: #2b5bff; --info-soft: rgba(43, 91, 255, 0.08);
+    --grad: #2b5bff; --mark: #2b5bff;
+    --glass: rgba(234, 238, 245, 0.94); --glass-nav: rgba(255, 255, 255, 0.97); --seg-on: #ffffff;
+    --font: "Instrument Sans", -apple-system, system-ui, sans-serif; --display: "Instrument Sans", system-ui, sans-serif;
+    --mono: "Red Hat Mono", ui-monospace, Menlo, monospace; --label: "Instrument Sans", system-ui, sans-serif;
+    --equity-stretch: 100%; --r-card: 18px; --r-tile: 12px; --r-ctl: 10px; --dot: rgba(20, 30, 60, 0.07);
+  }
+  :root[data-skin="rav"] { --accent-2: #45d48c; --accent-3: #86b9d2; }
+  :root[data-skin="papir"] { --dot: rgba(26, 24, 19, 0.1); --accent-2: #13804b; --accent-3: #2e6b8a; }
+
+  body::after { background-image: radial-gradient(circle, var(--dot) 1px, transparent 1.3px); }
+  :root[data-theme="light"] body::after { background-image: radial-gradient(circle, var(--dot) 1px, transparent 1.3px); }
+  h1, h2, h3, .page-head h2, .brand h1, .sym, .ltitle, .t-sym { font-family: var(--display); }
+  .label, .stat .k, .lane .ln, .meter-row .mn, .live, .pill, .nav-item, .qa, .more-card > summary, .appnav a, .t-tag, .phase { font-family: var(--label); }
+  .equity { font-family: var(--display); font-size: var(--equity-size); font-stretch: var(--equity-stretch); text-shadow: var(--equity-glow); }
+  .stat .v, .tile .t-pct, .lane .lt, .core b, .pnl-big, .target-big, .kpi .v { font-family: var(--display); font-stretch: var(--equity-stretch); }
+  .card, .card.kpi { border-radius: var(--r-card); }
+  .tile { border-radius: var(--r-tile); }
+  .btn, .seg, .segmented, .qa, .icon-btn, .chip, .pill, .appnav-in { border-radius: var(--r-ctl); }
+  .seg button, .segmented button, .appnav a { border-radius: calc(var(--r-ctl) - 2px); }
+  .card.mark::before {
+    background:
+      linear-gradient(var(--mark), var(--mark)) 0 0 / 9px 1px no-repeat, linear-gradient(var(--mark), var(--mark)) 0 0 / 1px 9px no-repeat,
+      linear-gradient(var(--mark), var(--mark)) 100% 0 / 9px 1px no-repeat, linear-gradient(var(--mark), var(--mark)) 100% 0 / 1px 9px no-repeat,
+      linear-gradient(var(--mark), var(--mark)) 0 100% / 9px 1px no-repeat, linear-gradient(var(--mark), var(--mark)) 0 100% / 1px 9px no-repeat,
+      linear-gradient(var(--mark), var(--mark)) 100% 100% / 9px 1px no-repeat, linear-gradient(var(--mark), var(--mark)) 100% 100% / 1px 9px no-repeat;
+  }
+  .sweep { background: conic-gradient(from 0deg, transparent 0deg, transparent 280deg, color-mix(in srgb, var(--accent-2) 7%, transparent) 325deg, color-mix(in srgb, var(--accent-2) 30%, transparent) 359deg, transparent 360deg); }
+  .sweep::after { background: var(--accent-2); }
+
+  /* Neon: tynde neonkanter, lysende tal, firkantede former. Alt glød er fast skygge, ingen filtre. */
+  :root[data-skin="neon"] .card { border-color: rgba(120, 190, 255, 0.12); background: linear-gradient(180deg, rgba(46, 230, 255, 0.035), transparent 120px), var(--surface); }
+  :root[data-skin="neon"] .card-head h2 { text-transform: uppercase; letter-spacing: 0.06em; font-size: 13.5px; font-weight: 600; }
+  :root[data-skin="neon"] .stat.up .v, :root[data-skin="neon"] .tile .t-pct.up, :root[data-skin="neon"] .lright b.up { text-shadow: 0 0 16px rgba(50, 245, 165, 0.35); }
+  :root[data-skin="neon"] .stat.down .v, :root[data-skin="neon"] .tile .t-pct.down { text-shadow: 0 0 16px rgba(255, 77, 109, 0.35); }
+  :root[data-skin="neon"] .btn.primary, :root[data-skin="neon"] .qa.primary .qa-ic { box-shadow: 0 0 22px -6px rgba(46, 230, 255, 0.8); }
+  :root[data-skin="neon"] .hero { background: linear-gradient(180deg, rgba(255, 62, 200, 0.06), transparent 55%), linear-gradient(90deg, rgba(46, 230, 255, 0.05), transparent 60%), var(--surface); }
+  :root[data-skin="neon"] .nav-item[aria-current="page"] .i { color: var(--accent); }
+  :root[data-skin="neon"] .tabbar { box-shadow: 0 0 0 1px rgba(46, 230, 255, 0.14), 0 18px 40px -18px rgba(0, 0, 0, 0.9); }
+  /* Volt: runde, fede former, store tal, sporty */
+  :root[data-skin="volt"] .card-head h2 { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; }
+  :root[data-skin="volt"] .label, :root[data-skin="volt"] .stat .k { font-weight: 700; letter-spacing: 0.05em; }
+  :root[data-skin="volt"] .hero { background: radial-gradient(120% 80% at 100% 0%, rgba(212, 255, 58, 0.09), transparent 55%), var(--surface); }
+  :root[data-skin="volt"] .card.mark::before { display: none; }
+  :root[data-skin="volt"] .tile::before { width: 3px; }
+  /* Is: lyst, luftigt, bløde skygger */
+  :root[data-skin="is"] .card { border-color: transparent; box-shadow: 0 1px 2px rgba(20, 30, 60, 0.05), 0 12px 30px -18px rgba(20, 30, 60, 0.25); }
+  :root[data-skin="is"] .card.mark::before { display: none; }
+  :root[data-skin="is"] .hero { background: linear-gradient(160deg, rgba(43, 91, 255, 0.07), transparent 50%), #fff; }
+  :root[data-skin="is"] .term { background: #0d1424; }
+  :root[data-skin="is"] .tabbar { box-shadow: 0 10px 30px -12px rgba(20, 30, 60, 0.35); border-color: transparent; }
+
+  /* ---------- Svævende bundmenu på telefonen ---------- */
+  @media (max-width: 999px) {
+    .tabbar {
+      left: max(10px, var(--safe-l)); right: max(10px, var(--safe-r)); bottom: max(10px, calc(var(--safe-b) - 6px));
+      padding: 5px 6px; border: 1px solid var(--border-strong); border-radius: 22px; background: var(--glass-nav);
+    }
+    .nav-item { height: 48px; border-radius: 16px; }
+    .nav-item[aria-current="page"] { background: var(--raised); }
+    .nav-item[aria-current="page"]::after { display: none; }
+    .shell { padding-bottom: calc(var(--nav-h) + var(--safe-b) + 40px); }
+  }
+
+  /* ---------- Reaktoren: motorens ure som ringe, ét lys pr. sekund ---------- */
+  .motor-body { display: grid; gap: 14px; align-items: center; }
+  .reactor { position: relative; width: min(100%, 232px); aspect-ratio: 1; margin: 0 auto; }
+  .reactor .ring { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; will-change: transform; }
+  .reactor .ring .t { fill: none; stroke: var(--raised-2); stroke-linecap: round; }
+  .reactor .ring path.t { stroke-linecap: butt; }
+  .reactor .r-scan .t { stroke-width: 2.2; }
+  .reactor .r-scan .t.on { stroke: var(--accent); }
+  .reactor .r-snipe .t.on { stroke: var(--accent-2); }
+  .reactor .r-top .t.on { stroke: var(--accent-3); }
+  .reactor .ring.spin { animation: spin-ring 1.6s linear infinite; }
+  .reactor .ring.spin .t { stroke-opacity: 0.85; }
+  .reactor .ring.off { opacity: 0.25; }
+  @keyframes spin-ring { to { transform: rotate(360deg); } }
+  .reactor .core { position: absolute; inset: 33%; display: grid; place-items: center; align-content: center; gap: 2px; border-radius: 50%; text-align: center; background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--border); }
+  .reactor .core b { font-size: clamp(22px, 7vw, 30px); font-weight: 700; letter-spacing: -0.01em; line-height: 1; color: var(--text); text-shadow: var(--num-glow); }
+  .reactor .core span { font: 600 9.5px var(--label); letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+  .reactor .core.busy b { color: var(--accent); }
+  .lanes .lane { grid-template-columns: 12px minmax(0, 1fr) auto; padding: 9px 0; }
+  .lanes .lane .ln { grid-column: 2; }
+  .lanes .lane .lt { grid-column: 3; grid-row: 1; }
+  .lanes .lane .ls { grid-column: 2 / 4; grid-row: 2; }
+  .lanes .lane .sw { grid-row: 1; width: 8px; height: 8px; border-radius: 2px; background: var(--c); }
+  .lanes .lane .ltrack { grid-column: 1 / 4; grid-row: 3; height: 3px; border-radius: 2px; margin-top: 2px; }
+  .lanes .lane .ltrack::after { display: none; }
+  .lanes .lane .ltrack .fill { background: var(--c); opacity: 1; }
+  .lanes .lane.running .ltrack .run { background: repeating-linear-gradient(-55deg, transparent 0 4px, rgba(0, 0, 0, 0.35) 4px 8px); }
+  .lanes .lane .lt { font-size: 14px; }
+  @media (min-width: 560px) { .motor-body { grid-template-columns: 210px minmax(0, 1fr); } }
+  @media (min-width: 1100px) { .motor-body { grid-template-columns: 180px minmax(0, 1fr); } }
+
+  /* ---------- Vælg udseende ---------- */
+  .skins { display: grid; gap: 8px; margin-bottom: 14px; }
+  .skin { display: grid; grid-template-columns: 54px minmax(0, 1fr) auto; gap: 12px; align-items: center; width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); color: var(--text); text-align: left; cursor: pointer; }
+  .skin[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+  .skin .sw3 { display: flex; height: 34px; overflow: hidden; border-radius: 8px; box-shadow: inset 0 0 0 1px rgba(127, 127, 127, 0.25); }
+  .skin .sw3 i { flex: 1; }
+  .skin b { display: block; font-size: 15px; }
+  .skin small { display: block; margin-top: 1px; font-size: 12.5px; color: var(--muted); }
+  .skin .ck { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 50%; color: var(--on-accent); background: var(--accent); opacity: 0; }
+  .skin[aria-pressed="true"] .ck { opacity: 1; }
 </style>
 </head>
 <body>
@@ -837,7 +992,7 @@
     <div class="top-side">
     <div class="card motor" id="motor">
       <div class="card-head"><h2 id="motor-title"></h2><span class="phase-wrap"><span class="clock-m num" id="clock-m" aria-hidden="true"></span><span class="phase" id="motor-phase"></span></span></div>
-      <div class="lanes" id="lanes"></div>
+      <div class="motor-body"><div class="reactor" id="reactor" aria-hidden="true"></div><div class="lanes" id="lanes"></div></div>
       <div class="motor-foot" id="motor-foot"></div>
     </div>
     <div class="quick">
@@ -1130,7 +1285,9 @@
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="menu-title">
     <div class="grab"></div>
     <h3 id="menu-title" style="margin-bottom:14px">Menu</h3>
-    <button class="menu-item" id="theme" type="button"></button>
+    <div class="label" style="margin:0 2px 8px">Udseende</div>
+    <div class="skins" id="skins"></div>
+    <button class="menu-item" id="theme" type="button" hidden></button>
     <button class="menu-item" id="notify" type="button" aria-pressed="false"></button>
     <button class="menu-item" id="menu-app" type="button"></button>
     <button class="menu-item" id="menu-settings" type="button"></button>
@@ -1301,15 +1458,45 @@ function axiomLink(mint, pairUrl) {
 }
 
 /* ---------- Tema og faner ---------- */
-function applyTheme(theme) {
-  document.documentElement.dataset.theme = theme;
-  try { localStorage.setItem("meme-theme", theme); } catch (e) {}
-  document.getElementById("theme").innerHTML = icon(theme === "dark" ? "sun" : "moon") + (theme === "dark" ? "Lyst tema" : "Mørkt tema") + `<span class="r">${theme === "dark" ? "mørkt nu" : "lyst nu"}</span>`;
+const SKINS = {
+  neon: { name: "Neon", mode: "dark", desc: "Mørk blå med cyan og magenta", colors: ["#05060d", "#2ee6ff", "#ff3ec8"], meta: "#05060d" },
+  volt: { name: "Volt", mode: "dark", desc: "Grafit og syregrøn, store fede tal", colors: ["#0c0d0e", "#d4ff3a", "#ff5a3c"], meta: "#0c0d0e" },
+  is: { name: "Is", mode: "light", desc: "Lyst og rent med elektrisk blå", colors: ["#eaeef5", "#2b5bff", "#00b3d6"], meta: "#eaeef5" },
+  rav: { name: "Rav", mode: "dark", desc: "Varm sort og ravgul, som et instrumentpanel", colors: ["#0b0b0a", "#ffb020", "#45d48c"], meta: "#0b0b0a" },
+  papir: { name: "Papir", mode: "light", desc: "Lyst papir med brændt orange", colors: ["#eeeae1", "#c45c00", "#13804b"], meta: "#eeeae1" },
+};
+const SKIN_FONTS = {"neon": "family=Oxanium:wght@400..700&family=Saira:wght@400..700&family=Red+Hat+Mono:wght@400..600", "volt": "family=Unbounded:wght@500..800&family=Manrope:wght@400..800&family=Red+Hat+Mono:wght@400..600", "is": "family=Instrument+Sans:wght@400..700&family=Red+Hat+Mono:wght@400..600", "rav": "family=Archivo:wdth,wght@62..125,400..800&family=IBM+Plex+Mono:wght@400;500;600", "papir": "family=Archivo:wdth,wght@62..125,400..800&family=IBM+Plex+Mono:wght@400;500;600"};
+const SKIN_ORDER = ["neon", "volt", "is", "rav", "papir"];
+function applySkin(name, save = true) {
+  const key = SKINS[name] ? name : "neon";
+  const sk = SKINS[key];
+  const d = document.documentElement;
+  d.dataset.skin = key;
+  d.dataset.theme = sk.mode;
+  const link = document.getElementById("skin-fonts");
+  const href = `https://fonts.googleapis.com/css2?${SKIN_FONTS[key]}&display=swap`;
+  if (link && link.getAttribute("href") !== href) link.setAttribute("href", href);
+  if (save) { try { localStorage.setItem("meme-skin", key); } catch (e) {} }
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute("content", theme === "dark" ? "#0b0b0a" : "#eeeae1");
-  for (const key of Object.keys(cache)) delete cache[key];
+  if (meta) meta.setAttribute("content", sk.meta);
+  renderSkins();
+  for (const k of Object.keys(cache)) delete cache[k];
   if (state) render(state);
 }
+function applyTheme(theme) { applySkin(theme === "light" ? "is" : "neon"); }
+function renderSkins() {
+  const box = document.getElementById("skins");
+  if (!box) return;
+  const now = document.documentElement.dataset.skin;
+  box.innerHTML = SKIN_ORDER.map((k) => `<button class="skin" type="button" data-skin="${k}" aria-pressed="${k === now}">
+    <span class="sw3">${SKINS[k].colors.map((c) => `<i style="background:${c}"></i>`).join("")}</span>
+    <span><b>${esc(SKINS[k].name)}</b><small>${esc(SKINS[k].desc)}</small></span>
+    <span class="ck">${icon("check", "sm")}</span></button>`).join("");
+}
+document.getElementById("skins").addEventListener("click", (ev) => {
+  const b = ev.target.closest("[data-skin]");
+  if (b) applySkin(b.dataset.skin);
+});
 function navOf(view) { return NAV.find((n) => n[3].includes(view)) || NAV[0]; }
 function setTab(name, push) {
   if (!VIEWS[name]) { const n = NAV.find((x) => x[0] === name); name = n ? (lastView[n[0]] || n[3][0]) : "oversigt"; }
@@ -2431,7 +2618,10 @@ document.getElementById("notify").addEventListener("click", async () => {
   else toast("down", "Browseren afviste notifikationer", "Tillad dem i browserens indstillinger.");
   renderBell();
 });
-document.getElementById("theme").addEventListener("click", () => applyTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark"));
+document.getElementById("theme").addEventListener("click", () => {
+  const i = SKIN_ORDER.indexOf(document.documentElement.dataset.skin);
+  applySkin(SKIN_ORDER[(i + 1) % SKIN_ORDER.length]);
+});
 document.getElementById("logout").addEventListener("click", async () => { try { await post("/logout"); } catch (e) {} location.assign("/login"); });
 document.addEventListener("keydown", (ev) => {
   if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
@@ -2463,7 +2653,7 @@ if (csrfToken()) document.getElementById("logout").hidden = false;
 let storedTheme = null;
 try { storedTheme = localStorage.getItem("meme-theme"); } catch (e) {}
 const queryTheme = new URLSearchParams(location.search).get("theme");
-applyTheme(queryTheme === "dark" || queryTheme === "light" ? queryTheme : (storedTheme || "dark"));
+applySkin(document.documentElement.dataset.skin || "neon", false);
 renderBell();
 renderTabs({ positions: [], kpis: { trades: 0 }, copy_wallets: [], sniper: null });
 setTab(location.hash.slice(1) || "oversigt", false);
@@ -2888,16 +3078,69 @@ function laneNote(name, data) {
   return `Følger ${(t.leaders || []).length} traders · kilde: ${t.source || "—"}`;
 }
 let laneEls = null;
+let ringEls = null;
+const LANE_COLOR = { scan: "var(--accent)", snipe: "var(--accent-2)", top: "var(--accent-3)" };
+function ringSvg(cls, n, r1, r2, arcs) {
+  const pt = (a, r) => `${(100 + Math.sin(a) * r).toFixed(2)},${(100 - Math.cos(a) * r).toFixed(2)}`;
+  const parts = Array.from({ length: n }, (_, i) => {
+    if (arcs) {
+      // Buesegmenter med et lille mellemrum, som en segmenteret måler.
+      const r = (r1 + r2) / 2, gap = Math.min(0.06, Math.PI / n / 3);
+      const a0 = (i / n) * 2 * Math.PI + gap, a1 = ((i + 1) / n) * 2 * Math.PI - gap;
+      return `<path class="t" d="M${pt(a0, r)} A${r},${r} 0 0 1 ${pt(a1, r)}" style="stroke-width:${r2 - r1}"/>`;
+    }
+    const a = (i / n) * 2 * Math.PI;
+    return `<line class="t" x1="${pt(a, r1).split(",")[0]}" y1="${pt(a, r1).split(",")[1]}" x2="${pt(a, r2).split(",")[0]}" y2="${pt(a, r2).split(",")[1]}"/>`;
+  }).join("");
+  return `<svg class="ring ${cls}" viewBox="0 0 200 200">${parts}</svg>`;
+}
+/* Ringene: ét lys pr. sekund siden sidste kørsel. Kører opgaven, er ringen fuld og drejer (transform). */
+function tickRings(now, c) {
+  if (!ringEls) ringEls = ["scan", "snipe", "top"].map((name) => {
+    const svg = document.querySelector(`#reactor .r-${name}`);
+    return svg ? { name, svg, lines: [...svg.querySelectorAll(".t")], lit: -1 } : null;
+  }).filter(Boolean);
+  for (const r of ringEls) {
+    const job = c && c.jobs ? c.jobs[r.name] : null;
+    const js = jobState(job, now, r.name);
+    const total = r.lines.length;
+    let lit = 0;
+    if (js.running) lit = total;
+    else if (js.left != null) lit = Math.max(0, Math.min(total, Math.floor((1 - js.left / Math.max(1, job.every || 60)) * total)));
+    r.svg.classList.toggle("spin", Boolean(js.running));
+    r.svg.classList.toggle("off", Boolean(js.off || js.frozen));
+    if (lit !== r.lit) {
+      r.lines.forEach((ln, i) => { const on = i < lit; if (ln.classList.contains("on") !== on) ln.classList.toggle("on", on); });
+      r.lit = lit;
+    }
+  }
+  const core = document.getElementById("core");
+  if (core && c && c.jobs) {
+    const js = jobState(c.jobs.scan, now, "scan");
+    core.classList.toggle("busy", Boolean(js.running));
+    const t = js.running ? dur(now - js.since) : js.left != null ? dur(Math.ceil(js.left)) : "—";
+    const l = js.running ? "scanner" : js.queued ? "i kø" : js.frozen ? "offline" : "til scan";
+    const tb = document.getElementById("core-t"), lb = document.getElementById("core-l");
+    if (tb.textContent !== t) tb.textContent = t;
+    if (lb.textContent !== l) lb.textContent = l;
+  }
+}
 function renderMotor(data) {
   document.getElementById("motor-title").innerHTML = icon("zap") + "Motoren";
   const c = clockOf(data);
-  const html = LANES.map(([name, label, help]) => `<div class="lane" data-lane="${name}" title="${esc(help)}">
+  const html = LANES.map(([name, label, help]) => `<div class="lane" data-lane="${name}" title="${esc(help)}" style="--c:${LANE_COLOR[name]}">
+      <span class="sw"></span>
       <span class="ln">${esc(label)}</span>
       <span class="ltrack"><span class="fill"></span><span class="run"></span></span>
       <span class="lt num">—</span>
       <span class="ls">${esc(laneNote(name, data))}</span>
     </div>`).join("");
   if (put("lanes", html) !== false) laneEls = null;
+  const jobs = (c && c.jobs) || {};
+  const n = (name, cap) => { const every = (jobs[name] || {}).every || 60; return Math.max(4, Math.min(cap, Math.round(every))); };
+  const scanN = n("scan", 60), snipeN = n("snipe", 30), topN = n("top", 30);
+  if (put("reactor", ringSvg("r-scan", scanN, 88, 98) + ringSvg("r-snipe", snipeN, 72, 80, true) + ringSvg("r-top", topN, 60, 68, true)
+      + `<div class="core" id="core"><b id="core-t">—</b><span id="core-l">til scan</span></div>`) !== false) ringEls = null;
   const every = c ? fmtNum.format(c.tick_every) : "—";
   put("motor-foot", `<div>Positioner tjekkes<b>hvert ${esc(every)}. s</b></div><div>Sidste runde<b id="mf-tick">—</b></div><div>Oppe i<b id="mf-up">—</b></div><div>Ny dag (UTC) om<b id="mf-day">—</b></div>`);
   tickMotor();
@@ -2921,7 +3164,9 @@ function tickMotor() {
     }
     if (js.running) {
       lane.el.className = "lane running";
-      lane.t.textContent = dur(now - js.since);
+      const el = now - js.since;
+      lane.t.textContent = el >= 3 ? `kører ${dur(el)}` : "kører";
+      lane.t.classList.remove("due");
       lane.track.classList.add("flow");
       lane.fill.style.transform = "scaleX(1)";
       lane.last = 1;
@@ -2943,6 +3188,7 @@ function tickMotor() {
     lane.fill.style.transform = `scaleX(${target.toFixed(4)})`;
     lane.last = target;
   }
+  tickRings(now, c);
   const phase = document.getElementById("motor-phase");
   if (phase && c && stale()) {
     phase.className = "phase";
