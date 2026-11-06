@@ -39,6 +39,7 @@ ET = ZoneInfo(ET_NAME)
 SCAN_START = (9, 45)
 SCAN_END = (15, 30)
 FLATTEN_AT = (15, 50)
+PRE_SCAN_MINUTES = 5  # før åbning kigger SCOUT hvert 5. minut
 CACHE_SECONDS = 30.0
 REFUSALS = ("wait", "skip", "rejected", "expired", "sized_zero")
 STOP_WORDS = {"stop nu", "stop", "stop now", "pause", "stop alt"}
@@ -122,15 +123,17 @@ class DeskEngine:
 
     # ------------------------------------------------------------------ indstillinger
     def _retire_old_defaults(self, *, announce: bool) -> None:
-        """Én gang: gemte værdier, der bare var de gamle standarder (3 % og 12 aktier), fjernes, så de nye gælder.
+        """Én gang pr. værdi: gemte værdier, der bare var de gamle standarder, fjernes, så de nye gælder.
 
         Trykker man Gem regler, gemmes alle felter. Uden det her ville en gammel standard hænge fast for altid.
         """
-        if self.store.get_state("defaults_v2") == "1":
+        done = list(self.store.get_json("retired_defaults", []) or [])
+        todo = [name for name in RETIRED_DEFAULTS if name not in done]
+        if not todo:
             return
-        self.store.set_state("defaults_v2", "1")
+        self.store.set_json("retired_defaults", done + todo)
         params = self.store.get_json("params", {}) or {}
-        dropped = [name for name, old in RETIRED_DEFAULTS.items() if name in params and params[name] == old]
+        dropped = [name for name in todo if name in params and params[name] == RETIRED_DEFAULTS[name]]
         for name in dropped:
             params.pop(name)
         if dropped:
@@ -140,9 +143,15 @@ class DeskEngine:
             self.store.post(
                 "system",
                 "info",
-                f"SCOUT er opdateret: grænsen er {cfg.move_pct:g} % på en time, watchlisten har {len(cfg.watchlist)} aktier "
-                f"({', '.join(cfg.watchlist)}), og markeringer kun på volumen bruger ikke længere de "
-                f"{cfg.max_flags_per_day} pladser om dagen.",
+                f"SCOUT er opdateret: grænsen er {cfg.move_pct:g} % på en time, højst {cfg.max_flags_per_day} markeringer "
+                f"om dagen, og watchlisten har {len(cfg.watchlist)} aktier ({', '.join(cfg.watchlist)}). Markeringer kun på "
+                "volumen bruger ikke længere pladserne. "
+                + (
+                    f"Før åbning (fra kl. 10 dansk tid) kigger SCOUT efter aktier, der er steget {cfg.gap_pct:g} % eller mere "
+                    "siden i går, og NEWS finder grunden. Ved åbningen kan sådan et gap blive købt, hvis det holder."
+                    if cfg.premarket
+                    else ""
+                ),
             )
 
     @property
@@ -152,14 +161,15 @@ class DeskEngine:
         watch = parse_watchlist(params.get("watchlist")) if params.get("watchlist") is not None else []
         if watch:
             values["watchlist"] = tuple(watch)
-        for name in ("move_pct", "volume_x", "position_pct", "stop_max_pct", "reward_risk"):
-            if isinstance(params.get(name), (int, float)):
+        for name in ("move_pct", "volume_x", "position_pct", "stop_max_pct", "reward_risk", "gap_pct"):
+            if isinstance(params.get(name), (int, float)) and not isinstance(params.get(name), bool):
                 values[name] = float(params[name])
         for name in ("max_open", "max_flags_per_day", "scan_minutes"):
             if isinstance(params.get(name), int):
                 values[name] = int(params[name])
-        if isinstance(params.get("auto_approve"), bool):
-            values["auto_approve"] = params["auto_approve"]
+        for name in ("auto_approve", "premarket"):
+            if isinstance(params.get(name), bool):
+                values[name] = params[name]
         return dataclasses.replace(self.base, **values) if values else self.base
 
     def update_params(self, body: dict) -> None:
@@ -174,8 +184,13 @@ class DeskEngine:
             "max_open": (1, HARD_MAX_OPEN, int),
             "max_flags_per_day": (1, HARD_MAX_FLAGS, int),
             "scan_minutes": (1, 30, int),
+            "gap_pct": (1.0, 20.0, float),
         }
         changes: list[str] = []
+        if "premarket" in body and body["premarket"] is not None:
+            early = body["premarket"] in (True, "true", "1", 1, "on")
+            params["premarket"] = early
+            changes.append("før åbning " + ("til: SCOUT og NEWS kigger på gaps fra kl. 10 dansk tid" if early else "fra"))
         if "auto_approve" in body and body["auto_approve"] is not None:
             auto = body["auto_approve"] in (True, "true", "1", 1, "on")
             params["auto_approve"] = auto
@@ -357,6 +372,11 @@ class DeskEngine:
             self._refresh_quotes(broker, now, max_age=120)
             return
         self._sync(broker, now)
+        if self._premarket_now(now, clock):
+            if not self.paused and now.minute % PRE_SCAN_MINUTES == 0:
+                self.premarket_scan(now)
+            self._refresh_quotes(broker, now, max_age=120)
+            return
         self._refresh_quotes(broker, now, max_age=600)
         hh, mm = (int(part) for part in self.base.log_time_et.split(":"))
         if (now.hour, now.minute) >= (hh, mm) and self.store.get_state(f"seen_open:{day}") == "1":
@@ -381,7 +401,7 @@ class DeskEngine:
         self._quotes = {
             "ts": now.isoformat(timespec="seconds"),
             "mode": "snapshot",
-            "items": rules.snapshot_quotes(everything, snaps, daily, flagged),
+            "items": rules.snapshot_quotes(everything, snaps, daily, flagged, now=now),
         }
 
     def _mark_open_day(self, day: str, broker, now: datetime) -> None:
@@ -442,21 +462,19 @@ class DeskEngine:
             for symbol in cfg.watchlist:
                 if symbol in moved:
                     continue
-                flag = rules.scout(
-                    symbol,
-                    intraday.get(symbol, []),
-                    daily.get(symbol, []),
-                    now,
-                    move_pct=cfg.move_pct,
-                    volume_x=cfg.volume_x,
-                )
+                bars, days = intraday.get(symbol, []), daily.get(symbol, [])
+                # Først: et gap ved åbningen, der holder (kun til kl. 11 ET). Så: en almindelig bevægelse på en time.
+                flag = rules.gap_flag(symbol, bars, days, now, gap_pct=cfg.gap_pct, volume_x=cfg.volume_x) if cfg.premarket else None
+                if flag is None:
+                    flag = rules.scout(symbol, bars, days, now, move_pct=cfg.move_pct, volume_x=cfg.volume_x)
                 if flag is None:
                     continue
                 if flag.by_move:
                     moves.append(flag)
                 elif symbol not in loud:
                     volume_only.append(flag)
-            moves.sort(key=lambda item: (abs(item.move_pct), item.volume_x), reverse=True)
+            # Gaps med en grund fra før åbning først, så de største bevægelser.
+            moves.sort(key=lambda item: (item.by_gap, abs(item.move_pct), item.volume_x), reverse=True)
             volume_only.sort(key=lambda item: item.volume_x, reverse=True)
             chosen = moves[: max(0, left_move)] + volume_only[: max(0, left_volume)]
             done = 0
@@ -472,6 +490,116 @@ class DeskEngine:
         finally:
             self.scanning = False
             self._scan_lock.release()
+
+    # ------------------------------------------------------------------ før åbning
+    def _premarket_now(self, now: datetime, clock=None) -> bool:
+        """Før åbning på en handelsdag: 4:00-9:30 ET (10:00-15:30 dansk tid)."""
+        if not self.cfg.premarket:
+            return False
+        todays = calendar.session(now.date())
+        if not todays or not (calendar.PRE_OPEN <= now.time() and now < todays[0]):
+            return False
+        # Alpacas ur vinder: lukker børsen ekstraordinært i dag, siger det, at næste åbning er en anden dag.
+        next_open = getattr(clock, "next_open", None)
+        return next_open is None or next_open.astimezone(ET).date() == now.date()
+
+    def premarket_on(self, day: str) -> dict[str, dict]:
+        return self.store.get_json(f"premarket:{day}", {}) or {}
+
+    def premarket_scan(self, now: datetime | None = None) -> int:
+        """Før åbning: SCOUT finder aktier, der er steget gap_pct siden i går, og NEWS finder grunden. Ingen køb før 9:45 ET."""
+        if not self._scan_lock.acquire(blocking=False):
+            return 0
+        self.scanning = True
+        try:
+            now = (now or self._now()).astimezone(ET)
+            cfg = self.cfg
+            day = now.date().isoformat()
+            broker = self.broker()
+            if not hasattr(broker, "get_snapshots"):
+                return 0
+            everything = list(dict.fromkeys([*cfg.watchlist, "SPY"]))
+            snaps = broker.get_snapshots(everything)
+            daily = self._daily(broker, everything, now)
+            self._quotes = {
+                "ts": now.isoformat(timespec="seconds"),
+                "mode": "snapshot",
+                "items": rules.snapshot_quotes(everything, snaps, daily, self.flags_on(day)["all"], now=now),
+            }
+            self.last_scan = now.isoformat(timespec="seconds")
+            notes = self.premarket_on(day)
+            left = cfg.max_flags_per_day - len(notes)
+            if left <= 0:
+                return 0
+            fresh = [item for item in rules.premarket_gaps(list(cfg.watchlist), snaps, daily, now, gap_pct=cfg.gap_pct) if item["symbol"] not in notes]
+            done = 0
+            for item in fresh[:left]:
+                if self.paused:
+                    break
+                self._premarket_note(item, now, cfg)
+                done += 1
+            return done
+        finally:
+            self.scanning = False
+            self._scan_lock.release()
+
+    def _premarket_note(self, item: dict, now: datetime, cfg: DeskSettings) -> None:
+        self.brain.settings = cfg
+        day = now.date().isoformat()
+        symbol = item["symbol"]
+        notes = self.premarket_on(day)
+        notes[symbol] = {**item, "news": None}
+        self.store.set_json(f"premarket:{day}", notes)
+        self.store.post("scout", "premarket", rules.premarket_text(item), symbol=symbol, data=item)
+        flag = {"symbol": symbol, "move_pct": None, "volume_x": None, "day_change_pct": item["gap_pct"], "gap_pct": item["gap_pct"], "session": "før åbning"}
+        news = self.brain.news(flag, self._headlines(symbol, now))
+        notes = self.premarket_on(day)
+        notes[symbol] = {**item, "news": news}
+        self.store.set_json(f"premarket:{day}", notes)
+        self.store.post(
+            "news",
+            "news",
+            f"{symbol}: {news['reason']}" if news.get("has_reason") else f"{symbol}: Ingen klar grund endnu.",
+            symbol=symbol,
+            data=news,
+        )
+
+    def _premarket_list(self, day: str) -> list[dict]:
+        out = []
+        for item in self.premarket_on(day).values():
+            news = item.get("news") or {}
+            out.append(
+                {
+                    "symbol": item.get("symbol"),
+                    "gap_pct": item.get("gap_pct"),
+                    "price": item.get("price"),
+                    "prev_close": item.get("prev_close"),
+                    "ts": item.get("ts"),
+                    "has_reason": bool(news.get("has_reason")),
+                    "reason": news.get("reason") if item.get("news") else None,
+                    "source_url": news.get("source_url") or "",
+                    "source_title": news.get("source_title") or "",
+                }
+            )
+        out.sort(key=lambda row: float(row.get("gap_pct") or 0), reverse=True)
+        return out
+
+    def _headlines(self, symbol: str, now: datetime) -> list[dict]:
+        try:
+            items = self.broker().get_news([symbol], now)
+        except BrokerError as exc:
+            logger.info("Nyheder for %s kunne ikke hentes: %s", symbol, exc)
+            items = []
+        return [
+            {
+                "headline": item.headline,
+                "created_at": item.created_at.isoformat(timespec="minutes"),
+                "summary": (item.summary or "")[:300],
+                "url": getattr(item, "url", ""),
+            }
+            for item in items
+            if symbol in (item.symbols or [symbol])
+        ]
 
     def flags_on(self, day: str) -> dict[str, list[str]]:
         """Dagens markeringer delt op: på kursbevægelse (tæller i kvoten) og kun på volumen."""
@@ -500,32 +628,16 @@ class DeskEngine:
         pid = self.store.create_proposal(day, symbol, flag.to_dict())
         self.store.post("scout", "flag", rules.scout_text(flag), symbol=symbol, proposal_id=pid, data=flag.to_dict())
 
-        # NEWS
-        try:
-            items = self.broker().get_news([symbol], now)
-        except BrokerError as exc:
-            logger.info("Nyheder for %s kunne ikke hentes: %s", symbol, exc)
-            items = []
-        headlines = [
-            {
-                "headline": item.headline,
-                "created_at": item.created_at.isoformat(timespec="minutes"),
-                "summary": (item.summary or "")[:300],
-                "url": getattr(item, "url", ""),
-            }
-            for item in items
-            if symbol in (item.symbols or [symbol])
-        ]
-        news = self.brain.news(flag.to_dict(), headlines)
+        # NEWS. Et gap, NEWS allerede har fundet grunden til før åbning, slås ikke op igen.
+        early = (self.premarket_on(day).get(symbol) or {}).get("news") if flag.by_gap else None
+        if early and early.get("has_reason"):
+            news = {**early, "premarket": True}
+            text = f"{symbol}: {news['reason']} (fundet før åbning)"
+        else:
+            news = self.brain.news(flag.to_dict(), self._headlines(symbol, now))
+            text = f"{symbol}: {news['reason']}" if news.get("has_reason") else f"{symbol}: Ingen klar grund."
         self.store.update_proposal(pid, news=news)
-        self.store.post(
-            "news",
-            "news",
-            f"{symbol}: {news['reason']}" if news.get("has_reason") else f"{symbol}: Ingen klar grund.",
-            symbol=symbol,
-            proposal_id=pid,
-            data=news,
-        )
+        self.store.post("news", "news", text, symbol=symbol, proposal_id=pid, data=news)
 
         # CHART
         plan = rules.chart(flag, bars, now, stop_max_pct=cfg.stop_max_pct, reward_risk=cfg.reward_risk)
@@ -903,9 +1015,15 @@ class DeskEngine:
             return prefix + f"Højst {cfg.position_pct:g} % pr. handel og {cfg.max_open} åbne ad gangen. Lige nu: {context['open']} åbne eller ventende."
         if key == "scout":
             extra = f" (+{context['volume_flags_today']} kun på volumen)" if context["volume_flags_today"] else ""
+            early = context["premarket"]
+            gaps = (
+                " Før åbning: " + ", ".join(f"{row['symbol']} {float(row['gap_pct']):+.1f} %" for row in early[:5]) + "."
+                if early
+                else (f" Før åbning kigger jeg efter gaps på {cfg.gap_pct:g} % fra kl. 10 dansk tid." if cfg.premarket else "")
+            )
             return prefix + (
                 f"I dag: {context['flags_today']} af {cfg.max_flags_per_day} markeringer på kursbevægelse{extra}. "
-                f"Grænse: {cfg.move_pct:g} % på en time. Watchlist: {', '.join(cfg.watchlist)}."
+                f"Grænse: {cfg.move_pct:g} % på en time.{gaps} Watchlist: {', '.join(cfg.watchlist)}."
             )
         if key == "executor":
             return prefix + f"Åbne handler: {context['open']}. Lukket i alt: {context['closed']} med {_usd(context['pnl'])}."
@@ -924,6 +1042,7 @@ class DeskEngine:
             "paused": self.paused,
             "flags_today": len(flags["move"]),
             "volume_flags_today": len(flags["volume"]),
+            "premarket": self._premarket_list(now.date().isoformat()),
             "open": self._open_count(),
             "closed": len(trades),
             "pnl": round(sum(float(row["pnl"]) for row in trades), 2),
@@ -1221,6 +1340,8 @@ class DeskEngine:
                 "approval_minutes": cfg.approval_minutes,
                 "scan_minutes": cfg.scan_minutes,
                 "auto_approve": cfg.auto_approve,
+                "premarket": cfg.premarket,
+                "gap_pct": cfg.gap_pct,
                 "daily_loss_pct": cfg.daily_loss_pct,
                 "max_chase_pct": cfg.max_chase_pct,
                 "log_time_et": cfg.log_time_et,
@@ -1249,6 +1370,7 @@ class DeskEngine:
                 "max_open": cfg.max_open,
             },
             "quotes": self._quotes,
+            "premarket": self._premarket_list(day),
             "systems": {
                 "last_scan": self.last_scan,
                 "last_tick": self.last_tick,

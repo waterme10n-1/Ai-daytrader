@@ -33,6 +33,7 @@ DEFAULT_WATCHLIST: tuple[str, ...] = (
 # Standarder fra før, der blev gemt på siden, når man trykkede Gem. De flyttes til de nye standarder ved opstart.
 RETIRED_DEFAULTS: dict[str, object] = {
     "move_pct": 3.0,
+    "max_flags_per_day": 5,
     "watchlist": ["NVDA", "AAPL", "MSFT", "AMZN", "META", "GOOGL", "TSLA", "AMD", "AVGO", "NFLX", "PLTR", "COIN"],
 }
 TICKER = re.compile(r"^[A-Z]{1,5}(\.[A-Z])?$")
@@ -86,7 +87,9 @@ class DeskSettings:
     watchlist: tuple[str, ...] = DEFAULT_WATCHLIST
     move_pct: float = 2.0
     volume_x: float = 2.0
-    max_flags_per_day: int = 5
+    max_flags_per_day: int = 8
+    premarket: bool = True  # SCOUT og NEWS kigger på gaps før åbning (4:00-9:30 ET, 10:00-15:30 dansk tid)
+    gap_pct: float = 3.0  # så meget skal en aktie være steget siden i går for at tælle som gap
     stop_max_pct: float = 2.0
     reward_risk: float = 2.0
     position_pct: float = 5.0
@@ -126,7 +129,9 @@ class DeskSettings:
             watchlist=tuple(watch),
             move_pct=min(20.0, max(0.5, _float(os.getenv("DESK_MOVE_PCT"), 2.0))),
             volume_x=min(20.0, max(1.2, _float(os.getenv("DESK_VOLUME_X"), 2.0))),
-            max_flags_per_day=max(1, min(HARD_MAX_FLAGS, _int(os.getenv("DESK_MAX_FLAGS_PER_DAY"), 5))),
+            max_flags_per_day=max(1, min(HARD_MAX_FLAGS, _int(os.getenv("DESK_MAX_FLAGS_PER_DAY"), 8))),
+            premarket=_flag(os.getenv("DESK_PREMARKET"), True),
+            gap_pct=min(20.0, max(1.0, _float(os.getenv("DESK_GAP_PCT"), 3.0))),
             stop_max_pct=min(HARD_MAX_STOP_PCT, max(0.3, _float(os.getenv("DESK_STOP_MAX_PCT"), 2.0))),
             reward_risk=min(5.0, max(HARD_MIN_REWARD_RISK, _float(os.getenv("DESK_REWARD_RISK"), 2.0))),
             position_pct=min(HARD_MAX_POSITION_PCT, max(0.5, _float(os.getenv("DESK_POSITION_PCT"), 5.0))),

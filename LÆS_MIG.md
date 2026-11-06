@@ -267,7 +267,7 @@ Bygget efter guiden "How to build a trading desk in one group chat", men på Cla
 
 | Bot | Job | Kører på |
 |---|---|---|
-| **SCOUT** | Markerer en ticker på watchlisten, der flytter sig mindst 2 % på en time eller handler mindst 2 gange normal volumen. Højst 5 markeringer om dagen på kursbevægelse; markeringer kun på volumen har deres egen kvote, så de ikke bruger pladserne op i første time. | fast kode |
+| **SCOUT** | Markerer en ticker på watchlisten, der flytter sig mindst 2 % på en time eller handler mindst 2 gange normal volumen. Højst 8 markeringer om dagen på kursbevægelse; markeringer kun på volumen har deres egen kvote, så de ikke bruger pladserne op i første time. Før åbning finder den gaps (se nedenfor). | fast kode |
 | **NEWS** | Finder grunden med websøgning og Alpaca-nyheder og skriver den på to linjer med link. Uden kilde: "Ingen klar grund". | Claude |
 | **CHART** | Sætter indgang, mål og stop. Stoppet er højst 2 % under indgangen, og målet er mindst 2 gange så langt væk. Ellers "Ingen setup". Kun køb, ingen short. | fast kode |
 | **SKEPTIC** | Giver de tre stærkeste grunde til, at handlen fejler, og afgør BUY, WAIT eller SKIP. Uden klar grund fra NEWS er svaret altid SKIP. Det håndhæves i koden, også hvis Claude siger BUY. | Claude |
@@ -311,3 +311,13 @@ Forsiden **Overblik** viser papirkontoen, en nedtælling til New York-børsen å
 3. Alle `DESK_*`-variabler står i `.env.example`. På Railway ligger databasen som `/data/desk.db`.
 
 SCOUT kigger hvert minut fra 9:45 til 15:30 ET (15:45–21:30 dansk tid). Intet her er finansiel rådgivning: bottene foreslår, du beslutter.
+
+### Før åbning og gaps
+
+Fra 4:00 til 9:30 ET (normalt 10:00–15:30 dansk tid) kigger SCOUT hvert 5. minut efter aktier på watchlisten, der er steget mindst 3 % siden gårsdagens lukkekurs (`DESK_GAP_PCT`). Kun handler fra samme dag tæller. NEWS finder grunden med det samme, så den står i Gruppen og på kortet **Før åbning**, før børsen åbner. Der bliver ikke købt noget før åbning.
+
+Fra 9:45 til 11:00 ET markerer SCOUT et gap, der stadig er oppe mindst 3 % og ligger over VWAP, selv om det ikke har flyttet sig 2 % på den første time. Har NEWS allerede fundet grunden før åbning, bliver den genbrugt. Ellers slår NEWS op som normalt. Herefter går gappet gennem CHART, SKEPTIC og SIZER som alt andet. Taber gap-køb flere gange, lærer bordet det ("Gaps købt ved åbningen") og siger WAIT til dem.
+
+Kurserne før åbning kommer fra IEX og kan være tynde. Slå det fra under **Bots → Indstillinger → Før åbning** eller med `DESK_PREMARKET=false`.
+
+Hver markering koster typisk to Claude-kald (NEWS og SKEPTIC), og hvert gap før åbning ét. Vil du have et loft over udgiften, så sæt `DESK_AI_DAILY_BUDGET_USD`.

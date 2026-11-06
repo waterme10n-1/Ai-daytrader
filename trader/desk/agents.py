@@ -37,8 +37,8 @@ BOTS: dict[str, dict[str, str]] = {
             "watchlisten. Du markerer en ticker, der bevæger sig mere end {move_pct:g}% på en time, eller handler mere end "
             "{volume_x:g} gange sin normale volumen. Du skriver ticker, bevægelse og volumen i gruppen. Højst "
             "{max_flags} markeringer om dagen på kursbevægelse. Markeringer kun på volumen har deres egen kvote på "
-            "lige så mange, og en ticker markeret på volumen kan markeres igen, når kursen flytter sig. Du vurderer "
-            "aldrig, om en bevægelse er god."
+            "lige så mange, og en ticker markeret på volumen kan markeres igen, når kursen flytter sig.{premarket} "
+            "Du vurderer aldrig, om en bevægelse er god."
         ),
     },
     "news": {
@@ -50,7 +50,7 @@ BOTS: dict[str, dict[str, str]] = {
             "Du er NEWS på et handelsbord med seks bots. Din ene opgave er at forklare, hvorfor en ticker bevæger sig. "
             "Når SCOUT markerer en, tjekker du overskrifter, indberetninger og meddelelser og skriver grunden i gruppen "
             "på to linjer med et link til kilden. Er der ingen klar grund, skriver du \"Ingen klar grund\", for det er "
-            "et brugbart svar. Du foreslår aldrig handler."
+            "et brugbart svar. Før åbning forklarer du på samme måde de gaps, SCOUT finder. Du foreslår aldrig handler."
         ),
     },
     "chart": {
@@ -110,7 +110,16 @@ DESK_CONTEXT = (
 
 
 def bot_rules(key: str, settings: DeskSettings) -> str:
+    gap = float(getattr(settings, "gap_pct", 3.0))
+    premarket = (
+        f" Før åbning (4:00-9:30 ET, 10:00-15:30 dansk tid) kigger du hvert 5. minut efter aktier, der er steget "
+        f"{gap:g}% eller mere siden i går, så NEWS kan finde grunden i god tid. Fra 9:45 til 11:00 ET markerer du et "
+        f"gap, der holder sig over VWAP, selv om det ikke har flyttet sig {settings.move_pct:g}% på en time."
+        if getattr(settings, "premarket", False)
+        else ""
+    )
     return BOTS[key]["rules"].format(
+        premarket=premarket,
         move_pct=settings.move_pct,
         volume_x=settings.volume_x,
         max_flags=settings.max_flags_per_day,
@@ -297,6 +306,10 @@ class DeskBrain:
                 "time_et": datetime.now(ET).isoformat(timespec="minutes"),
                 "alpaca_headlines_last_18h": headlines[:12],
             }
+            if flag.get("gap_pct") is not None:
+                payload["change_since_yesterday_close_pct"] = flag.get("gap_pct")
+            if flag.get("session"):
+                payload["session"] = flag["session"]
             prompt = (
                 "SCOUT har markeret denne ticker. Find ud af præcis hvorfor den bevæger sig i dag. Søg efter nyheder, "
                 "indberetninger (SEC), analytikerændringer og meddelelser fra de sidste 24 timer. has_reason er kun true, "

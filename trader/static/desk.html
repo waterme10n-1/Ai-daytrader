@@ -177,6 +177,10 @@
   .trade-h { display: flex; align-items: center; gap: 10px; }
   .trade-h .nm { flex: 1; min-width: 0; }
   .trade-h .nm b { display: block; font: 600 16px var(--display); }
+  .gap + .gap { margin-top: 14px; padding-top: 14px; border-top: 0.5px solid var(--sep); }
+  .gap .why-t { display: block; margin-top: 3px; font-size: 13px; line-height: 1.4; color: var(--text-2, var(--muted)); }
+  .gap .why-t a { color: var(--accent); text-decoration: none; white-space: nowrap; }
+  .gap .why-t.wait { color: var(--muted); font-style: italic; }
   .track { position: relative; height: 6px; border-radius: 3px; background: var(--fill); margin: 16px 0 8px; }
   .track .fillbar { position: absolute; top: 0; bottom: 0; border-radius: 3px; transition: left 0.8s ease, width 0.8s ease; }
   .track .dot { position: absolute; top: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; background: var(--text); box-shadow: 0 0 0 3px var(--card); transition: left 0.8s ease; }
@@ -403,6 +407,11 @@
             <div class="market-tx"><b id="mk-head"><span class="sk" style="width:150px;height:18px"></span></b><p id="mk-sub"><span class="sk" style="width:190px;height:13px"></span></p><div class="ny" id="ny"></div></div>
           </div>
         </article>
+        <article class="card" id="pre-card" hidden>
+          <div class="card-h"><h2 id="pre-title">Før åbning</h2><span class="pill right" id="pre-pill"></span></div>
+          <div id="pre-list"></div>
+          <p class="cap" style="margin:12px 0 0" id="pre-cap"></p>
+        </article>
         <article class="card" id="trades-card" hidden>
           <div class="card-h"><h2>Åbne handler</h2></div>
           <div id="trades"></div>
@@ -477,6 +486,7 @@
       <div class="card-h"><h2>Indstillinger</h2></div>
       <form class="form" id="params">
         <label class="wide toggle"><span class="tx">Autopilot<span>Bordet køber selv på papir, når SKEPTIC siger BUY.</span></span><input name="auto_approve" type="checkbox"></label>
+        <label class="wide toggle"><span class="tx">Før åbning<span>SCOUT og NEWS kigger på gaps fra kl. 10 dansk tid, og et gap, der holder, kan købes ved åbningen.</span></span><input name="premarket" type="checkbox"></label>
         <label class="wide toggle"><span class="tx">Lyd og vibration<span>Ved køb og salg (gemmes på denne enhed).</span></span><input id="sound-toggle" type="checkbox"></label>
         <label class="wide toggle"><span class="tx">Lyst tema<span>Gemmes på denne enhed.</span></span><input id="theme-toggle" type="checkbox"></label>
         <label class="wide">Watchlist (10–20 aktier du kender)<textarea name="watchlist" rows="2"></textarea></label>
@@ -484,6 +494,7 @@
         <label>SCOUT: volumen (gange normal)<input name="volume_x" type="number" step="0.1" min="1.2" max="20"></label>
         <label>SCOUT: højst markeringer pr. dag (på kursbevægelse)<input name="max_flags_per_day" type="number" step="1" min="1"></label>
         <label>SCOUT: kigger hvert (minutter)<input name="scan_minutes" type="number" step="1" min="1" max="30"></label>
+        <label>SCOUT: gap siden i går (%)<input name="gap_pct" type="number" step="0.5" min="1" max="20"></label>
         <label>CHART: stop højst (% under indgang)<input name="stop_max_pct" type="number" step="0.1" min="0.3"></label>
         <label>CHART: målet mindst (gange stoppet)<input name="reward_risk" type="number" step="0.1" min="1.5" max="5"></label>
         <label>SIZER: højst (% af kontoen pr. handel)<input name="position_pct" type="number" step="0.5" min="0.5"></label>
@@ -769,7 +780,7 @@ function tickClock() {
   if (m.is_open) sub = `Bordet handler nu. Alt lukkes ti minutter før børsen lukker.${m.early_close ? ` Halv dag: ${m.early_close}.` : ""}`;
   else if (m.holiday) sub = `Børsen holder lukket i dag (${m.holiday}).`;
   else if (m.weekend) sub = "Weekend i New York.";
-  else if (m.phase === "pre") sub = "Før åbning i New York.";
+  else if (m.phase === "pre") sub = state && state.params && state.params.premarket ? "Før åbning i New York. SCOUT kigger efter gaps." : "Før åbning i New York.";
   else if (m.phase === "after") sub = "Efter lukketid i New York.";
   else sub = "Børsen er lukket.";
   sub += " Tider i din tid.";
@@ -786,7 +797,7 @@ function approvalCard(p) {
     <div class="card-h"><h2>Køb ${esc(p.symbol)}?</h2><span class="expires right" data-expires="${esc(p.expires_at || "")}"></span></div>
     <div class="levels"><div><div class="cap">Indgang</div><div class="v">${price(p.entry)}</div></div><div><div class="cap">Stop</div><div class="v down">${price(p.stop)}</div></div><div><div class="cap">Mål</div><div class="v up">${price(p.target)}</div></div></div>
     <div class="why">
-      ${line("scout", f.move_pct !== undefined ? `${pct(f.move_pct)} på ${f.window_minutes} min med ${f.volume_x}x volumen` : "–")}
+      ${line("scout", f.by_gap ? `Gap ${pct(f.gap_pct)} siden i går, over VWAP, ${f.volume_x}x volumen` : f.move_pct !== undefined ? `${pct(f.move_pct)} på ${f.window_minutes} min med ${f.volume_x}x volumen` : "–")}
       ${line("news", `${esc(n.reason || "–")}${url ? ` <a href="${esc(url)}" target="_blank" rel="noopener noreferrer">Kilde ›</a>` : ""}`)}
       ${line("skeptic", (s.reasons || []).map(esc).join("<br>") || "–")}
       ${line("sizer", z.qty ? `${z.qty} aktier for ${money(z.notional)} $. Største tab ved stop ${money(z.max_loss)} $.` : esc(z.reason || "–"))}
@@ -868,6 +879,33 @@ function renderTrades(d) {
   }).join("");
 }
 
+// ---------- før åbning ----------
+let preKey = "";
+function renderPre(d) {
+  const list = d.premarket || [], m = d.market || {}, p = d.params || {};
+  const early = m.phase === "pre" && !m.holiday && p.premarket;
+  $("pre-card").hidden = !list.length && !early;
+  if ($("pre-card").hidden) return;
+  const key = JSON.stringify([list, early, p.gap_pct, m.session_open]);
+  if (key === preKey) return;
+  preKey = key;
+  $("pre-title").textContent = early ? "Før åbning" : "Dagens gaps";
+  $("pre-pill").textContent = list.length ? `${list.length} ${list.length === 1 ? "gap" : "gaps"}` : "SCOUT kigger";
+  $("pre-list").innerHTML = list.length
+    ? list.map((g) => {
+        const url = safeUrl(g.source_url);
+        const why = g.reason === null || g.reason === undefined
+          ? '<span class="why-t wait">NEWS leder efter grunden …</span>'
+          : `<span class="why-t">${esc(g.reason)}${url ? ` <a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(g.source_title || "Kilde")} ›</a>` : ""}</span>`;
+        return `<div class="gap trade-h" style="align-items:flex-start"><span class="av lg" style="--c:var(--scout)">${esc(String(g.symbol).slice(0, 2))}</span><div class="nm"><b>${esc(g.symbol)} <span class="cap" style="font-weight:500">${price(g.price)} $</span></b>${why}</div><span class="pill up">${pct(g.gap_pct)}</span></div>`;
+      }).join("")
+    : `<p class="cap" style="margin:0">Ingen aktier på watchlisten er steget ${nf2.format(p.gap_pct)} % siden i går endnu. SCOUT kigger hvert 5. minut.</p>`;
+  const first = m.session_open ? hhmm(new Date(Date.parse(m.session_open) + 15 * 60000).toISOString()) : "";
+  $("pre-cap").textContent = early
+    ? `Ingen køb før ${first ? `kl. ${first}` : "9:45 ET"}. Holder et gap sig over VWAP efter åbningen, kan SCOUT markere det, og NEWS behøver ikke lede igen.`
+    : "Gaps fra før åbning. Dem, der holdt sig over VWAP, blev vurderet af bordet ved åbningen.";
+}
+
 // ---------- watchlist: liste og radar ----------
 function heatOf(x, p, snap) {
   if (snap || x.move_pct === null || x.move_pct === undefined) return Math.min(1, Math.abs(x.day_pct || 0) / p.move_pct);
@@ -877,7 +915,8 @@ let lastPx = {}, wlKey = "", scopeKey = "";
 function renderWatch(d) {
   const q = d.quotes || {}, p = d.params, snap = q.mode === "snapshot";
   const items = (q.items || []).filter((x) => x.symbol !== "SPY");
-  $("wl-src").textContent = items.length ? (snap ? `Børsen er lukket · kurser fra sidste handelsdag · ${ago(q.ts)}` : `Live · opdateret ${ago(q.ts)}`) : "";
+  const pre = (d.market || {}).phase === "pre";
+  $("wl-src").textContent = items.length ? (snap ? (pre ? `Før åbning · seneste handel mod i går (IEX, tyndt før åbning) · ${ago(q.ts)}` : `Børsen er lukket · kurser fra sidste handelsdag · ${ago(q.ts)}`) : `Live · opdateret ${ago(q.ts)}`) : "";
   if (!items.length) {
     $("wl-list").innerHTML = `<div class="empty">${d.keys_present ? "Henter kurser …" : 'Kurserne vises, når bordet er forbundet til Alpaca.<br><button class="btn plain" type="button" data-goto="bots">Forbind nu</button>'}</div>`;
     $("blips").innerHTML = ""; wlKey = ""; return;
@@ -941,8 +980,8 @@ function systems(d) {
   return [
     ["Alpaca", !d.keys_present || err ? "bad" : "ok", !d.keys_present ? "Mangler nøgler" : err ? err : "Forbundet til papirkontoen"],
     ["Børsen", m.is_open ? "ok" : "", m.label || "–"],
-    ["Kurser", q.ts ? "ok" : "warn", q.ts ? `${q.mode === "live" ? "Live" : "Sidste handelsdag"}, ${ago(q.ts)}` : "Ingen endnu"],
-    ["SCOUT", d.paused ? "warn" : sys.last_scan ? "ok" : "", d.paused ? "På pause" : sys.last_scan ? `Kiggede ${ago(sys.last_scan)}` : m.is_open ? "Venter på første scan" : "Kigger, når børsen åbner"],
+    ["Kurser", q.ts ? "ok" : "warn", q.ts ? `${q.mode === "live" ? "Live" : m.phase === "pre" ? "Før åbning" : "Sidste handelsdag"}, ${ago(q.ts)}` : "Ingen endnu"],
+    ["SCOUT", d.paused ? "warn" : sys.last_scan ? "ok" : "", d.paused ? "På pause" : sys.last_scan ? `Kiggede ${ago(sys.last_scan)}` : m.is_open ? "Venter på første scan" : d.params.premarket ? "Kigger fra kl. 10 dansk tid (før åbning)" : "Kigger, når børsen åbner"],
     ["Claude", !ai.configured ? "warn" : ai.last_error ? "bad" : "ok", !ai.configured ? "ANTHROPIC_API_KEY mangler i Railway" : ai.last_error ? ai.last_error : ai.limited ? `${money(ai.spent_today_usd)} af ${money(ai.budget_usd)} $ brugt i dag` : `Klar · ${money(ai.spent_today_usd)} $ brugt i dag`],
     ["Autopilot", d.params.auto_approve ? "ok" : "warn", d.params.auto_approve ? "Køber selv på papir" : "Du godkender hver ordre"],
     ["Læring", rules ? "ok" : "", rules ? `${rules} regel${rules > 1 ? "er" : ""} aktiv` : "Samler data"],
@@ -981,8 +1020,9 @@ function renderBots(d) {
   $("hard").textContent = `Lofter: ${p.hard.position_pct} % pr. handel, ${p.hard.max_open} åbne, stop ${p.hard.stop_max_pct} %.`;
   if (paramsFilled && form.contains(document.activeElement)) return;
   form.watchlist.value = p.watchlist.join(", ");
-  ["move_pct", "volume_x", "max_flags_per_day", "scan_minutes", "stop_max_pct", "reward_risk", "position_pct", "max_open"].forEach((k) => { form[k].value = p[k]; });
+  ["move_pct", "volume_x", "max_flags_per_day", "scan_minutes", "gap_pct", "stop_max_pct", "reward_risk", "position_pct", "max_open"].forEach((k) => { form[k].value = p[k]; });
   form.auto_approve.checked = !!p.auto_approve;
+  form.premarket.checked = !!p.premarket;
   form.max_flags_per_day.max = p.hard.max_flags_per_day; form.position_pct.max = p.hard.position_pct; form.max_open.max = p.hard.max_open; form.stop_max_pct.max = p.hard.stop_max_pct;
   paramsFilled = true;
 }
@@ -1000,7 +1040,7 @@ function renderTab(force) {
     if (force) { wlKey = ""; scopeKey = ""; chartKey = ""; }
     safe("godkendelser", () => { const n = (d.approvals || []).length; $("approvals").hidden = !n; $("approvals").innerHTML = n ? d.approvals.map(approvalCard).join("") : ""; });
     safe("konto", () => renderHero(d)); safe("børsen", tickClock); safe("bordet lige nu", () => renderNow(d));
-    safe("åbne handler", () => renderTrades(d)); safe("watchlist", () => renderWatch(d));
+    safe("åbne handler", () => renderTrades(d)); safe("watchlist", () => renderWatch(d)); safe("før åbning", () => renderPre(d));
   } else if (tab === "trades") safe("handler", () => renderTradesTab(d));
   else if (tab === "learn") safe("læring", () => renderLearn(d));
   else if (tab === "bots") safe("bots", () => renderBots(d));
@@ -1071,11 +1111,12 @@ $("log-btn").onclick = () => action("/api/desk/log", () => "Dagsloggen er skreve
 $("close-btn").onclick = () => { if (confirm("Luk alle bordets positioner nu?")) action("/api/desk/close-all", (r) => `${r.closed} position(er) lukket.`); };
 $("params").onsubmit = async (e) => {
   e.preventDefault();
-  const f = e.target, body = { watchlist: f.watchlist.value, auto_approve: f.auto_approve.checked };
-  ["move_pct", "volume_x", "max_flags_per_day", "scan_minutes", "stop_max_pct", "reward_risk", "position_pct", "max_open"].forEach((k) => { body[k] = f[k].value; });
+  const f = e.target, body = { watchlist: f.watchlist.value, auto_approve: f.auto_approve.checked, premarket: f.premarket.checked };
+  ["move_pct", "volume_x", "max_flags_per_day", "scan_minutes", "gap_pct", "stop_max_pct", "reward_risk", "position_pct", "max_open"].forEach((k) => { body[k] = f[k].value; });
   try { await post("/api/desk/params", body); paramsFilled = false; toast("Gemt."); refresh(); } catch (err) { toast(err.message); }
 };
 $("params").auto_approve.onchange = async (e) => { try { await post("/api/desk/params", { auto_approve: e.target.checked }); toast(e.target.checked ? "Autopilot er slået til." : "Du godkender nu hver ordre."); refresh(); } catch (err) { toast(err.message); } };
+$("params").premarket.onchange = async (e) => { try { await post("/api/desk/params", { premarket: e.target.checked }); toast(e.target.checked ? "SCOUT og NEWS kigger nu også før åbning." : "Bordet kigger kun i åbningstiden."); refresh(); } catch (err) { toast(err.message); } };
 $("reset-params").onclick = async () => { try { await post("/api/desk/params", { reset: true }); paramsFilled = false; toast("Tilbage til standard."); refresh(); } catch (err) { toast(err.message); } };
 $("diag-btn").onclick = async () => {
   const btn = $("diag-btn"); btn.disabled = true; $("diag").innerHTML = '<span class="muted">Tester …</span>';
@@ -1124,7 +1165,7 @@ function notifyApprovals(list) {
 }
 document.addEventListener("click", () => { if ("Notification" in window && Notification.permission === "default") Notification.requestPermission().catch(() => {}); }, { once: true });
 // Nye hændelser glider ned fra toppen som en besked på telefonen.
-const BANNER_KINDS = { flag: "Ny markering", approval: "Venter på dig", fill: "Købt", close: "Lukket", lesson: "Lært i dag", log: "Dagslog" };
+const BANNER_KINDS = { premarket: "Før åbning", flag: "Ny markering", approval: "Venter på dig", fill: "Købt", close: "Lukket", lesson: "Lært i dag", log: "Dagslog" };
 let bannerTimer = null;
 function showBanner(m) {
   const who = BOT[m.author] || BOT.system, el = $("banner");
