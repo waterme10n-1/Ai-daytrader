@@ -575,6 +575,19 @@ def create_app(
         meme().return_to_paper()
         return {"ok": True, "status": meme().status()}
 
+    @app.post("/api/meme/paper/restart")
+    async def meme_paper_restart(request: Request) -> dict:
+        try:
+            body = await request.json()
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Ugyldig JSON.") from exc
+        amount = (body or {}).get("amount") if isinstance(body, dict) else None
+        try:
+            message = meme().restart_paper(amount)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return {"ok": True, "message": message, "status": meme().status()}
+
     return app
 
 

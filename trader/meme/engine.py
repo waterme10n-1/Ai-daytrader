@@ -68,6 +68,8 @@ from trader.meme.learning import (
     adapt_params,
     adapt_sniper,
     build_features,
+    MOMENTUM_STOP_GRID,
+    MOMENTUM_TARGET_GRID,
     optimize_targets,
     shadow_summary,
     simulate_path,
@@ -136,6 +138,9 @@ GUARD_HOLD_HOURS = 24
 GUARD_MAX_HOURS = 96
 GUARD_SKIP_EXITS = {"kill", "manual"}
 # Automatisk mål for sniperen: kun med mange kursforløb, kun hvis det klart er bedre og giver overskud.
+# Én gang efter opdateringen: en papirkonto med historik starter forfra med 50 USD (brugerens ønske).
+PAPER_RESTART_ONCE = ("papir-50-nov-2026", 50.0)
+PAPER_MIN_USD, PAPER_MAX_USD = 5.0, 100_000.0
 AUTO_TARGET_MIN_PATHS = 40
 AUTO_TARGET_GAIN = 0.02
 AUTO_TARGET_EVERY_SECONDS = 24 * 3600
@@ -253,8 +258,11 @@ class MemeEngine:
         notifier: Callable[[str], None] | None = None,
     ) -> None:
         self.settings = settings or MemeSettings.from_env()
+        self._env_settings = self.settings
         self.main_settings = main_settings
         self.store = store or MemeStore(self.settings.db_path)
+        if (self.store.get_state("mode", "paper") or "paper") != "live":
+            self.settings = self._mode_settings("paper")
         self.clients = clients or MemeClients(self.settings)
         self.researcher = researcher or MemeResearcher(self.settings, self.store)
         stored_ai = self.store.get_json("ai_budget", None) or {}
@@ -300,6 +308,7 @@ class MemeEngine:
         self._last_insider_check = 0.0
         self._shadow_misses: dict[int, int] = {}
         self._optimizer_cache: tuple[tuple, float, dict] | None = None
+        self._mopt_cache: tuple[tuple, float, dict] | None = None
         self._sell_queue: set[int] = set()
         self._missing_price: dict[int, int] = {}
         self._copy_sells: set[tuple[str, str]] = set()
@@ -324,6 +333,8 @@ class MemeEngine:
         self.consecutive_errors = 0
         self.mode = "paper"
         self._restore_mode()
+        self.settings = self._mode_settings(self.mode)
+        self._maybe_restart_once()
 
     # ------------------------------------------------------------------ livscyklus
     def start(self) -> None:
@@ -416,6 +427,80 @@ class MemeEngine:
             send(self.main_settings, f"Memebot: {text}")
 
     # ------------------------------------------------------------------ tilstand
+    # ------------------------------------------------------------------ papirkontoen
+    def _mode_settings(self, mode: str) -> MemeSettings:
+        """Live bruger altid MEME_BANKROLL_USD som hårdt loft. Papir kan have sit eget startbeløb,
+        og så skaleres beløbene pr. handel med, så de faste gebyrer fylder lige så lidt."""
+        env = self._env_settings
+        if mode != "paper":
+            return env
+        try:
+            amount = float(self.store.get_state("paper_bankroll") or 0)
+        except ValueError:
+            amount = 0.0
+        if amount <= 0 or env.bankroll_usd <= 0:
+            return env
+        scale = amount / env.bankroll_usd
+        position = round(max(0.5, min(amount, env.position_usd * scale)), 2)
+        return dataclasses.replace(
+            env,
+            bankroll_usd=amount,
+            position_usd=position,
+            sniper_position_usd=round(max(0.5, env.sniper_position_usd * scale), 2),
+        )
+
+    def restart_paper(self, amount: float) -> str:
+        """Start papirkontoen forfra med et nyt beløb. Gamle handler gemmes i et arkiv, læringen beholdes."""
+        try:
+            amount = round(float(amount), 2)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("Beløbet skal være et tal.") from exc
+        if not PAPER_MIN_USD <= amount <= PAPER_MAX_USD:
+            raise ValueError(f"Beløbet skal være mellem {PAPER_MIN_USD:.0f} og {PAPER_MAX_USD:,.0f} USD.".replace(",", "."))
+        with self._lock:
+            if self.mode != "paper":
+                raise ValueError("Kun papirkontoen kan startes forfra. Med rigtige penge bestemmer din wallet beløbet.")
+            old = self.settings.bankroll_usd
+            scale = amount / old if old > 0 else 1.0
+            stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+            archived = self.store.archive_paper(f"paper-arkiv-{stamp}")
+            self.store.set_state("paper_cash", repr(amount))
+            self.store.set_state("paper_bankroll", repr(amount))
+            for key in ("failed_fees:paper", "dd_reset:paper", "halt_dd:paper", f"halt_day:paper:{utc_day()}"):
+                self.store.set_state(key, "0")
+            self.settings = self._mode_settings("paper")
+            sniper_usd, top_usd = self.sniper.position_usd * scale, self.top_cfg.position_usd * scale
+            self.sniper = dataclasses.replace(self.sniper, position_usd=clamp_sniper("position_usd", sniper_usd, self.settings.position_usd))
+            self._save_sniper()
+            self.top_cfg = dataclasses.replace(self.top_cfg, position_usd=clamp_top("position_usd", top_usd, self.settings.position_usd))
+            self.store.set_json("toptraders", self.top_cfg.to_dict())
+            for cache in (self._paths, self._path_at, self._priced_at, self._missing_price):
+                cache.clear()
+            self._sell_queue.clear()
+            self._copy_sells.clear()
+            self._optimizer_cache = None
+            self._last_snapshot = 0.0
+            message = (
+                f"Papirkontoen er startet forfra med {_dk(amount)} USD. Beløb pr. handel: {_dk(self.settings.position_usd)} USD "
+                f"(almindelig), {_dk(self.sniper.position_usd)} USD (sniper) og {_dk(self.top_cfg.position_usd)} USD (Top 10). "
+                f"Læringen er beholdt, og de {archived} gamle handler er gemt i et arkiv."
+            )
+            self.store.add_event("info", message)
+            self._wake.set()
+            return message
+
+    def _maybe_restart_once(self) -> None:
+        key, amount = PAPER_RESTART_ONCE
+        if self.store.get_state("paper_restart_once") == key:
+            return
+        self.store.set_state("paper_restart_once", key)
+        # Kun en papirkonto, der allerede har handlet. En helt ny bot starter med MEME_BANKROLL_USD.
+        if self.mode == "paper" and (self.store.open_positions("paper") or self.store.closed_positions("paper")):
+            try:
+                self.restart_paper(amount)
+            except ValueError as exc:
+                logger.warning("Papirkontoen kunne ikke startes forfra: %s", exc)
+
     def _restore_mode(self) -> None:
         stored = self.store.get_state("mode", "paper") or "paper"
         if stored == "live" and self._unlock()["all_passed"]:
@@ -1237,6 +1322,35 @@ class MemeEngine:
         self._optimizer_cache = (key, time.time(), result)
         return result
 
+    def _momentum_optimizer(self) -> dict:
+        """Samme regnestykke som sniperens, men med den almindelige strategis salgsregler og skyggehandler."""
+        done = [row for row in self.store.done_shadows(self.mode, "momentum", 600) if row["stage"] in SHADOW_OPTIMIZER_STAGES][:300]
+        p = self.params
+        key = (len(done), int(done[0]["id"]) if done else 0, p.partial_fraction, p.max_hold_minutes, p.take_profit_pct,
+               p.stop_loss_pct, p.trail_activation_pct, p.trailing_stop_pct, p.stale_minutes)
+        cached = self._mopt_cache
+        if cached and cached[0] == key and time.time() - cached[1] < 300:
+            return cached[2]
+        paths = [(loads(row["path"], []) or [[0.0, 1.0]], bool(row["rugged"])) for row in done]
+        rules = {"trail_activation": p.trail_activation_pct, "trailing": p.trailing_stop_pct, "stale": p.stale_minutes}
+        cost = self._cost_pct("momentum")
+        result = optimize_targets(paths, frac=p.partial_fraction, max_hold=p.max_hold_minutes, cost_pct=cost, rules=rules,
+                                  targets=MOMENTUM_TARGET_GRID, stops=MOMENTUM_STOP_GRID)
+        current = [
+            simulate_path(path, tp=p.take_profit_pct, frac=p.partial_fraction, sl=p.stop_loss_pct, max_hold=p.max_hold_minutes,
+                          rugged=rugged, cost_pct=cost, **rules)[0]
+            for path, rugged in paths
+        ]
+        result["current"] = {
+            "tp": p.take_profit_pct,
+            "sl": p.stop_loss_pct,
+            "n": len(current),
+            "avg": sum(current) / len(current) if current else None,
+            "win_rate": sum(1 for value in current if value > 0) / len(current) if current else None,
+        }
+        self._mopt_cache = (key, time.time(), result)
+        return result
+
     def _shadow_view(self, row: dict) -> dict:
         return {
             "id": row["id"],
@@ -1791,15 +1905,12 @@ class MemeEngine:
         if now - self._last_auto_target_check < AUTO_TARGET_CHECK_SECONDS:
             return
         self._last_auto_target_check = now
+        self._auto_momentum_targets(now)
         if now - float(self.store.get_state("auto_target_at", "0") or 0) < AUTO_TARGET_EVERY_SECONDS:
             return
         opt = self._optimizer()
         best, current = opt.get("best") or {}, opt.get("current") or {}
-        if opt.get("n", 0) < AUTO_TARGET_MIN_PATHS or best.get("avg") is None or current.get("avg") is None:
-            return
-        if best["avg"] <= 0 or best["avg"] < current["avg"] + AUTO_TARGET_GAIN:
-            return
-        if abs(best["tp"] - current["tp"]) < 1e-9 and abs(best["sl"] - current["sl"]) < 1e-9:
+        if not self._clearly_better(opt):
             return
         old_tp, old_sl = self.sniper.take_profit_pct, self.sniper.stop_loss_pct
         self.update_sniper({"take_profit_pct": best["tp"], "stop_loss_pct": best["sl"]})
@@ -1808,6 +1919,37 @@ class MemeEngine:
             f"Sniperens mål er ændret fra +{old_tp * 100:.0f} % / -{old_sl * 100:.0f} % til "
             f"+{self.sniper.take_profit_pct * 100:.0f} % / -{self.sniper.stop_loss_pct * 100:.0f} %. "
             f"På de seneste {opt['n']} kursforløb gav det {best['avg'] * 100:+.1f} % pr. snipe i stedet for {current['avg'] * 100:+.1f} %."
+        )
+        self.store.add_event("info", message)
+        self.store.add_lesson("parameter", message)
+
+    @staticmethod
+    def _clearly_better(opt: dict) -> bool:
+        best, current = opt.get("best") or {}, opt.get("current") or {}
+        if opt.get("n", 0) < AUTO_TARGET_MIN_PATHS or best.get("avg") is None or current.get("avg") is None:
+            return False
+        if best["avg"] <= 0 or best["avg"] < current["avg"] + AUTO_TARGET_GAIN:
+            return False
+        return abs(best["tp"] - current["tp"]) > 1e-9 or abs(best["sl"] - current["sl"]) > 1e-9
+
+    def _auto_momentum_targets(self, now: float) -> None:
+        """Den almindelige strategi lærer også sit mål og stop af de kursforløb, botten har fulgt."""
+        if now - float(self.store.get_state("auto_target_at:momentum", "0") or 0) < AUTO_TARGET_EVERY_SECONDS:
+            return
+        opt = self._momentum_optimizer()
+        if not self._clearly_better(opt):
+            return
+        best, current = opt["best"], opt["current"]
+        old_tp, old_sl = self.params.take_profit_pct, self.params.stop_loss_pct
+        self.params.take_profit_pct = clamp_param("take_profit_pct", best["tp"])
+        self.params.stop_loss_pct = clamp_param("stop_loss_pct", best["sl"])
+        self._save_learning()
+        self._mopt_cache = None
+        self.store.set_state("auto_target_at:momentum", repr(now))
+        message = (
+            f"Den almindelige strategis mål er ændret fra +{old_tp * 100:.0f} % / -{old_sl * 100:.0f} % til "
+            f"+{self.params.take_profit_pct * 100:.0f} % / -{self.params.stop_loss_pct * 100:.0f} %. "
+            f"På de seneste {opt['n']} kursforløb gav det {best['avg'] * 100:+.1f} % pr. handel i stedet for {current['avg'] * 100:+.1f} %."
         )
         self.store.add_event("info", message)
         self.store.add_lesson("parameter", message)
@@ -2635,6 +2777,7 @@ class MemeEngine:
             self.store.set_state("phrase_accepted", "1")
             self.mode = "live"
             self.store.set_state("mode", "live")
+            self.settings = self._mode_settings("live")
             self.store.set_state("dd_reset:live", repr(self._totals("live")["total_pnl"]))
             self.store.add_event("warning", f"RIGTIGE PENGE slået til. Botten bruger højst {self.settings.bankroll_usd:.2f} USD.")
             self._notify(f"Rigtige penge er slået til. Loft {self.settings.bankroll_usd:.2f} USD.")
@@ -2646,6 +2789,7 @@ class MemeEngine:
                 self._sell_all("live", "manual", "Tilbage til papir: live-positioner sælges.")
             self.mode = "paper"
             self.store.set_state("mode", "paper")
+            self.settings = self._mode_settings("paper")
             self.store.set_state("phrase_accepted", "0")
             self.store.add_event("info", "Tilbage på papirpenge.")
 

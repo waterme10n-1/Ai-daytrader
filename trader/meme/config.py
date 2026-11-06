@@ -476,7 +476,8 @@ def clamp_top(name: str, value: float, cap_usd: float | None = None) -> float:
 
 
 def top_from(data: dict | None, settings: MemeSettings) -> TopTraderSettings:
-    cfg = TopTraderSettings(enabled=settings.toptraders_enabled, position_usd=min(2.0, settings.position_usd))
+    # Standard: to tredjedele af beløbet pr. almindelig handel (2 USD ved 3 USD), så det følger startbeløbet.
+    cfg = TopTraderSettings(enabled=settings.toptraders_enabled, position_usd=min(settings.position_usd, round(settings.position_usd * 2 / 3, 2)))
     for key, value in (data or {}).items():
         if key in TOP_BOOLS:
             setattr(cfg, key, bool(value))
