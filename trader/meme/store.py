@@ -141,6 +141,14 @@ CREATE INDEX IF NOT EXISTS idx_shadows_mint ON shadows (mint, ts);
 CREATE INDEX IF NOT EXISTS idx_positions_mode_status ON positions (mode, status);
 CREATE INDEX IF NOT EXISTS idx_candidates_mint ON candidates (mint, ts);
 CREATE INDEX IF NOT EXISTS idx_equity_mode ON equity (mode, ts);
+
+-- Kursforløb for åbne positioner (mini-grafer). Slettes, når positionen lukkes.
+CREATE TABLE IF NOT EXISTS position_paths (
+    position_id INTEGER NOT NULL,
+    ts REAL NOT NULL,
+    ratio REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_position_paths ON position_paths (position_id, ts);
 """
 
 POSITION_FIELDS = (
@@ -293,6 +301,30 @@ class MemeStore:
                 f"DELETE FROM {table} WHERE id <= (SELECT COALESCE(MAX(id), 0) - ? FROM {table})",
                 (keep,),
             )
+
+    # Kursforløb -------------------------------------------------------------
+    def add_path_point(self, position_id: int, ts: float, ratio: float) -> None:
+        self._write("INSERT INTO position_paths (position_id, ts, ratio) VALUES (?, ?, ?)", (int(position_id), float(ts), float(ratio)))
+
+    def path_points(self, position_id: int, limit: int) -> list[tuple[float, float]]:
+        rows = self._all(
+            "SELECT ts, ratio FROM position_paths WHERE position_id = ? ORDER BY ts DESC LIMIT ?",
+            (int(position_id), int(limit)),
+        )
+        return [(float(row["ts"]), float(row["ratio"])) for row in reversed(rows)]
+
+    def drop_path(self, position_id: int) -> None:
+        self._write("DELETE FROM position_paths WHERE position_id = ?", (int(position_id),))
+
+    def prune_paths(self, keep_per_position: int) -> None:
+        """Kun åbne positioner har et forløb, og kun de seneste punkter gemmes."""
+        self._write("DELETE FROM position_paths WHERE position_id NOT IN (SELECT id FROM positions WHERE status = 'open')")
+        self._write(
+            "DELETE FROM position_paths WHERE rowid IN (SELECT rowid FROM ("
+            " SELECT rowid, ROW_NUMBER() OVER (PARTITION BY position_id ORDER BY ts DESC) AS n FROM position_paths"
+            ") WHERE n > ?)",
+            (int(keep_per_position),),
+        )
 
     # Positioner -------------------------------------------------------------
     def open_position(self, row: dict[str, Any]) -> int:
