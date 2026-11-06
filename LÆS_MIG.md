@@ -18,7 +18,7 @@ python run.py
 
 ## Claude-nøgle (valgfri)
 
-Med `ANTHROPIC_API_KEY` researcher Claude hver kandidat på X og nyheder, før botten køber, og gennemgår dagens fejl. Opret nøglen i [Claude Console](https://console.anthropic.com/). Forbruget betales separat fra et Claude Max-abonnement, og `MEME_AI_DAILY_BUDGET_USD` er et hårdt dagligt loft. Uden nøgle kører botten på regler og RugCheck.
+Med `ANTHROPIC_API_KEY` researcher Claude hver kandidat på X og nyheder, før botten køber, og gennemgår dagens fejl. Opret nøglen i [Claude Console](https://console.anthropic.com/). Forbruget betales separat fra et Claude Max-abonnement. Der er intet dagligt loft som standard, så Claude tjekker coins hele dagen. Hvert tjek koster ca. 0,15-0,40 USD, og du kan følge forbruget under **AI i dag** i dashboardet. Vil du have et loft, slår du **Dagligt AI-loft** til under Mere → Indstillinger → Tabsgrænser. Uden nøgle kører botten på regler og RugCheck.
 
 ## Udgiv på Railway
 
@@ -72,9 +72,15 @@ python tests/meme_soak.py 50 250 hard
 
 ## Dashboardet
 
-Efter login lander du på `/meme`. Siden er bygget til mobilen først, opdaterer sig selv hvert 8. sekund og har lyst og mørkt tema (menuen øverst til højre). På telefonen ligger menuen i bunden. På en computer ligger den i venstre side.
+Efter login lander du på `/meme`. Siden er bygget til mobilen først og opdaterer sig selv hvert 8. sekund. Under **Menu → Udseende** (øverst til højre) vælger du mellem fem udseender: **Neon** (mørk blå med cyan og magenta, standard), **Volt** (grafit og syregrøn), **Is** (lyst med elektrisk blå), **Rav** (varm sort og ravgul) og **Papir** (lyst papir). Valget huskes på telefonen. På telefonen ligger menuen i bunden. På en computer ligger den i venstre side.
 
-- **Hjem** er bottens kontrolrum. Øverst kører et bånd med dine åbne positioner og dagens tal. Derefter: egenkapitalen med graf (24 t, 7 d eller alt), fire hovedtal (i dag, i alt, vinderprocent og åbne), knapperne **Scan nu**, **Pause køb** (åbne positioner passes stadig) og **Nødstop** (sælger alt), og dine åbne positioner som fliser med en mini-graf over kursen den seneste halve time (tryk for detaljer). **Live-radaren** viser hver coin, botten har kigget på: grøn er købt, gul fik for lav score, blå faldt på markedsfiltrene og rød på rug-tjekket. Jo tættere på midten, jo længere nåede den. Tryk på en prik for at se hvorfor. Så følger **Hvad tjener penge?**, **Systemstatus** (nedtælling til næste scanning og hvor meget af Jupiter-, RugCheck- og DexScreener-kvoten der er brugt det seneste minut), aktiviteten som en log, målet om Claude Max og seneste lektion. Nøgletal, tragten for seneste scanning, dagligt resultat og hvorfor botten solgte ligger under **Flere tal og grafer**.
+- **Hjem** er bottens kontrolrum. Alt, der tæller, tæller rigtigt: siden får de præcise tider fra motoren og tæller selv ned sekund for sekund.
+  - Øverst står klokken og hvad botten laver lige nu (fx *Scan om 0:42* eller *Scanner · 0:03*). Under den kører et bånd med dine åbne positioner og dagens tal.
+  - **Egenkapitalen** ruller som på en tavle og blinker grønt eller rødt, når den ændrer sig. Grafen viser 24 t, 7 d eller alt.
+  - **Motoren** er en reaktor med tre ringe: den yderste er markeds-scanningen (hvert minut, ét lys pr. sekund), den midterste sniperen (hvert 10. sekund) og den inderste Top 10 (hvert 8. sekund). Ringen fyldes, mens der tælles ned, og drejer rundt, mens opgaven kører. I midten står tiden til næste scanning. Ved siden af står, hvad sidste runde fandt, og nederst hvornår positionerne sidst blev tjekket, hvor længe botten har kørt, og hvornår den nye dag (UTC) starter. Trykker du **Scan nu**, kan du se scanningen køre med det samme. Mister siden forbindelsen, står der *Ingen forbindelse* i stedet for en nedtælling, der ikke passer.
+  - **Åbne positioner** er fliser med kursen den seneste halve time, hvor langt kursen er fra stop og mål, et ur der viser, hvor længe botten har holdt den, og hvor lang tid der er tilbage, før den senest bliver solgt. Prikken er grøn, når kursen er frisk. Graferne gemmes, så de også er der efter en genstart.
+  - **Radaren** viser hver coin, botten har kigget på. Grøn er købt, gul fik for lav score, orange faldt på risiko, blå faldt på markedsfiltrene og rød på rug-tjekket. Jo tættere på midten, jo længere nåede den. Prikkerne lyser op, når strålen passerer dem, og nye coins blinker. Tryk på en prik for at se hvorfor.
+  - Derefter **Hvad tjener penge?**, **Datakilder** (hvor meget af Jupiter-, RugCheck- og DexScreener-kvoten der er brugt det seneste minut), **Log**, målet om Claude Max og seneste lektion. Nøgletal, tragten for seneste scanning, dagligt resultat og hvorfor botten solgte ligger under **Flere tal og grafer**.
 - **Handler**: **Åbne** viser et kort pr. position med en skala for kursen i forhold til stop-loss, købskurs, delsalg og trailing stop, links til DexScreener, RugCheck, Solscan, X og Axiom, og knappen **Sælg nu**. **Historik** viser alle lukkede handler. Tryk på en handel for begrundelse og transaktioner.
 - **Sniper**: tænd og sluk, sæt gevinstmål og stop-loss, filtre for nye tokens, hvilket mål der ville have virket, og de nye tokens botten har set. **Radar** viser hvert token botten har set på, hvilket trin det faldt ved og hvorfor. Filtrér, søg og bloker tokens.
 - **Wallet**: bot-wallet'ens saldo, forbind din Phantom, indbetal og hæv, wallets botten følger, Axiom-genveje og blokerede tokens.
@@ -120,7 +126,7 @@ Hvert minut:
 3. **Rug-tjek** via RugCheck og Jupiter: mint- og freeze authority skal være slået fra, ingen "danger"-risici, begrænset ejerkoncentration, udvikleren må ikke sidde på store beholdninger. Kan RugCheck ikke svare, købes der ikke.
 4. **Exit-tjek**: botten beder Jupiter om en købs- og en salgspris. Kan tokenet ikke sælges igen, eller koster frem og tilbage mere end 8 %, købes der ikke (honeypot- og tynd-pool-filter).
 5. **Score**: en lille læringsmodel vægter signalerne (købspres, likviditet, organisk handel, sociale links, X-omtale, copy-signal, rug-risiko m.fl.).
-6. **Claude** (hvis nøgle og budget er sat) søger på X, nyheder og fora efter røde flag: falske konti, koordineret shill, kopier af kendte tokens, rug-historik. Claude kan kun sige nej. Claude kan aldrig tvinge et køb igennem eller ændre risikogrænserne.
+6. **Claude** (hvis nøglen er sat) søger på X, nyheder og fora efter røde flag: falske konti, koordineret shill, kopier af kendte tokens, rug-historik. Claude kan kun sige nej. Claude kan aldrig tvinge et køb igennem eller ændre risikogrænserne.
 7. **Risiko**: højst `MEME_POSITION_USD` pr. handel, aldrig mere end `MEME_BANKROLL_USD` i alt, højst `MEME_MAX_OPEN` åbne og `MEME_MAX_TRADES_PER_DAY` køb om dagen.
 
 Hvert 15. sekund overvåges åbne positioner: stop-loss (-25 %), halvdelen sælges ved +60 %, trailing stop 25 % fra toppen, salg hvis likviditeten trækkes (rug-alarm), hvis intet sker, eller hvis den fulgte trader sælger. Tomme token-konti lukkes, så rent-depositummet kommer tilbage.
@@ -223,7 +229,7 @@ Botten bruger højst `MEME_BANKROLL_USD` i alt, også hvis du sender flere penge
 
 ## Valgfrie tilføjelser
 
-- **Claude-research**: `ANTHROPIC_API_KEY` og `MEME_AI_DAILY_BUDGET_USD` (standard 0,50 USD om dagen). Standardmodellen er `claude-opus-5-5` med indsats `medium` og websøgning. Er budgettet brugt, kører botten videre på regler. Vil du bruge en billigere model, kan du sætte `MEME_ANTHROPIC_MODEL`. Ældre modeller skal muligvis have `MEME_ANTHROPIC_WEB_SEARCH_TOOL=web_search_20250305`.
+- **Claude-research**: `ANTHROPIC_API_KEY`. Intet dagligt loft som standard. Slå **Dagligt AI-loft** til i dashboardet, eller sæt `MEME_AI_BUDGET_LIMIT=true`, så stopper Claude for i dag ved `MEME_AI_DAILY_BUDGET_USD` (standard 0,50 USD), og botten kører videre på regler. `MEME_AI_DAILY_BUDGET_USD=0` slår Claude helt fra. Standardmodellen er `claude-opus-5-5` med indsats `medium` og websøgning. Vil du bruge en billigere model, kan du sætte `MEME_ANTHROPIC_MODEL`. Ældre modeller skal muligvis have `MEME_ANTHROPIC_WEB_SEARCH_TOOL=web_search_20250305`.
 - **X API**: `X_BEARER_TOKEN` fra developer.x.com (betalt). Botten søger efter kontraktadressen og tickeren og måler, hvor mange forskellige konti der skriver om tokenet. `X_DAILY_REQUESTS` begrænser forbruget.
 - **Copy-trading**: `MEME_COPY_WALLETS=adresse1,adresse2`. Find kandidater på fx GMGN, Birdeye eller Kolscan, og tjek selv deres historik. Første gang botten ser en wallet, husker den kun, hvor den er nået til; gamle handler kopieres aldrig. Et køb fra en fulgt wallet skal stadig bestå alle tjek ovenfor.
 - **Telegram**: sæt `TELEGRAM_BOT_TOKEN` og `TELEGRAM_CHAT_ID`. Du får besked ved køb, salg, tabsgrænser og fejl.

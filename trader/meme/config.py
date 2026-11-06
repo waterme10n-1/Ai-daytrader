@@ -98,6 +98,8 @@ class MemeSettings:
     monitor_seconds: int
     copy_wallets: tuple[str, ...]
     ai_daily_budget_usd: float
+    # Fra som standard: Claude tjekker hele dagen. Til: stop ved ai_daily_budget_usd.
+    ai_budget_limit: bool
     ai_model: str
     ai_effort: str
     ai_web_search_tool: str
@@ -181,6 +183,8 @@ class MemeSettings:
             monitor_seconds=max(5, _int(os.getenv("MEME_MONITOR_SECONDS"), 15)),
             copy_wallets=_list(os.getenv("MEME_COPY_WALLETS")),
             ai_daily_budget_usd=max(0.0, _float(os.getenv("MEME_AI_DAILY_BUDGET_USD"), 0.5)),
+            # Intet dagligt AI-loft som standard. Kan slås til under Mere → Indstillinger → Tabsgrænser.
+            ai_budget_limit=_flag(os.getenv("MEME_AI_BUDGET_LIMIT"), False),
             ai_model=(os.getenv("MEME_ANTHROPIC_MODEL") or os.getenv("ANTHROPIC_MODEL") or "claude-opus-5-5").strip(),
             ai_effort=(os.getenv("MEME_ANTHROPIC_EFFORT") or "medium").strip(),
             ai_web_search_tool=(
@@ -504,6 +508,7 @@ def public_meme_settings(settings: MemeSettings) -> dict:
         "ai_model": settings.ai_model,
         "ai_effort": settings.ai_effort,
         "ai_daily_budget_usd": settings.ai_daily_budget_usd,
+        "ai_budget_limit": settings.ai_budget_limit,
         "ai_web_search_tool": settings.ai_web_search_tool,
         "x_configured": settings.x_configured,
         "x_daily_requests": settings.x_daily_requests,
