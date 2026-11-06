@@ -23,11 +23,22 @@ def _flag_hour(flag: dict) -> int | None:
         return None
 
 
+def _late(flag: dict) -> bool:
+    """Under to timer til lukning. Ældre markeringer uden minuttal: efter kl. 14 (New York lukker kl. 16)."""
+    left = flag.get("to_close_min")
+    if left is not None:
+        try:
+            return int(left) <= 120
+        except (TypeError, ValueError):
+            return False
+    return (_flag_hour(flag) or 0) >= 14
+
+
 # (nøgle, tekst, test på flag/news/chart)
 PATTERNS: tuple[tuple[str, str, Callable[[dict, dict, dict], bool]], ...] = (
     ("far_above_vwap", "Køb mere end 1,5 % over VWAP", lambda f, n, c: float(f.get("vs_vwap_pct") or 0) > 1.5),
     ("big_move", "Aktier, der allerede er steget 5 % eller mere på en time", lambda f, n, c: float(f.get("move_pct") or 0) >= 5),
-    ("late_day", "Køb efter kl. 14 ET (20 dansk tid)", lambda f, n, c: (_flag_hour(f) or 0) >= 14),
+    ("late_day", "Køb under to timer før lukning", lambda f, n, c: _late(f)),
     ("volume_only", "Markeringer kun på volumen, uden kursbevægelse", lambda f, n, c: not f.get("by_move")),
     ("headline_only", "Køb, hvor grunden kun var en overskrift (ikke Claude)", lambda f, n, c: n.get("source") == "rules"),
     ("wide_stop", "Køb med stop mere end 1,5 % væk", lambda f, n, c: float(c.get("stop_pct") or 0) > 1.5),
