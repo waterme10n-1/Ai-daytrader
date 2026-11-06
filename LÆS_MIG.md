@@ -84,7 +84,15 @@ Efter login lander du på `/meme`. Siden er bygget til mobilen først og opdater
 - **Handler**: **Åbne** viser et kort pr. position med en skala for kursen i forhold til stop-loss, købskurs, delsalg og trailing stop, links til DexScreener, RugCheck, Solscan, X og Axiom, og knappen **Sælg nu**. **Historik** viser alle lukkede handler. Tryk på en handel for begrundelse og transaktioner.
 - **Sniper**: tænd og sluk, sæt gevinstmål og stop-loss, filtre for nye tokens, hvilket mål der ville have virket, og de nye tokens botten har set. **Radar** viser hvert token botten har set på, hvilket trin det faldt ved og hvorfor. Filtrér, søg og bloker tokens.
 - **Wallet**: bot-wallet'ens saldo, forbind din Phantom, indbetal og hæv, wallets botten følger, Axiom-genveje og blokerede tokens.
-- **Mere**: **Læring** (lektioner, signalvægte, kilder, skyggehandler og strategiparametre) og **Indstillinger** (app på hjemmeskærmen, kravene før rigtige penge, forbindelsestest, sikkerhed, alle indstillinger og Telegram).
+- **Mere**: **Læring** (lektioner, signalvægte, kilder, skyggehandler og strategiparametre) og **Indstillinger** (app på hjemmeskærmen, papirkontoen, kravene før rigtige penge, forbindelsestest, sikkerhed, alle indstillinger og Telegram).
+
+**Start papirkontoen forfra.** Under Mere → Indstillinger → **Papirkonto** skriver du et beløb (fx 50 USD) og trykker **Start forfra**. Så sker der følgende:
+- Åbne papirpositioner lukkes, og resultaterne starter fra nul.
+- De gamle handler gemmes i et arkiv i databasen.
+- Botten beholder alt, den har lært: vægte, lektioner, skyggehandler og mål.
+- Beløbene pr. handel skaleres med. Med standardindstillingerne bliver 50 USD til 10 USD pr. almindelig handel, 5 USD pr. snipe og 6,67 USD pr. Top 10-handel. Faste gebyrer fylder så meget mindre i hver handel.
+
+Det gælder kun papir. Med rigtige penge er `MEME_BANKROLL_USD` stadig det hårde loft. Efter opdateringen i november 2026 starter en papirkonto, der allerede har handlet, automatisk forfra med 50 USD én gang.
 
 Alt, der flytter penge eller ændrer botten (sælg, nødstop, bloker, hæv, nulstil), spørger først i et vindue nederst på skærmen. Info-beskeder vises kun på Hjem, og en besked, du har lukket, forbliver lukket. Klokken i menuen slår notifikationer til ved køb og salg. På en computer: `1`–`8` skifter side, `S` scanner, `P` sætter køb på pause, `/` søger i radaren og `T` skifter tema.
 
@@ -169,7 +177,7 @@ Vær ærlig over for dig selv: dagens vindere er ofte heldige eller bots, og du 
 
 - **Hvad tjener penge?** På Hjem står hver strategi (Almindelig, Sniper, Top 10) med antal handler, gevinstprocent, resultat og de seneste handler. Tryk **Hold pause** for at stoppe en strategi, og **Genoptag** for at starte den igen.
 - **Strategi-vagt** (slået fra som standard, slå til med `MEME_STRATEGY_GUARD=true`): taber en strategi på sine seneste 8–12 handler (profitfaktor under 0,8), sættes den selv på hold i 24 timer, næste gang 48, op til 4 døgn, mens den lærer videre som skyggehandler.
-- **Det bedste mål automatisk** (slået til som standard, `MEME_AUTO_TARGETS`): når skyggehandlerne har mindst 40 kursforløb, og et andet gevinstmål og stop klart har virket bedre (mindst 2 procentpoint pr. snipe) og givet overskud, skifter sniperen selv, højst én gang i døgnet. Ændringen står under Læring. Slå det fra under Strategi → Sniper.
+- **Det bedste mål automatisk** (slået til som standard, `MEME_AUTO_TARGETS`): gælder både sniperen og den almindelige strategi. Når skyggehandlerne har mindst 40 kursforløb, og et andet gevinstmål og stop klart har virket bedre (mindst 2 procentpoint pr. handel) og givet overskud, skifter strategien selv, højst én gang i døgnet pr. strategi. Den almindelige strategi bruger sine egne salgsregler (trailing og stale) i regnestykket. Ændringen står under Læring. Slå det fra under Strategi → Sniper.
 
 ## Sådan lærer den
 

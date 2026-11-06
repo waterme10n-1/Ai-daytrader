@@ -1100,7 +1100,7 @@
     </div>
     <div class="card">
       <div class="card-head"><h2 id="opt-title"></h2><span class="muted small-txt" id="opt-note"></span></div>
-      <div class="field" style="padding-top:0"><div class="field-top"><span>Brug det bedste mål automatisk</span><button class="switch" id="auto-targets" type="button" role="switch" aria-checked="false" aria-label="Brug det bedste mål automatisk"></button></div><span class="muted small-txt">Når botten har mindst 40 kursforløb, og et andet mål og stop klart har virket bedre og givet overskud, skifter den selv. Højst én gang i døgnet, og du kan se det under Læring.</span></div>
+      <div class="field" style="padding-top:0"><div class="field-top"><span>Brug det bedste mål automatisk</span><button class="switch" id="auto-targets" type="button" role="switch" aria-checked="false" aria-label="Brug det bedste mål automatisk"></button></div><span class="muted small-txt">Gælder både sniperen og den almindelige strategi. Når botten har fulgt mindst 40 kursforløb, og et andet mål og stop klart har virket bedre og givet overskud, skifter den selv. Højst én gang i døgnet pr. strategi, og du kan se det under Læring.</span></div>
       <div id="opt"></div>
     </div>
     <div class="card">
@@ -1225,6 +1225,14 @@
     <div class="card" id="app-card">
       <div class="card-head"><h2 id="app-title"></h2><button class="btn small primary" type="button" id="app-install" hidden>Installer app</button></div>
       <div id="app-body"></div>
+    </div>
+    <div class="card" id="paper-card">
+      <div class="card-head"><h2 id="paper-title"></h2><span class="muted small-txt num" id="paper-now"></span></div>
+      <p class="muted" style="margin:0 0 12px;font-size:13.5px">Start papirkontoen forfra med et nyt beløb. Beløbene pr. handel skaleres med, så gebyrerne fylder lige så lidt. Læringen (vægte, lektioner, skyggehandler og mål) beholdes, og de gamle handler gemmes i et arkiv.</p>
+      <form class="addform" id="paper-form" style="margin:0">
+        <input id="paper-amount" type="number" inputmode="decimal" min="5" step="1" value="50" aria-label="Startbeløb i USD">
+        <button class="btn primary" type="submit">Start forfra</button>
+      </form>
     </div>
     <div class="card">
       <div class="card-head"><h2 id="limits-title"></h2></div>
@@ -2405,6 +2413,7 @@ function render(data) {
   renderSniper(data);
   renderTop(data);
   renderLimits(data);
+  renderPaper(data);
   renderStrategies(data);
   renderStats4(data);
   renderMotor(data);
@@ -2864,6 +2873,23 @@ document.getElementById("top-save").addEventListener("click", () => {
   }, "Indstillingerne for top-traders er gemt");
 });
 
+/* ---------- Papirkonto ---------- */
+function renderPaper(data) {
+  document.getElementById("paper-title").innerHTML = icon("wallet") + "Papirkonto";
+  const card = document.getElementById("paper-card");
+  card.hidden = data.mode !== "paper";
+  const k = data.kpis;
+  const s = data.settings;
+  document.getElementById("paper-now").textContent = `start ${money(k.bankroll)} · ${money(s.position_usd)} pr. handel`;
+}
+document.getElementById("paper-form").addEventListener("submit", (ev) => {
+  ev.preventDefault();
+  const amount = Number(document.getElementById("paper-amount").value);
+  if (!Number.isFinite(amount) || amount < 5) { toast("down", "Ugyldigt beløb", "Skriv mindst 5 USD."); return; }
+  ask(`Start forfra med ${money(amount)}?`, "Åbne papirpositioner lukkes, og resultaterne starter fra nul. De gamle handler gemmes, og botten beholder alt, den har lært.", { confirm: "Start forfra" })
+    .then((ok) => ok && act(async () => { const body = await post("/api/meme/paper/restart", { amount }); toast("up", "Papirkontoen er startet forfra", body.message || ""); return body; }, ""));
+});
+
 /* ---------- Tabsgrænser ---------- */
 function renderLimits(data) {
   const l = data.loss_limits;
@@ -2927,7 +2953,7 @@ document.getElementById("strat-card").addEventListener("click", (ev) => {
 });
 document.getElementById("auto-targets").addEventListener("click", () => {
   const on = !(state && state.auto_targets);
-  act(() => post("/api/meme/strategies", { auto_targets: on }), on ? "Sniperen lærer selv sit mål" : "Sniperens mål ændres kun af dig");
+  act(() => post("/api/meme/strategies", { auto_targets: on }), on ? "Botten lærer selv sine mål" : "Målene ændres kun af dig");
 });
 
 document.getElementById("top-add").addEventListener("submit", (ev) => {

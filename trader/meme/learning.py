@@ -362,13 +362,30 @@ def verdict_for(stage: str, pnl: float, rugged: bool) -> str:
     return "neutral"
 
 
-def optimize_targets(paths: list[tuple[list, bool]], *, frac: float, max_hold: float, cost_pct: float) -> dict:
-    """Hvilket gevinstmål og stop ville have givet det bedste gennemsnit på de observerede kurs-stier?"""
+# Den almindelige strategis mål og stop skal holde sig inden for PARAM_BOUNDS.
+MOMENTUM_TARGET_GRID = (0.25, 0.4, 0.6, 1.0, 2.0)
+MOMENTUM_STOP_GRID = (0.15, 0.2, 0.25, 0.3, 0.35)
+
+
+def optimize_targets(
+    paths: list[tuple[list, bool]],
+    *,
+    frac: float,
+    max_hold: float,
+    cost_pct: float,
+    rules: dict | None = None,
+    targets: tuple[float, ...] = TARGET_GRID,
+    stops: tuple[float, ...] = STOP_GRID,
+) -> dict:
+    """Hvilket gevinstmål og stop ville have givet det bedste gennemsnit på de observerede kurs-stier?
+
+    `rules` er strategiens øvrige salgsregler (trailing, stale osv.), så kun mål og stop varieres."""
+    extra = {"breakeven_after_partial": True} if rules is None else dict(rules)
     cells = []
-    for tp in TARGET_GRID:
-        for sl in STOP_GRID:
+    for tp in targets:
+        for sl in stops:
             results = [
-                simulate_path(path, tp=tp, frac=frac, sl=sl, max_hold=max_hold, rugged=rugged, cost_pct=cost_pct, breakeven_after_partial=True)[0]
+                simulate_path(path, tp=tp, frac=frac, sl=sl, max_hold=max_hold, rugged=rugged, cost_pct=cost_pct, **extra)[0]
                 for path, rugged in paths
             ]
             n = len(results)
@@ -383,7 +400,7 @@ def optimize_targets(paths: list[tuple[list, bool]], *, frac: float, max_hold: f
             )
     ranked = [cell for cell in cells if cell["avg"] is not None]
     best = max(ranked, key=lambda cell: cell["avg"]) if ranked else None
-    return {"n": len(paths), "enough": len(paths) >= MIN_PATHS, "cells": cells, "best": best, "targets": list(TARGET_GRID), "stops": list(STOP_GRID)}
+    return {"n": len(paths), "enough": len(paths) >= MIN_PATHS, "cells": cells, "best": best, "targets": list(targets), "stops": list(stops)}
 
 
 def shadow_summary(done: list[dict]) -> list[dict]:

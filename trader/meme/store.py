@@ -302,6 +302,23 @@ class MemeStore:
                 (keep,),
             )
 
+    # Papirkontoen ----------------------------------------------------------
+    def archive_paper(self, archive_mode: str) -> int:
+        """Flyt papirhandler, egenkapitalkurve og dage til et arkiv, så en ny runde starter rent.
+        Kandidater, skyggehandler og læring bliver, hvor de er."""
+        with self._lock:
+            n = int(self._conn.execute("SELECT COUNT(*) FROM positions WHERE mode = 'paper'").fetchone()[0])
+            self._conn.execute(
+                "UPDATE positions SET status = 'closed', exit_reason = COALESCE(exit_reason, 'reset'), closed_at = COALESCE(closed_at, ?) "
+                "WHERE mode = 'paper' AND status = 'open'",
+                (now_iso(),),
+            )
+            for table in ("positions", "equity", "days"):
+                self._conn.execute(f"UPDATE {table} SET mode = ? WHERE mode = 'paper'", (archive_mode,))
+            self._conn.execute("DELETE FROM position_paths WHERE position_id NOT IN (SELECT id FROM positions WHERE status = 'open')")
+            self._conn.commit()
+        return n
+
     # Kursforløb -------------------------------------------------------------
     def add_path_point(self, position_id: int, ts: float, ratio: float) -> None:
         self._write("INSERT INTO position_paths (position_id, ts, ratio) VALUES (?, ?, ?)", (int(position_id), float(ts), float(ratio)))
