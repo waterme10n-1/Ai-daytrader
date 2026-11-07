@@ -9,6 +9,7 @@ botten har lært, og hvorfor.
 from __future__ import annotations
 
 import math
+import time
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -21,6 +22,7 @@ from trader.meme.config import (
     clamp_param,
     clamp_sniper,
 )
+from trader.meme.safety import has_real_socials
 
 FEATURES: dict[str, tuple[str, float]] = {
     # navn: (dansk forklaring, startvægt)
@@ -35,12 +37,15 @@ FEATURES: dict[str, tuple[str, float]] = {
     "rug_risk": ("RugCheck-risiko", -1.5),
     "concentration": ("Ejerkoncentration i top-10", -1.0),
     "organic": ("Organisk handel (Jupiter)", 0.8),
-    "socials": ("Har X, Telegram og hjemmeside", 0.4),
+    "socials": ("Har Telegram og X", 0.4),
     "x_buzz": ("Omtale på X", 0.5),
     "copy_signal": ("Købt af en fulgt trader", 0.7),
     "boosted": ("Betalt promovering (boost)", -0.1),
     "verified": ("Verificeret på Jupiter", 0.3),
     "ai_view": ("Claudes vurdering", 0.6),
+    "insiders": ("Insider-wallets (RugCheck)", -0.6),
+    "dev_mints": ("Udvikleren har lavet mange tokens", -0.5),
+    "holder_growth": ("Flere holdere sidste time", 0.3),
 }
 INITIAL_BIAS = -0.6
 LEARNING_RATE = 0.08
@@ -69,11 +74,7 @@ def build_features(
     ratio_m5 = pair.buy_ratio("m5")
     age = pair.age_minutes(now_ms)
     change_h1 = pair.change.get("h1", 0.0)
-    socials = 0
-    has_x = bool(pair.socials.get("twitter") or pair.socials.get("x") or (token and token.twitter))
-    has_tg = bool(pair.socials.get("telegram") or (token and token.telegram))
-    has_web = bool(pair.websites or (token and token.website))
-    socials = int(has_x) + int(has_tg) + int(has_web)
+    has_x, has_tg, has_web = has_real_socials(pair, token)
     top10 = None
     if report is not None and report.top10_pct is not None:
         top10 = report.top10_pct
@@ -92,13 +93,81 @@ def build_features(
         "rug_risk": report.risk if report is not None else 0.6,
         "concentration": _clip((top10 if top10 is not None else 30.0) / 50.0, 0.0, 1.0),
         "organic": _clip(organic / 100.0, 0.0, 1.0),
-        "socials": socials / 3.0,
+        # Telegram og X vejer mest; en hjemmeside alene siger næsten intet.
+        "socials": 0.45 * has_tg + 0.4 * has_x + 0.15 * has_web,
         "x_buzz": 0.0 if buzz is None else _clip(math.log10(1 + buzz.authors) / 2.0, 0.0, 1.0),
         "copy_signal": 1.0 if copy_signal else 0.0,
         "boosted": 1.0 if (boosted or pair.boosts_active > 0) else 0.0,
         "verified": 1.0 if token is not None and token.verified else 0.0,
         "ai_view": _clip(ai_view, -1.0, 1.0),
+        "insiders": _clip(math.log10(1 + max(0, report.insiders)) / 2.0, 0.0, 1.0) if report is not None else 0.0,
+        "dev_mints": _clip(math.log10(max(1, token.dev_mints)) / 2.0, 0.0, 1.0) if token is not None and token.dev_mints else 0.0,
+        "holder_growth": _clip(_num_or(token.stats_1h.get("holderChange"), 0.0) / 30.0, -1.0, 1.0) if token is not None else 0.0,
     }
+
+
+def _num_or(value: Any, default: float) -> float:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return default
+    return number if math.isfinite(number) else default
+
+
+def facts_of(
+    pair: PairInfo,
+    *,
+    token: TokenInfo | None = None,
+    report: RugReport | None = None,
+    boosted: bool = False,
+    now_ms: int | None = None,
+) -> dict[str, float]:
+    """De rå tal bag en beslutning. Gemmes med hver skyggehandel og position, så man bagefter
+    kan se, hvilke egenskaber der faktisk hang sammen med gevinst og tab."""
+    facts: dict[str, float] = {}
+
+    def put(key: str, value: Any, digits: int = 3) -> None:
+        if value is None:
+            return
+        number = _num_or(value, float("nan"))
+        if math.isfinite(number):
+            facts[key] = round(number, digits)
+
+    liquidity = pair.liquidity_usd
+    put("liq", liquidity, 0)
+    put("mcap", pair.mcap or None, 0)
+    put("age_min", pair.age_minutes(now_ms), 2)
+    put("chg_m5", pair.change.get("m5"), 2)
+    put("chg_h1", pair.change.get("h1"), 2)
+    put("vol_h1", pair.volume.get("h1"), 0)
+    put("txns_h1", pair.txns("h1"), 0)
+    put("buy_ratio_h1", pair.buy_ratio("h1"))
+    put("buy_ratio_m5", pair.buy_ratio("m5"))
+    if liquidity > 0:
+        put("vol_liq", pair.volume.get("h1", 0.0) / liquidity)
+    has_x, has_tg, has_web = has_real_socials(pair, token)
+    facts.update({"x": int(has_x), "tg": int(has_tg), "web": int(has_web), "boosted": int(bool(boosted or pair.boosts_active > 0))})
+    if token is not None:
+        put("organic", token.organic_score, 1)
+        put("holders", token.holders, 0)
+        put("top10", token.top_holders_pct, 2)
+        put("dev_pct", token.dev_balance_pct, 2)
+        put("dev_mints", token.dev_mints, 0)
+        facts["sus"] = int(token.sus)
+        facts["verified"] = int(token.verified)
+        put("holder_chg_h1", token.stats_1h.get("holderChange"), 2)
+        put("organic_buyers_h1", token.stats_1h.get("numOrganicBuyers"), 0)
+        put("net_buyers_h1", token.stats_1h.get("numNetBuyers"), 0)
+    if report is not None:
+        put("rug_risk", report.risk)
+        put("insiders", report.insiders, 0)
+        put("top10", report.top10_pct, 2)
+        put("lp_locked", report.lp_locked_pct, 1)
+        put("rc_holders", report.holders, 0)
+        facts["dangers"] = len(report.dangers)
+        facts["warnings"] = len(report.warnings)
+    facts["hour"] = int(((now_ms or int(time.time() * 1000)) // 3_600_000) % 24)
+    return facts
 
 
 def _sigmoid(value: float) -> float:
@@ -415,3 +484,169 @@ def shadow_summary(done: list[dict]) -> list[dict]:
     for entry in stages.values():
         entry["avg"] = entry["sum"] / entry["n"] if entry["n"] else None
     return sorted(stages.values(), key=lambda item: item["n"], reverse=True)
+
+
+# --------------------------------------------------------------------------- hvad virker? (faktaanalyse)
+
+FACT_LABELS: dict[str, str] = {
+    "organic": "Organisk score (Jupiter)",
+    "liq": "Likviditet (USD)",
+    "mcap": "Markedsværdi (USD)",
+    "age_min": "Alder (min.)",
+    "chg_h1": "Stigning sidste time (%)",
+    "chg_m5": "Stigning sidste 5 min. (%)",
+    "buy_ratio_h1": "Andel køb sidste time",
+    "vol_liq": "Volumen/likviditet",
+    "top10": "Top-10 ejerandel (%)",
+    "insiders": "Insider-wallets",
+    "holders": "Holdere",
+    "holder_chg_h1": "Holder-vækst sidste time (%)",
+    "dev_mints": "Tokens lavet af udvikleren",
+    "rug_risk": "Rug-risiko (0-1)",
+    "tg": "Har Telegram",
+    "x": "Har X",
+    "web": "Har hjemmeside",
+    "boosted": "Betalt boost",
+}
+BINARY_FACTS = {"tg", "x", "web", "boosted", "sus", "verified"}
+FACT_MIN_ROWS = 30
+BUCKET_MIN_ROWS = 8
+
+
+def _nice(value: float) -> float:
+    """Rund en grænse til to betydende cifre, så den kan læses ("31.000" i stedet for "30.874")."""
+    if value == 0 or not math.isfinite(value):
+        return 0.0
+    digits = 1 - int(math.floor(math.log10(abs(value))))
+    return round(value, digits)
+
+
+def _edge(value: float) -> str:
+    """Grænse i en gruppe-etiket: hele tal uden decimaler ("3", ikke "3.00")."""
+    if value == int(value) and abs(value) < 1000:
+        return str(int(value))
+    return _fmt(value)
+
+
+def _bucket_stats(label: str, values: list[float]) -> dict:
+    n = len(values)
+    enough = n >= BUCKET_MIN_ROWS
+    return {
+        "label": label,
+        "n": n,
+        "avg": sum(values) / n if enough else None,
+        "win_rate": sum(1 for value in values if value > 0) / n if enough else None,
+    }
+
+
+def fact_report(rows: list[dict]) -> list[dict]:
+    """rows: [{"facts": {...}, "pnl": resultat i brøk}]. For hver egenskab: resultat i tre lige store grupper
+    (eller ja/nej). Sorteret, så egenskaberne med størst forskel mellem grupperne står øverst."""
+    out = []
+    for key, label in FACT_LABELS.items():
+        pairs = [(float(row["facts"][key]), float(row["pnl"])) for row in rows if key in (row.get("facts") or {})]
+        if len(pairs) < FACT_MIN_ROWS:
+            continue
+        if key in BINARY_FACTS:
+            buckets = [
+                _bucket_stats("Nej", [pnl for value, pnl in pairs if value < 0.5]),
+                _bucket_stats("Ja", [pnl for value, pnl in pairs if value >= 0.5]),
+            ]
+        else:
+            ordered = sorted(value for value, _pnl in pairs)
+            low = _nice(ordered[len(ordered) // 3])
+            high = _nice(ordered[(2 * len(ordered)) // 3])
+            if high <= low:
+                continue
+            buckets = [
+                _bucket_stats(f"under {_edge(low)}", [pnl for value, pnl in pairs if value < low]),
+                _bucket_stats(f"{_edge(low)}–{_edge(high)}", [pnl for value, pnl in pairs if low <= value < high]),
+                _bucket_stats(f"{_edge(high)}+", [pnl for value, pnl in pairs if value >= high]),
+            ]
+        avgs = [bucket["avg"] for bucket in buckets if bucket["avg"] is not None]
+        if len(avgs) < 2:
+            continue
+        out.append({"fact": key, "label": label, "n": len(pairs), "buckets": buckets, "spread": max(avgs) - min(avgs)})
+    return sorted(out, key=lambda item: item["spread"], reverse=True)
+
+
+# Hvilke filtre læringen må stramme ud fra skyggehandlernes fakta. "min": højere er strengere; "max": lavere er strengere.
+# scale omregner faktaens enhed til indstillingens (alder i minutter → sniperens sekunder).
+TIGHTEN_RULES: dict[str, list[dict]] = {
+    "momentum": [
+        {"fact": "organic", "param": "min_organic_score", "kind": "min", "grid": (20, 30, 40, 50, 60, 70)},
+        {"fact": "liq", "param": "min_liquidity_usd", "kind": "min", "grid": (25_000, 40_000, 60_000, 100_000, 150_000)},
+        {"fact": "mcap", "param": "min_mcap_usd", "kind": "min", "grid": (60_000, 100_000, 250_000, 500_000)},
+        {"fact": "age_min", "param": "min_age_minutes", "kind": "min", "grid": (30, 60, 120, 240)},
+        {"fact": "chg_h1", "param": "max_change_h1_pct", "kind": "max", "grid": (250, 150, 100, 60)},
+        {"fact": "top10", "param": "max_top10_pct", "kind": "max", "grid": (35, 30, 25, 20)},
+        {"fact": "insiders", "param": "max_insiders", "kind": "max", "grid": (50, 30, 15, 8)},
+        {"fact": "rug_risk", "param": "max_rug_score", "kind": "max", "grid": (0.55, 0.45, 0.35)},
+    ],
+    "sniper": [
+        {"fact": "age_min", "param": "min_age_seconds", "kind": "min", "scale": 60.0, "grid": (300, 420, 600, 900)},
+        {"fact": "liq", "param": "min_liquidity_usd", "kind": "min", "grid": (8_000, 12_000, 20_000, 35_000)},
+        {"fact": "holders", "param": "min_holders", "kind": "min", "grid": (25, 50, 100, 200, 400)},
+        {"fact": "top10", "param": "max_top10_pct", "kind": "max", "grid": (30, 25, 20, 15)},
+        {"fact": "organic", "param": "min_organic_score", "kind": "min", "grid": (10, 20, 30, 40)},
+    ],
+}
+TIGHTEN_MIN_REMOVED = 25
+TIGHTEN_MIN_KEPT = 20
+TIGHTEN_MAX_REMOVED_AVG = -0.05
+TIGHTEN_MIN_GAP = 0.05
+
+
+def _passes(row: dict, rule: dict, threshold: float) -> bool:
+    value = (row.get("facts") or {}).get(rule["fact"])
+    if value is None:
+        return True
+    value = float(value) * float(rule.get("scale", 1.0))
+    return value >= threshold if rule["kind"] == "min" else value <= threshold
+
+
+def tighten_suggestion(rows: list[dict], current: dict[str, float], rules: list[dict]) -> dict | None:
+    """Det ene filter, hvor en strammere grænse ville have fjernet flest tabende handler.
+
+    Kun strammere end nu, kun med mindst TIGHTEN_MIN_REMOVED fjernede tokens, der i snit tabte
+    mindst 5 %, og kun hvis de resterende klarede sig tydeligt bedre. Ellers None."""
+    best: dict | None = None
+    for rule in rules:
+        name = rule["param"]
+        if name not in current:
+            continue
+        now = float(current[name])
+        others = [other for other in rules if other is not rule and other["param"] in current]
+        pool = [
+            row
+            for row in rows
+            if rule["fact"] in (row.get("facts") or {})
+            and _passes(row, rule, now)
+            and all(_passes(row, other, float(current[other["param"]])) for other in others)
+        ]
+        for candidate in rule["grid"]:
+            stricter = candidate > now if rule["kind"] == "min" else candidate < now
+            if not stricter:
+                continue
+            removed = [float(row["pnl"]) for row in pool if not _passes(row, rule, candidate)]
+            kept = [float(row["pnl"]) for row in pool if _passes(row, rule, candidate)]
+            if len(removed) < TIGHTEN_MIN_REMOVED or len(kept) < TIGHTEN_MIN_KEPT:
+                continue
+            removed_avg = sum(removed) / len(removed)
+            kept_avg = sum(kept) / len(kept)
+            if removed_avg > TIGHTEN_MAX_REMOVED_AVG or kept_avg - removed_avg < TIGHTEN_MIN_GAP:
+                continue
+            saved = -sum(removed)
+            if best is None or saved > best["saved"]:
+                best = {
+                    "param": name,
+                    "fact": rule["fact"],
+                    "old": now,
+                    "new": float(candidate),
+                    "removed": len(removed),
+                    "removed_avg": removed_avg,
+                    "kept": len(kept),
+                    "kept_avg": kept_avg,
+                    "saved": saved,
+                }
+    return best

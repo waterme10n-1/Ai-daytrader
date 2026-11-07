@@ -70,7 +70,12 @@ from trader.meme.learning import (
     build_features,
     MOMENTUM_STOP_GRID,
     MOMENTUM_TARGET_GRID,
+    FACT_MIN_ROWS,
+    TIGHTEN_RULES,
+    fact_report,
+    facts_of,
     optimize_targets,
+    tighten_suggestion,
     shadow_summary,
     simulate_path,
     verdict_for,
@@ -88,7 +93,15 @@ from trader.meme.risk import (
     sniper_exit_decision,
     top_exit_decision,
 )
-from trader.meme.safety import market_rejections, roundtrip_rejections, rug_rejections, sniper_rejections
+from trader.meme.safety import (
+    BONDING_CURVE_DEXES,
+    insider_rejections,
+    market_rejections,
+    roundtrip_rejections,
+    rug_rejections,
+    sniper_rejections,
+    token_quality_rejections,
+)
 from trader.meme.store import MemeStore, loads, now_iso, utc_day
 from trader.meme.wallet import MAX_DEPOSIT_SOL, PaperWallet, SolanaWallet, b58encode, build_transfer_message, fee_sol, load_keypair
 
@@ -139,7 +152,13 @@ GUARD_MAX_HOURS = 96
 GUARD_SKIP_EXITS = {"kill", "manual"}
 # Automatisk mål for sniperen: kun med mange kursforløb, kun hvis det klart er bedre og giver overskud.
 # Én gang efter opdateringen: en papirkonto med historik starter forfra med 50 USD (brugerens ønske).
-PAPER_RESTART_ONCE = ("papir-50-nov-2026", 50.0)
+PAPER_RESTART_ONCE = ("papir-50-forskning-nov-2026", 50.0)
+# Én gang: nye, forskningsbaserede standarder for allerede gemte indstillinger (kun strammere, aldrig løsere).
+RESEARCH_UPGRADE = "forskning-nov-2026"
+SNIPER_RESEARCH_MIN_AGE_SECONDS = 300.0
+ANALYSIS_ROWS = 1500
+ANALYSIS_CACHE_SECONDS = 300
+TIGHTEN_LOG_KEPT = 20
 PAPER_MIN_USD, PAPER_MAX_USD = 5.0, 100_000.0
 AUTO_TARGET_MIN_PATHS = 40
 AUTO_TARGET_GAIN = 0.02
@@ -147,6 +166,7 @@ AUTO_TARGET_EVERY_SECONDS = 24 * 3600
 AUTO_TARGET_CHECK_SECONDS = 3600
 SNIPER_DEEP_CHECKS = 4
 SNIPER_SEEN_HOURS = 6
+SNIPER_WAITING_MAX = 300
 
 SOURCE_LABELS = {
     "sniper": "Sniper: ny token",
@@ -309,6 +329,7 @@ class MemeEngine:
         self._shadow_misses: dict[int, int] = {}
         self._optimizer_cache: tuple[tuple, float, dict] | None = None
         self._mopt_cache: tuple[tuple, float, dict] | None = None
+        self._analysis_cache: tuple[float, dict] | None = None
         self._sell_queue: set[int] = set()
         self._missing_price: dict[int, int] = {}
         self._copy_sells: set[tuple[str, str]] = set()
@@ -334,6 +355,7 @@ class MemeEngine:
         self.mode = "paper"
         self._restore_mode()
         self.settings = self._mode_settings(self.mode)
+        self._maybe_research_upgrade()
         self._maybe_restart_once()
 
     # ------------------------------------------------------------------ livscyklus
@@ -500,6 +522,28 @@ class MemeEngine:
                 self.restart_paper(amount)
             except ValueError as exc:
                 logger.warning("Papirkontoen kunne ikke startes forfra: %s", exc)
+
+    def _maybe_research_upgrade(self) -> None:
+        """Nye værn efter research i nov. 2026. Gemte sniper-indstillinger fra før får den nye ventetid."""
+        if self.store.get_state("research_upgrade") == RESEARCH_UPGRADE:
+            return
+        self.store.set_state("research_upgrade", RESEARCH_UPGRADE)
+        notes = []
+        if self.sniper.min_age_seconds < SNIPER_RESEARCH_MIN_AGE_SECONDS:
+            old = self.sniper.min_age_seconds
+            self.sniper.min_age_seconds = SNIPER_RESEARCH_MIN_AGE_SECONDS
+            self._save_sniper()
+            notes.append(f"Sniperen venter nu {SNIPER_RESEARCH_MIN_AGE_SECONDS:.0f} s i stedet for {old:.0f} s efter lancering")
+        text = (
+            "Nye værn mod tab (research nov. 2026): Jupiters mistænkelig-markering og serie-udviklere afvises, "
+            f"organisk score under {self.params.min_organic_score:.0f} afvises, RugCheck-insidere tæller med, "
+            "sniperen kræver Telegram eller X, og Top 10 køber ikke langt over traderens egen pris."
+        )
+        if notes:
+            text += " " + ". ".join(notes) + "."
+        if self.store.get_json("params") is not None or notes:  # kun for en bot, der har kørt før
+            self.store.add_lesson("parameter", text)
+            self.store.add_event("info", text)
 
     def _restore_mode(self) -> None:
         stored = self.store.get_state("mode", "paper") or "paper"
@@ -1149,6 +1193,8 @@ class MemeEngine:
             self._marked_shadow_budget -= 1
         elif stage not in SHADOW_STAGES:
             return
+        if stage != "købt" and pair.dex_id.lower() in BONDING_CURVE_DEXES:
+            return  # tokens på bonding curve kan ikke købes alligevel; de fylder bare pladserne
         if stage != "købt" and self.store.count_active_shadows() >= SHADOW_MAX_ACTIVE:
             return
         since = (datetime.now(timezone.utc) - timedelta(hours=6)).isoformat(timespec="seconds")
@@ -1159,14 +1205,38 @@ class MemeEngine:
                 "mode": self.mode,
                 "mint": cand["mint"],
                 "symbol": pair.symbol,
-                "strategy": "sniper" if cand.get("source") == "sniper" else "momentum",
+                "strategy": self._cand_strategy(cand),
                 "stage": stage,
                 "reason": reason[:300],
                 "entry_price": pair.price_usd,
                 "liquidity_entry": pair.liquidity_usd,
                 "features": features,
+                "facts": self._facts(cand),
             }
         )
+
+    @staticmethod
+    def _cand_strategy(cand: dict) -> str:
+        if cand.get("strategy"):
+            return str(cand["strategy"])
+        return "sniper" if cand.get("source") == "sniper" else "momentum"
+
+    def _facts(self, cand: dict) -> dict:
+        """De rå tal bag beslutningen. Til faktaanalysen og den automatiske strammer."""
+        pair: PairInfo | None = cand.get("pair")
+        if pair is None:
+            return {}
+        try:
+            facts = facts_of(pair, token=cand.get("token"), report=cand.get("report"), boosted=bool(cand.get("boosted")))
+        except Exception as exc:  # fakta må aldrig stoppe en handel
+            logger.info("Fakta kunne ikke samles for %s: %s", cand.get("mint"), exc)
+            return {}
+        if cand.get("age_minutes") is not None:
+            facts["age_min"] = round(float(cand["age_minutes"]), 2)
+        lead = cand.get("leader") or {}
+        if lead.get("chase") is not None:
+            facts["chase"] = round(float(lead["chase"]), 4)
+        return facts
 
     def _cost_pct(self, strategy: str) -> float:
         slip = self.settings.paper_slippage_pct + (self.settings.paper_sniper_extra_pct if strategy == "sniper" else 0.0)
@@ -1176,6 +1246,18 @@ class MemeEngine:
         return 2 * slip / 100.0 + (2 * fee_usd / size if size > 0 else 0.0)
 
     def _rules_for(self, strategy: str) -> dict:
+        if strategy == "toptrader":
+            # Traderens salg kendes ikke i en simulering. Stop-loss, sikring af store gevinster og tidsgrænse gør.
+            top = self.top_cfg
+            return {
+                "tp": 1000.0,
+                "frac": 1.0,
+                "sl": top.stop_loss_pct if top.stop_loss_on else 0.99,
+                "max_hold": top.max_hold_minutes,
+                "trail_activation": TOP_TRAIL_ACTIVATION,
+                "trailing": TOP_TRAIL,
+                "cost_pct": self._cost_pct("momentum"),
+            }
         if strategy == "sniper":
             return {
                 "tp": self.sniper.take_profit_pct,
@@ -1635,7 +1717,11 @@ class MemeEngine:
                 summary["errors"].append(f"RugCheck: {exc}")
                 report = None
             cand["report"] = report
-            reasons = rug_rejections(report, token, self.params)
+            reasons = (
+                rug_rejections(report, token, self.params)
+                + token_quality_rejections(token, min_organic=self.params.min_organic_score, max_dev_mints=self.params.max_dev_mints)
+                + insider_rejections(report, self.params.max_insiders)
+            )
             if reasons:
                 self._record(cand, "rug", False, "; ".join(reasons[:3]), cand["prelim"])
                 continue
@@ -1696,17 +1782,30 @@ class MemeEngine:
             logger.info("DexScreener profiler sprunget over: %s", exc)
         except SourceError as exc:
             summary["errors"].append(f"DexScreener profiler: {exc}")
+        # Tokens, der var for unge sidste gang. De tjekkes, når de er gamle nok, også selv om de
+        # er gledet ud af listen over de nyeste tokens imens.
+        waiting = {
+            mint: float(created)
+            for mint, created in (self.store.get_json("sniper_waiting", {}) or {}).items()
+            if mint not in seen and now - float(created) < cfg.max_age_minutes * 60
+        }
+        due = [mint for mint, created in waiting.items() if now - created >= cfg.min_age_seconds]
+        for mint in due:
+            found.setdefault(mint, {"mint": mint, "token": None})
         summary["checked"] = len(found)
+        summary["waiting"] = len(waiting) - len(due)
         open_mints = {row["mint"] for row in self.store.open_positions(self.mode)}
         blocked = {row["mint"] for row in self._blacklist()}
+        order = due + [mint for mint in found if mint not in waiting]
         fresh = [
-            cand
-            for mint, cand in found.items()
+            found[mint]
+            for mint in order
             if mint not in seen and mint not in open_mints and mint not in blocked and mint not in QUOTE_MINTS and not self.store.ever_rugged(mint)
         ]
         summary["new"] = len(fresh)
         if not fresh:
             self.store.set_json("sniper_seen", seen)
+            self._save_waiting(waiting)
             return
         try:
             pairs = self.clients.dex.pairs_for([cand["mint"] for cand in fresh][:60])
@@ -1742,18 +1841,22 @@ class MemeEngine:
                     seen[mint] = now
                 continue
             if age * 60 < cfg.min_age_seconds:
+                if pair.dex_id.lower() not in BONDING_CURVE_DEXES:
+                    waiting[mint] = created / 1000
                 continue
             seen[mint] = now
+            waiting.pop(mint, None)
             if age > cfg.max_age_minutes:
                 continue
             summary["young"] += 1
-            cand.update({"pair": pair, "source": "sniper", "copy": False, "boosted": False, "age_minutes": age})
+            cand.update({"pair": pair, "source": "sniper", "strategy": "sniper", "copy": False, "boosted": False, "age_minutes": age})
             reasons = sniper_rejections(pair, token, cfg, age)
             if reasons:
                 self._record(cand, "sniper", False, "; ".join(reasons[:3]))
                 continue
             passed.append(cand)
         self.store.set_json("sniper_seen", seen)
+        self._save_waiting(waiting)
         passed.sort(key=lambda item: item["pair"].liquidity_usd, reverse=True)
         rug_params = StrategyParams.from_dict({**self.params.to_dict(), "max_top10_pct": cfg.max_top10_pct})
         retry: list[str] = []
@@ -1769,7 +1872,8 @@ class MemeEngine:
             except SourceError as exc:
                 summary["errors"].append(f"RugCheck: {exc}")
                 report = None
-            reasons = rug_rejections(report, cand["token"], rug_params)
+            cand["report"] = report
+            reasons = rug_rejections(report, cand["token"], rug_params) + insider_rejections(report, self.params.max_insiders)
             if reasons:
                 self._record(cand, "rug", False, "; ".join(reasons[:3]))
                 continue
@@ -1784,9 +1888,16 @@ class MemeEngine:
                 # Kun Jupiters kvote stoppede tjekket. Tokenet er ikke afvist; se på det igen næste runde.
                 retry.append(cand["mint"])
         if retry:
+            ages = {item["mint"]: float(item.get("age_minutes") or 0.0) for item in passed}
             for mint in retry:
                 seen.pop(mint, None)
+                waiting[mint] = now - ages.get(mint, 0.0) * 60  # tjekkes igen i næste runde
             self.store.set_json("sniper_seen", seen)
+            self._save_waiting(waiting)
+
+    def _save_waiting(self, waiting: dict[str, float]) -> None:
+        newest = sorted(waiting.items(), key=lambda item: item[1], reverse=True)[:SNIPER_WAITING_MAX]
+        self.store.set_json("sniper_waiting", dict(newest))
 
     # ------------------------------------------------------------------ strategi-vagt og automatisk mål
     def _holds(self) -> dict:
@@ -1905,6 +2016,7 @@ class MemeEngine:
         if now - self._last_auto_target_check < AUTO_TARGET_CHECK_SECONDS:
             return
         self._last_auto_target_check = now
+        self._auto_tighten(now)
         self._auto_momentum_targets(now)
         if now - float(self.store.get_state("auto_target_at", "0") or 0) < AUTO_TARGET_EVERY_SECONDS:
             return
@@ -1953,6 +2065,108 @@ class MemeEngine:
         )
         self.store.add_event("info", message)
         self.store.add_lesson("parameter", message)
+
+    def _shadow_rows(self, strategy: str) -> list[dict]:
+        """Afsluttede skyggehandler med fakta og simuleret resultat, nyeste først."""
+        rows = []
+        for row in self.store.done_shadows(self.mode, strategy, ANALYSIS_ROWS):
+            facts = loads(row.get("facts"), {}) or {}
+            if facts and row.get("sim_pnl_pct") is not None and not facts.get("sus"):
+                rows.append({"facts": facts, "pnl": float(row["sim_pnl_pct"]), "stage": row["stage"]})
+        return rows
+
+    def _auto_tighten(self, now: float) -> None:
+        """Stram ét filter pr. strategi pr. døgn, når skyggehandlerne klart viser, at grænsen lukker tabere ind."""
+        for strategy, target in (("momentum", self.params), ("sniper", self.sniper)):
+            key = f"auto_tighten_at:{strategy}"
+            if now - float(self.store.get_state(key, "0") or 0) < AUTO_TARGET_EVERY_SECONDS:
+                continue
+            rules = TIGHTEN_RULES[strategy]
+            current = {rule["param"]: float(getattr(target, rule["param"])) for rule in rules}
+            best = tighten_suggestion(self._shadow_rows(strategy), current, rules)
+            if not best:
+                continue
+            name = best["param"]
+            if strategy == "sniper":
+                self.update_sniper({name: best["new"]})
+                new, label = getattr(self.sniper, name), SNIPER_LABELS.get(name, name)
+            else:
+                setattr(self.params, name, clamp_param(name, best["new"]))
+                self._save_learning()
+                self._mopt_cache = None
+                new, label = getattr(self.params, name), PARAM_LABELS.get(name, name)
+            if abs(float(new) - best["old"]) < 1e-9:
+                continue
+            self.store.set_state(key, repr(now))
+            message = (
+                f"{STRATEGY_LABELS[strategy]}: {label} strammet fra {_dk(best['old'], 2 if best['old'] < 10 else 0)} "
+                f"til {_dk(float(new), 2 if float(new) < 10 else 0)}. De {best['removed']} tokens, den nye grænse ville have "
+                f"sorteret fra, gav i snit {best['removed_avg'] * 100:+.1f} %; de øvrige {best['kept']} gav {best['kept_avg'] * 100:+.1f} %."
+            )
+            log = list(self.store.get_json("auto_tighten_log", []) or [])
+            log.append({"at": now_iso(), "strategy": strategy, "label": label, **best, "new": float(new)})
+            self.store.set_json("auto_tighten_log", log[-TIGHTEN_LOG_KEPT:])
+            self._analysis_cache = None
+            self.store.add_event("info", message)
+            self.store.add_lesson("parameter", message)
+
+    def _analysis(self) -> dict:
+        """Hvad virker? Resultat pr. egenskab for hver strategi (fra skyggehandlerne). Gemmes i 5 min."""
+        cached = self._analysis_cache
+        if cached and time.time() - cached[0] < ANALYSIS_CACHE_SECONDS:
+            return cached[1]
+        result: dict[str, Any] = {"min_rows": FACT_MIN_ROWS, "strategies": []}
+        for strategy in ("momentum", "sniper", "toptrader"):
+            rows = self._shadow_rows(strategy)
+            bought = [row["pnl"] for row in rows if row["stage"] == "købt"]
+            skipped = [row["pnl"] for row in rows if row["stage"] != "købt"]
+            result["strategies"].append({
+                "strategy": strategy,
+                "label": STRATEGY_LABELS[strategy],
+                "n": len(rows),
+                "bought": {"n": len(bought), "avg": sum(bought) / len(bought) if bought else None},
+                "skipped": {"n": len(skipped), "avg": sum(skipped) / len(skipped) if skipped else None},
+                "facts": fact_report(rows)[:8],
+            })
+        result["tightened"] = list(reversed(self.store.get_json("auto_tighten_log", []) or []))[:6]
+        self._analysis_cache = (time.time(), result)
+        return result
+
+    def export_data(self) -> dict:
+        """Alt, hvad der skal til for at analysere bottens resultater udefra. Ingen hemmeligheder."""
+        def position(row: dict) -> dict:
+            return {
+                key: (loads(row[key], None) if key in {"features", "safety", "ai"} else row[key])
+                for key in row
+                if key not in {"signatures", "token_raw", "remaining_raw"}
+            }
+
+        def shadow(row: dict) -> dict:
+            path = loads(row.get("path"), []) or []
+            step = max(1, len(path) // 60)
+            return {
+                **{key: row[key] for key in ("id", "ts", "mint", "symbol", "strategy", "stage", "reason", "entry_price", "liquidity_entry",
+                                             "peak_ratio", "low_ratio", "last_ratio", "rugged", "status", "sim_pnl_pct", "sim_exit", "verdict", "done_at")},
+                "facts": loads(row.get("facts"), {}) or {},
+                "features": loads(row.get("features"), {}) or {},
+                "path": path[::step],
+            }
+
+        # Uden motorens lås: databasen har sin egen, og handlen skal ikke vente på en stor eksport.
+        return {
+            "exported_at": now_iso(),
+            "mode": self.mode,
+            "settings": public_meme_settings(self.settings),
+            "params": self.params.to_dict(),
+            "sniper": self.sniper.to_dict(),
+            "toptraders": self.top_cfg.to_dict(),
+            "model": self.model.to_dict(),
+            "positions": [position(row) for row in self.store.all_positions(self.mode)],
+            "archived_positions": [position(row) for row in self.store.archived_paper_positions()],
+            "shadows": [shadow(row) for row in self.store.done_shadows(self.mode, None, 3000)],
+            "lessons": self.store.recent_lessons(200),
+            "tightened": self.store.get_json("auto_tighten_log", []) or [],
+        }
 
     def _strategies_status(self, closed: list[dict], open_rows: list[dict]) -> list[dict]:
         holds = self._holds()
@@ -2138,7 +2352,14 @@ class MemeEngine:
             "copy": True,
             "boosted": False,
             "token": None,
-            "leader": {"rank": leader.get("rank"), "pnl_usd": leader.get("pnl_usd"), "sol": float(signal.sol), "age": age},
+            "strategy": "toptrader",
+            "leader": {
+                "rank": leader.get("rank"),
+                "pnl_usd": leader.get("pnl_usd"),
+                "sol": float(signal.sol),
+                "age": age,
+                "token_raw": int(getattr(signal, "token_raw", 0) or 0),
+            },
         }
         if pair.liquidity_usd < cfg.min_liquidity_usd:
             reason = f"Top-trader købte, men likviditeten er kun {_dk(pair.liquidity_usd, 0)} $ (grænse {_dk(cfg.min_liquidity_usd, 0)} $)."
@@ -2248,6 +2469,7 @@ class MemeEngine:
         kinds = {
             "count": "int", "days": "days", "position_usd": "usd", "max_open": "int", "max_per_day": "int", "stop_loss_pct": "pct",
             "max_hold_minutes": "min", "min_liquidity_usd": "usd", "max_signal_age_seconds": "sec", "min_leader_sol": "sol",
+            "max_chase_pct": "pct",
         }
         fields = []
         for name, (low, high) in TOP_BOUNDS.items():
@@ -2339,7 +2561,7 @@ class MemeEngine:
         kinds = {
             "take_profit_pct": "pct", "sell_fraction": "pct", "stop_loss_pct": "pct", "max_hold_minutes": "min",
             "position_usd": "usd", "min_age_seconds": "sec", "max_age_minutes": "min", "min_liquidity_usd": "usd",
-            "min_holders": "int", "max_top10_pct": "int",
+            "min_holders": "int", "max_top10_pct": "int", "min_organic_score": "int", "max_dev_mints": "int",
         }
         fields = []
         for name, (low, high) in SNIPER_BOUNDS.items():
@@ -2430,6 +2652,18 @@ class MemeEngine:
         if reasons:
             self._record(cand, "rute", False, "; ".join(reasons), cand["score"], cand["features"])
             return False
+        chase = self._chase(cand, buy_quote) if topping else None
+        if chase is not None and chase > self.top_cfg.max_chase_pct:
+            self._record(
+                cand,
+                "rute",
+                False,
+                f"Vores pris er {chase * 100:.0f} % over traderens købspris (maks. {self.top_cfg.max_chase_pct * 100:.0f} %). "
+                "Kursen er allerede løbet; vi ville købe traderens gevinst.",
+                cand["score"],
+                cand["features"],
+            )
+            return False
 
         verdict: Verdict | None = None
         # Top-trader-køb skal gå hurtigt efter traderen, så Claude springes over dér.
@@ -2472,8 +2706,9 @@ class MemeEngine:
             who = f"nr. {lead['rank']} på listen" if lead.get("rank") else "en top-trader"
             earned = f", {'+' if lead['pnl_usd'] >= 0 else '-'}{_dk(abs(lead['pnl_usd']), 0)} USD i perioden" if isinstance(lead.get("pnl_usd"), (int, float)) else ""
             exit_plan = "Sælger, når traderen sælger" if self.top_cfg.follow_sells else "Følger ikke traderens salg"
+            paid = f" Vores pris: {lead['chase'] * 100:+.0f} % i forhold til traderens." if lead.get("chase") is not None else ""
             reasoning = (
-                f"Top-trader {source_label(cand['source'])[6:]} ({who}{earned}) købte for {_dk(lead.get('sol', 0))} SOL for {lead.get('age', 0):.0f} s siden. "
+                f"Top-trader {source_label(cand['source'])[6:]} ({who}{earned}) købte for {_dk(lead.get('sol', 0))} SOL for {lead.get('age', 0):.0f} s siden.{paid} "
                 f"Bestod rug-tjek og exit-rute. {exit_plan}" + (f", stop ved -{self.top_cfg.stop_loss_pct * 100:.0f} %." if self.top_cfg.stop_loss_on else " (ingen stop-loss).")
             )
         else:
@@ -2508,6 +2743,8 @@ class MemeEngine:
                     "lp_locked_pct": report.lp_locked_pct if report else None,
                     "warnings": report.warnings[:5] if report else [],
                     "roundtrip_loss_pct": round((1 - sell_quote.out_amount / buy_quote.in_amount) * 100, 2) if buy_quote and sell_quote and buy_quote.in_amount else None,
+                    "insiders": report.insiders if report else None,
+                    "facts": self._facts(cand),
                     "watch": {
                         "dev": report.creator if report else "",
                         "holders": [owner for owner, _pct in (report.top_owners if report else []) if owner and owner != (report.creator if report else "")][:3],
@@ -2528,6 +2765,19 @@ class MemeEngine:
         self._notify(f"Købt {pair.symbol} for {fill.usd:.2f} USD. {reasoning[:300]} {pair.url}")
         logger.info("Ny position %s i %s", position_id, pair.symbol)
         return True
+
+    @staticmethod
+    def _chase(cand: dict, buy_quote) -> float | None:
+        """Hvor meget dyrere end traderen botten køber (0,2 = 20 % dyrere). None hvis det ikke kan regnes ud."""
+        lead = cand.get("leader") or {}
+        token_raw, sol = int(lead.get("token_raw") or 0), float(lead.get("sol") or 0.0)
+        if buy_quote is None or token_raw <= 0 or sol <= 0 or buy_quote.out_amount <= 0:
+            return None
+        ours = buy_quote.in_amount / buy_quote.out_amount
+        theirs = sol * LAMPORTS_PER_SOL / token_raw
+        chase = ours / theirs - 1.0
+        lead["chase"] = chase
+        return chase
 
     def _ai_payload(self, cand: dict, buy_quote, sell_quote) -> dict:
         pair: PairInfo = cand["pair"]
@@ -2907,6 +3157,7 @@ class MemeEngine:
                 "summary": shadow_summary([row for row in self.store.done_shadows(mode, limit=500)]),
                 "recent": [self._shadow_view(row) for row in self.store.recent_shadows(mode, 60)],
                 "optimizer": self._optimizer() if self.settings.shadows else None,
+                "analysis": self._analysis() if self.settings.shadows else None,
             },
             "equity": {
                 "24h": _downsample([row for row in series if row["ts"] >= cut_day], 300),

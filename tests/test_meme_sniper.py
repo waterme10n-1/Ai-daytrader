@@ -20,7 +20,7 @@ from trader.meme.store import MemeStore
 NEW = "NewToken1111111111111111111111111111111111"
 
 
-def _token(mint=NEW, *, age_min=4.0, mint_disabled=True, holders=150, top=18.0, socials=True):
+def _token(mint=NEW, *, age_min=8.0, mint_disabled=True, holders=150, top=18.0, socials=True, audit=None):
     created = datetime.now(timezone.utc) - timedelta(minutes=age_min)
     raw = {
         "id": mint,
@@ -34,6 +34,7 @@ def _token(mint=NEW, *, age_min=4.0, mint_disabled=True, holders=150, top=18.0, 
             "freezeAuthorityDisabled": True,
             "topHoldersPercentage": top,
             "devBalancePercentage": 1.0,
+            **(audit or {}),
         },
         "firstPool": {"createdAt": created.isoformat().replace("+00:00", "Z")},
     }
@@ -42,7 +43,7 @@ def _token(mint=NEW, *, age_min=4.0, mint_disabled=True, holders=150, top=18.0, 
     return parse_token_info(raw)
 
 
-def _arm(dex, rug, jup, mint=NEW, *, age_min=4.0, **token_kwargs):
+def _arm(dex, rug, jup, mint=NEW, *, age_min=8.0, **token_kwargs):
     jup.recent.append(_token(mint, age_min=age_min, **token_kwargs))
     dex.pairs[mint] = raw_pair(mint, symbol="NEW", age_min=age_min, liq=20_000, vol_h1=30_000, change_h1=60)
     if not token_kwargs.get("socials", True):
@@ -107,15 +108,51 @@ def test_sniper_stop_loss_uses_sniper_setting():
     assert engine.store.closed_positions("paper")[0]["exit_reason"] == "stop_loss"
 
 
+def _age(engine, dex, mint, minutes):
+    """Lad tiden gå: tokenet er nu `minutes` gammelt (både poolen og sniperens venteliste)."""
+    created = time.time() - minutes * 60
+    dex.pairs[mint]["pairCreatedAt"] = int(created * 1000)
+    waiting = engine.store.get_json("sniper_waiting", {}) or {}
+    if mint in waiting:
+        waiting[mint] = created
+        engine.store.set_json("sniper_waiting", waiting)
+
+
 def test_sniper_waits_for_minimum_age_then_buys():
     engine, dex, rug, jup, _notes = make_engine()
+    assert engine.sniper.min_age_seconds == 300  # de første 5 minutter afslører de fleste rugs
     _arm(dex, rug, jup, age_min=0.3)
     engine.tick(force_scan=True)
     assert engine.store.open_positions("paper") == []
     assert NEW not in (engine.store.get_json("sniper_seen", {}) or {})
-    dex.pairs[NEW]["pairCreatedAt"] = int(time.time() * 1000) - 3 * 60_000
+    assert NEW in (engine.store.get_json("sniper_waiting", {}) or {})
+    _age(engine, dex, NEW, 3)
+    engine.tick(force_scan=True)
+    assert engine.store.open_positions("paper") == []  # stadig under 5 min.
+    _age(engine, dex, NEW, 6)
     engine.tick(force_scan=True)
     assert len(engine.store.open_positions("paper")) == 1
+    assert NEW not in (engine.store.get_json("sniper_waiting", {}) or {})
+
+
+def test_sniper_remembers_young_tokens_that_leave_the_newest_list():
+    engine, dex, rug, jup, _notes = make_engine()
+    _arm(dex, rug, jup, age_min=1)
+    engine.tick(force_scan=True)
+    assert engine.store.open_positions("paper") == []
+    jup.recent.clear()  # tokenet er gledet ud af Jupiters liste over de nyeste
+    _age(engine, dex, NEW, 6)
+    engine.tick(force_scan=True)
+    rows = engine.store.open_positions("paper")
+    assert len(rows) == 1 and rows[0]["strategy"] == "sniper"
+
+
+def test_sniper_does_not_wait_for_tokens_on_a_bonding_curve():
+    engine, dex, rug, jup, _notes = make_engine()
+    _arm(dex, rug, jup, age_min=1)
+    dex.pairs[NEW]["dexId"] = "pumpfun"
+    engine.tick(force_scan=True)
+    assert NEW not in (engine.store.get_json("sniper_waiting", {}) or {})
 
 
 def test_sniper_rejects_unsafe_and_old_tokens():
@@ -129,7 +166,7 @@ def test_sniper_rejects_unsafe_and_old_tokens():
     reasons = {row["mint"][:8]: row["reason"] for row in engine.store.recent_candidates("paper")}
     assert "Mint authority" in reasons["MintAuth"]
     assert "holdere" in reasons["Lonely11"]
-    assert "Ingen X" in reasons["NoSocial"]
+    assert "Hverken X eller Telegram" in reasons["NoSocial"]
     assert "OldToken" not in reasons  # for gamle tokens springes stille over
     # Set tokens tjekkes ikke igen hver runde.
     engine.tick(force_scan=True)

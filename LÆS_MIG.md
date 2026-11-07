@@ -131,7 +131,7 @@ Hvert minut:
 
 1. **Finder kandidater** fra Jupiter (trending og organisk score), DexScreener (boosts og nye profiler) og køb fra wallets, du følger.
 2. **Markedsfiltre**: likviditet, volumen, antal handler, alder, markedsværdi, ikke overophedet, flere købere end sælgere, ikke på en bonding curve.
-3. **Rug-tjek** via RugCheck og Jupiter: mint- og freeze authority skal være slået fra, ingen "danger"-risici, begrænset ejerkoncentration, udvikleren må ikke sidde på store beholdninger. Kan RugCheck ikke svare, købes der ikke.
+3. **Rug-tjek** via RugCheck og Jupiter: mint- og freeze authority skal være slået fra, ingen "danger"-risici, begrænset ejerkoncentration, udvikleren må ikke sidde på store beholdninger. Kan RugCheck ikke svare, købes der ikke. Desuden (se **Værn mod tab** nedenfor): Jupiters organiske score skal være mindst 30, tokenet må ikke være markeret som mistænkeligt af Jupiter, udvikleren må ikke have lavet over 50 tokens, og RugCheck må højst finde 50 insider-wallets.
 4. **Exit-tjek**: botten beder Jupiter om en købs- og en salgspris. Kan tokenet ikke sælges igen, eller koster frem og tilbage mere end 8 %, købes der ikke (honeypot- og tynd-pool-filter).
 5. **Score**: en lille læringsmodel vægter signalerne (købspres, likviditet, organisk handel, sociale links, X-omtale, copy-signal, rug-risiko m.fl.).
 6. **Claude** (hvis nøglen er sat) søger på X, nyheder og fora efter røde flag: falske konti, koordineret shill, kopier af kendte tokens, rug-historik. Claude kan kun sige nej. Claude kan aldrig tvinge et køb igennem eller ændre risikogrænserne.
@@ -143,10 +143,10 @@ Hvert 15. sekund overvåges åbne positioner: stop-loss (-25 %), halvdelen sælg
 
 Sniperen er en ekstra strategi ved siden af den almindelige. Hvert 10. sekund henter den tokens, hvis første pool lige er oprettet (Jupiter), og nye profiler fra DexScreener. Et token købes kun, hvis det består alt dette:
 
-1. Det er mellem `Vent mindst` (standard 60 sek.) og `Maks. alder` (standard 30 min.) gammelt. Botten venter med vilje lidt, fordi mange rugs sker i det første minut.
+1. Det er mellem `Vent mindst` (standard 5 min.) og `Maks. alder` (standard 30 min.) gammelt. Botten venter med vilje, fordi de første 5 minutters handel afslører de fleste rug pulls. Tokens, der er for unge, kommer på en venteliste og tjekkes, når de er gamle nok, også selv om de er gledet ud af listen over de nyeste.
 2. Det er ikke på en bonding curve, har mindst 8.000 USD likviditet, ikke dumper lige nu og ikke har massivt salg.
-3. Mint- og freeze authority er slået fra, udvikleren ejer højst 5 %, top-10 ejer højst 30 %, og der er mindst 25 holdere.
-4. Det har X, Telegram eller en hjemmeside (kan slås fra).
+3. Mint- og freeze authority er slået fra, udvikleren ejer højst 5 %, top-10 ejer højst 30 %, og der er mindst 25 holdere. Jupiter må ikke markere tokenet som mistænkeligt, og udvikleren må højst have lavet 20 tokens.
+4. Det har X eller Telegram (kan slås fra). En hjemmeside alene tæller ikke: den siger intet om, om tokenet overlever.
 5. RugCheck har ingen alvorlige advarsler, og Jupiter kan både købe og sælge tokenet igen uden stort tab (honeypot-tjek).
 6. Risikogrænserne tillader det: standard 1,50 USD pr. snipe, højst 2 åbne snipes og 10 om dagen, og bankroll-loftet gælder.
 
@@ -165,7 +165,7 @@ Vær klar over:
 Under **Strategi → Top 10** kan du slå en funktion til, der køber lige efter de traders, der har tjent mest i dag, og sælger, når de sælger. Den er slået fra, til du tænder den.
 
 1. **Listen**: indsæt dine egne traders under **Dine traders** på Top 10-siden (én pr. linje: adressen og gerne et navn, højst 25). Har du en egen liste, følger botten kun den. Ellers henter den med `SOLANATRACKER_API_KEY` (fra solanatracker.io) hver halve time de mest profitable Solana-traders i dag eller den seneste uge, og uden nøgle bruger den de wallets, du følger under Wallet.
-2. **Køb**: hvert 8. sekund kigger botten efter nye handler fra dem. Køber en af dem et token for mindst 0,1 SOL, og er købet højst 2 minutter gammelt, tjekker botten tokenet (likviditet, RugCheck og at det kan sælges igen) og køber for dit beløb pr. handel. Claude springes over her, fordi det skal gå hurtigt.
+2. **Køb**: hvert 8. sekund kigger botten efter nye handler fra dem. Køber en af dem et token for mindst 0,1 SOL, og er købet højst 2 minutter gammelt, tjekker botten tokenet (likviditet, RugCheck og at det kan sælges igen) og køber for dit beløb pr. handel. Er bottens pris over 15 % højere end den pris, traderen selv betalte (**Maks. pris over traderens købspris**), springes købet over: kursen er allerede løbet, og botten ville bare købe traderens gevinst. Claude springes over her, fordi det skal gå hurtigt.
 3. **Salg**: sælger traderen tokenet, sælger botten hele positionen med det samme. Det gælder også, hvis traderen er røget af listen, eller funktionen er slået fra. Som sikkerhedsnet er der stop-loss (standard 30 %, kan slås fra med **Brug stop-loss** under Top 10), rug-alarm (likviditeten trækkes), en gevinstsikring hvis kursen er fordoblet og falder 35 % fra toppen, og en tidsgrænse (standard 12 timer), hvis traderen aldrig sælger.
 4. **Grænser**: maks. åbne kopier (standard 3) og køb pr. dag (standard 10). Top 10 har ingen daglig tabsgrænse: den bliver ved med at kopiere, også når resten af botten har ramt dagens tabsgrænse. Vil du have, at den stopper dér, så slå **Stop ved dagens tabsgrænse** til under Top 10. Bankroll-loftet, den samlede tabsgrænse, pause og nødstop gælder altid. Traders, der giver tab over tid, slås automatisk fra.
 
@@ -178,6 +178,28 @@ Vær ærlig over for dig selv: dagens vindere er ofte heldige eller bots, og du 
 - **Hvad tjener penge?** På Hjem står hver strategi (Almindelig, Sniper, Top 10) med antal handler, gevinstprocent, resultat og de seneste handler. Tryk **Hold pause** for at stoppe en strategi, og **Genoptag** for at starte den igen.
 - **Strategi-vagt** (slået fra som standard, slå til med `MEME_STRATEGY_GUARD=true`): taber en strategi på sine seneste 8–12 handler (profitfaktor under 0,8), sættes den selv på hold i 24 timer, næste gang 48, op til 4 døgn, mens den lærer videre som skyggehandler.
 - **Det bedste mål automatisk** (slået til som standard, `MEME_AUTO_TARGETS`): gælder både sniperen og den almindelige strategi. Når skyggehandlerne har mindst 40 kursforløb, og et andet gevinstmål og stop klart har virket bedre (mindst 2 procentpoint pr. handel) og givet overskud, skifter strategien selv, højst én gang i døgnet pr. strategi. Den almindelige strategi bruger sine egne salgsregler (trailing og stale) i regnestykket. Ændringen står under Læring. Slå det fra under Strategi → Sniper.
+
+## Værn mod tab (research nov. 2026)
+
+Botten tabte penge, så vi gennemgik forskning og analyser af Solana-memecoins (blandt andet Bitquery, Pine Analytics og videnskabelige artikler om rug pulls, pump.fun og copy trading). Det førte til disse værn:
+
+- **Organisk score** (`Min. organisk score`, standard 30): Jupiter måler, hvor meget af handlen der kommer fra rigtige wallets og ikke bots. Lav score betyder, at volumen er pumpet op af bots. Gælder den almindelige strategi. Sniperen har sin egen grænse (standard fra, fordi helt nye tokens sjældent har en score endnu).
+- **Mistænkelig**: Jupiter markerer nogle tokens som mistænkelige. De købes aldrig.
+- **Serie-udviklere** (`Maks. tokens lavet af udvikleren`, standard 50 og 20 for sniperen): en udvikler, der har lavet mange tokens, er typisk en "token-fabrik", der laver nye tokens for at sælge dem til køberne.
+- **Insidere** (`Maks. insider-wallets`, standard 50): RugCheck finder wallets, der hænger sammen via overførsler. Mange insidere betyder, at nogle få sidder på meget af beholdningen og kan sælge på én gang.
+- **Telegram og X** vægter mest i scoren. En hjemmeside alene tæller næsten ikke.
+- **Sniperen venter 5 minutter** (før 1 minut). Gemte indstillinger fra før er sat op til 5 minutter én gang; du kan selv ændre det bagefter.
+- **Top 10 jagter ikke kursen** (se ovenfor).
+
+Papirkontoen er startet forfra med 50 USD én gang, så resultaterne viser de nye regler. Læringen (vægte, lektioner, skyggehandler og mål) er beholdt.
+
+## Hvad virker? Fakta pr. token og den automatiske strammer
+
+For hvert token, botten følger (købt eller afvist), gemmes de rå tal: likviditet, markedsværdi, alder, stigning, andel køb, organisk score, holdere, top-10, insidere, udviklerens antal tokens, Telegram/X/hjemmeside, boost og tidspunkt. Når skyggehandlen er færdig (6 timer), ved botten, hvad tokenet ville have givet med dens egne salgsregler efter gebyrer.
+
+- **Læring → Hvad virker?** viser for hver strategi, hvordan tokens med lav, mellem og høj værdi af hver egenskab klarede sig. Egenskaberne med størst forskel står øverst. Det kræver mindst 30 færdige skyggehandler pr. strategi.
+- **Den automatiske strammer** (følger **Det bedste mål automatisk**, `MEME_AUTO_TARGETS`): viser data, at en strammere grænse ville have sorteret mindst 25 tokens fra, som i snit tabte mindst 5 %, mens resten klarede sig tydeligt bedre, strammes grænsen. Kun strammere, aldrig løsere, højst ét filter pr. strategi i døgnet, og altid inden for de faste grænser. Hver stramning står som en lektion med tallene bag. Den almindelige strategi kan strammes på organisk score, likviditet, markedsværdi, alder, stigning sidste time, top-10, insidere og rug-risiko. Sniperen på ventetid, likviditet, holdere, top-10 og organisk score.
+- **Hent data (JSON)** på samme kort giver én fil med alle handler, skyggehandler med fakta, indstillinger, modelvægte og lektioner. Der er ingen nøgler eller adgangskoder i den. Send den videre, hvis du vil have en grundig analyse af, hvor botten taber.
 
 ## Sådan lærer den
 

@@ -133,7 +133,8 @@ CREATE TABLE IF NOT EXISTS shadows (
     sim_exit TEXT,
     verdict TEXT,
     learned INTEGER NOT NULL DEFAULT 0,
-    done_at TEXT
+    done_at TEXT,
+    facts TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_shadows_status ON shadows (status, id);
@@ -217,6 +218,10 @@ class MemeStore:
             columns = {row[1] for row in self._conn.execute("PRAGMA table_info(positions)")}
             if "strategy" not in columns:
                 self._conn.execute("ALTER TABLE positions ADD COLUMN strategy TEXT NOT NULL DEFAULT 'momentum'")
+            shadow_columns = {row[1] for row in self._conn.execute("PRAGMA table_info(shadows)")}
+            if "facts" not in shadow_columns:
+                # De rå tal bag hver skyggehandel (likviditet, organisk score, insiders …) til faktaanalysen.
+                self._conn.execute("ALTER TABLE shadows ADD COLUMN facts TEXT")
             self._conn.commit()
 
     def close(self) -> None:
@@ -383,6 +388,13 @@ class MemeStore:
     def list_positions(self, mode: str, limit: int = 300) -> list[dict[str, Any]]:
         return self._all("SELECT * FROM positions WHERE mode = ? ORDER BY id DESC LIMIT ?", (mode, limit))
 
+    def all_positions(self, mode: str) -> list[dict[str, Any]]:
+        return self._all("SELECT * FROM positions WHERE mode = ? ORDER BY id", (mode,))
+
+    def archived_paper_positions(self, limit: int = 2000) -> list[dict[str, Any]]:
+        """Handler fra tidligere papirrunder (før "Start forfra")."""
+        return self._all("SELECT * FROM positions WHERE mode LIKE 'paper-arkiv-%' ORDER BY id DESC LIMIT ?", (limit,))
+
     def closed_positions(self, mode: str) -> list[dict[str, Any]]:
         return self._all(
             "SELECT * FROM positions WHERE mode = ? AND status = 'closed' AND pnl_usd IS NOT NULL ORDER BY id",
@@ -427,8 +439,8 @@ class MemeStore:
     def add_shadow(self, row: dict[str, Any]) -> int:
         return self._write(
             """
-            INSERT INTO shadows (ts, mode, mint, symbol, strategy, stage, reason, entry_price, liquidity_entry, features, path)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO shadows (ts, mode, mint, symbol, strategy, stage, reason, entry_price, liquidity_entry, features, path, facts)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 now_iso(),
@@ -442,6 +454,7 @@ class MemeStore:
                 row.get("liquidity_entry"),
                 _json(row.get("features")),
                 _json([[0.0, 1.0]]),
+                _json(row.get("facts")),
             ),
         )
 
@@ -460,7 +473,7 @@ class MemeStore:
             return
         parts, values = [], []
         for key, value in changes.items():
-            if key in {"features", "path"}:
+            if key in {"features", "path", "facts"}:
                 value = _json(value)
             if isinstance(value, bool):
                 value = int(value)

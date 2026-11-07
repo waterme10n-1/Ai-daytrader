@@ -1215,6 +1215,21 @@
       <div class="table-wrap" id="shadow-summary"></div>
       <details style="margin-top:12px"><summary>Seneste skyggehandler</summary><div class="table-wrap" id="shadow-recent" style="margin-top:10px"></div></details>
     </div>
+    <div class="card" id="analysis-card">
+      <div class="card-head"><h2 id="analysis-title"></h2>
+        <div class="seg" role="group" aria-label="Strategi" id="analysis-seg">
+          <button type="button" data-an="momentum" aria-pressed="true">Almindelig</button>
+          <button type="button" data-an="sniper" aria-pressed="false">Sniper</button>
+          <button type="button" data-an="toptrader" aria-pressed="false">Top 10</button>
+        </div>
+      </div>
+      <p class="muted" style="margin:0 0 12px;font-size:13.5px">Hver række deler de tokens, botten har fulgt, i tre lige store grupper efter én egenskab og viser, hvad de gav i snit med bottens egne salgsregler (efter gebyrer). Egenskaberne med størst forskel står øverst. Viser en grænse klart tab, strammer botten den selv, højst ét filter i døgnet.</p>
+      <div id="analysis"></div>
+      <div class="savebar" style="margin-top:12px;justify-content:space-between">
+        <span class="muted" style="font-size:0.84rem;flex:1 1 260px">Vil du have en grundig analyse? Hent alle handler, skyggehandler og indstillinger som én fil og send den videre. Der er ingen nøgler eller adgangskoder i den.</span>
+        <a class="btn small" href="/api/meme/export" download id="export-link">Hent data (JSON)</a>
+      </div>
+    </div>
     <div class="card">
       <div class="card-head"><h2 id="params-title"></h2><span class="muted small-txt">Læringen må kun flytte dem inden for grænserne</span></div>
       <div class="table-wrap" id="params"></div>
@@ -2193,6 +2208,8 @@ function renderSniperForm(data) {
     numberField(f.min_liquidity_usd, 500),
     numberField(f.min_holders, 1),
     numberField(f.max_top10_pct, 1),
+    numberField(f.min_organic_score, 1),
+    numberField(f.max_dev_mints, 1),
     boolField(f.require_socials),
     boolField(f.use_claude),
   ].join(""));
@@ -2284,12 +2301,42 @@ function renderShadows(data) {
   const recent = sh.recent || [];
   put("shadow-recent", recent.length ? `<table><thead><tr><th>Startet</th><th>Token</th><th>Afvist ved</th><th>Top</th><th>Nu</th><th>Hvis købt</th><th></th></tr></thead><tbody>${recent.map((r) => {
     const v = VERDICT[r.verdict] || ["Følges", ""];
-    return `<tr><td class="muted" style="white-space:nowrap">${esc(ago(r.ts))}</td><td class="tok">${esc(r.symbol)}<small>${esc(r.strategy === "sniper" ? "sniper" : "momentum")}</small></td>
+    return `<tr><td class="muted" style="white-space:nowrap">${esc(ago(r.ts))}</td><td class="tok">${esc(r.symbol)}<small>${esc(({ sniper: "sniper", toptrader: "top 10" })[r.strategy] || "almindelig")}</small></td>
       <td>${esc(STAGES[r.stage] || r.stage)}</td><td class="num">${esc(spct(r.peak_pct))}</td><td class="num ${tone(r.last_pct)}">${esc(spct(r.last_pct))}${r.rugged ? ' <span class="stage-tag rug">rug</span>' : ""}</td>
       <td class="num ${tone(r.sim_pnl_pct)}">${r.status === "done" ? esc(spct(r.sim_pnl_pct)) + `<small class="muted" style="display:block">${esc(r.sim_exit || "")}</small>` : '<span class="muted">følges</span>'}</td>
       <td><span class="chip ${v[1]}">${esc(r.status === "done" ? v[0] : "Følges")}</span></td></tr>`;
   }).join("")}</tbody></table>` : empty("Ingen endnu.", "ghost"));
 }
+let analysisStrategy = "momentum";
+try { analysisStrategy = localStorage.getItem("meme-analysis") || "momentum"; } catch (e) {}
+function renderAnalysis(data) {
+  document.getElementById("analysis-title").innerHTML = icon("bars") + "Hvad virker?";
+  for (const b of document.querySelectorAll("#analysis-seg [data-an]")) b.setAttribute("aria-pressed", String(b.dataset.an === analysisStrategy));
+  const an = data.shadows && data.shadows.analysis;
+  if (!an) { put("analysis", empty("Skyggehandler er slået fra (MEME_SHADOWS=false).", "bars")); return; }
+  const st = (an.strategies || []).find((x) => x.strategy === analysisStrategy) || { n: 0, facts: [], bought: {}, skipped: {} };
+  const tightened = (an.tightened || []).filter((t) => t.strategy === analysisStrategy);
+  const log = tightened.length ? `<div class="kv" style="margin-top:12px">${tightened.map((t) => `<div><span>${esc(ago(t.at))} · ${esc(t.label)}</span><b class="num">${esc(fmtNum.format(t.old))} → ${esc(fmtNum.format(t.new))} <small class="muted">(${esc(t.removed)} fjernet gav ${esc(spct(t.removed_avg))})</small></b></div>`).join("")}</div>` : "";
+  if (!st.facts.length) {
+    const done = Math.min(100, Math.round((st.n / an.min_rows) * 100));
+    put("analysis", `<p class="muted" style="margin:0 0 8px;font-size:0.88rem">Fra nu af gemmer botten de rå tal (likviditet, organisk score, insidere, alder …) for hvert token, den følger. Når ${esc(an.min_rows)} er færdige, vises det her.</p><div class="meter"><i style="width:${done}%"></i></div><p class="muted" style="font-size:0.84rem">${esc(st.n)} af ${esc(an.min_rows)} indsamlet for ${esc(st.label || "")}.</p>${log}`);
+    return;
+  }
+  const ext = Math.max(0.05, ...st.facts.flatMap((f) => f.buckets.map((b) => Math.abs(b.avg || 0))));
+  const bg = (v) => (v == null ? "" : `background:color-mix(in srgb, ${v >= 0 ? "var(--up)" : "var(--down)"} ${Math.round(Math.min(1, Math.abs(v) / ext) * 28)}%, transparent)`);
+  const head = `<p class="muted" style="margin:0 0 10px;font-size:0.86rem">${esc(st.n)} tokens fulgt. Købt: <b class="${tone(st.bought.avg)}">${esc(spct(st.bought.avg))}</b> i snit (${esc(st.bought.n)}). Afvist: <b class="${tone(st.skipped.avg)}">${esc(spct(st.skipped.avg))}</b> i snit (${esc(st.skipped.n)}).</p>`;
+  put("analysis", head + `<div class="table-wrap"><table class="grid-table"><thead><tr><th style="text-align:left">Egenskab</th><th>Lav</th><th>Mellem</th><th>Høj</th></tr></thead><tbody>${st.facts.map((f) => {
+    const cells = f.buckets.length === 2 ? [f.buckets[0], null, f.buckets[1]] : f.buckets;
+    return `<tr><th style="text-align:left">${esc(f.label)}<small class="muted" style="display:block;font-weight:400">${esc(f.n)} tokens</small></th>${cells.map((b) => b ? `<td class="cell" style="${bg(b.avg)}" title="${esc(b.n)} tokens · ${b.win_rate == null ? "for få til et snit" : esc(pct(b.win_rate)) + " gav gevinst"}"><small>${esc(b.label)}</small><b class="${tone(b.avg)}">${esc(b.avg == null ? "—" : spct(b.avg))}</b><small>${b.win_rate == null ? `kun ${esc(b.n)}` : `${esc(Math.round(b.win_rate * 100))} % vinder`}</small></td>` : "<td></td>").join("")}</tr>`;
+  }).join("")}</tbody></table></div>${log}`);
+}
+document.getElementById("analysis-seg").addEventListener("click", (ev) => {
+  const b = ev.target.closest("[data-an]");
+  if (!b) return;
+  analysisStrategy = b.dataset.an;
+  try { localStorage.setItem("meme-analysis", analysisStrategy); } catch (e) {}
+  if (state) renderAnalysis(state);
+});
 function renderOptimizer(data) {
   const opt = data.shadows && data.shadows.optimizer;
   document.getElementById("opt-title").innerHTML = icon("bars") + "Hvilket mål ville have virket?";
@@ -2426,6 +2473,7 @@ function render(data) {
   renderWallets(data);
   renderKrav(data);
   renderShadows(data);
+  renderAnalysis(data);
   renderOptimizer(data);
   renderDiagnostics(data);
   renderSecurity(data);
@@ -2749,7 +2797,7 @@ function topField(f) {
 }
 function renderTopForm(data) {
   const fields = data.toptraders.fields;
-  const order = ["count", "days", "position_usd", "max_open", "max_per_day", "follow_sells", "stop_loss_on", "stop_loss_pct", "daily_loss_stop", "max_hold_minutes", "min_liquidity_usd", "max_signal_age_seconds", "min_leader_sol"];
+  const order = ["count", "days", "position_usd", "max_open", "max_per_day", "follow_sells", "stop_loss_on", "stop_loss_pct", "daily_loss_stop", "max_hold_minutes", "min_liquidity_usd", "max_signal_age_seconds", "min_leader_sol", "max_chase_pct"];
   const byName = {}; for (const f of fields) byName[f.name] = f;
   put("top-form", `<div class="sn-grid" style="gap:0 24px">${order.filter((n) => byName[n]).map((n) => topField(byName[n])).join("")}</div>`);
 }

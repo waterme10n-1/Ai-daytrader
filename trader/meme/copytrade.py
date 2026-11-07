@@ -29,6 +29,9 @@ class CopySignal:
     sol: float
     signature: str
     block_time: int
+    # Hvor mange tokens (rå enheder) traderen fik for sine SOL. 0 hvis købet ikke var i SOL.
+    # Bruges til traderens købspris, så botten ikke køber langt over den.
+    token_raw: int = 0
 
 
 def _keys(message: dict) -> list[str]:
@@ -82,7 +85,8 @@ def parse_wallet_swaps(tx: dict, wallet: str, signature: str = "") -> list[CopyS
         if mint in QUOTE_MINTS or delta == 0:
             continue
         if delta > 0 and quote_out:
-            signals.append(CopySignal(wallet, mint, "buy", abs(sol_delta + wsol), signature, block_time))
+            paid_sol = sol_delta + wsol < -0.001
+            signals.append(CopySignal(wallet, mint, "buy", abs(sol_delta + wsol), signature, block_time, delta if paid_sol else 0))
         elif delta < 0 and quote_in:
             signals.append(CopySignal(wallet, mint, "sell", abs(sol_delta + wsol), signature, block_time))
     return signals
