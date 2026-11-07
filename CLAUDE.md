@@ -38,7 +38,14 @@ Testene bruger falske datakilder (`tests/meme_fakes.py`). Nye tests må ikke ram
 
 ## Tjek brugerfladen
 
-Efter ændringer i `trader/static/*.html`: start appen og tag skærmbilleder af `/meme` og `/desk` i telefonstørrelse med Playwright (forudinstalleret i cloud-sessioner, `require('playwright')`). Tjek, at der ikke er JS-fejl i konsollen eller vandret scroll, og se på billederne. Siderne loader uden nøgler og viser så forbindelsesfejl i stedet for data.
+Efter ændringer i `trader/static/*.html`: brug skill'en `/ui-check` (`node .claude/skills/ui-check/ui_check.js --out <mappe>`). Den starter appen uden nøgler og tager skærmbilleder af `/meme` og `/desk` (USA og Danmark) på telefon og computer, og melder JS-fejl, HTTP-fejl og vandret scroll. Se altid på billederne bagefter. Bordet vælger børs med `?m=dk`, ikke `?market=dk`.
+
+## Værktøjer i `.claude/`
+
+- Hook efter hver ændring: Python-filer og inline-JavaScript i `trader/static/*.html` tjekkes for syntaksfejl.
+- Hook ved stop: er Python-koden ændret i forhold til main, køres `pytest`, og fejl skal rettes, før du stopper.
+- Skill `/ny-indstilling`: tjekliste til nye eller ændrede indstillinger.
+- `.env` må ikke læses. Brug `.env.example`.
 
 ## Claude i appen
 
