@@ -244,6 +244,12 @@ class StrategyParams:
     trailing_stop_pct: float = 0.25
     max_hold_minutes: float = 360.0
     stale_minutes: float = 75.0
+    # Jupiters organiske score (0-100): hvor meget af handlen der kommer fra rigtige wallets og ikke bots.
+    min_organic_score: float = 30.0
+    # RugCheck: wallets i samme "insider-netværk" (fundet via overførsler mellem dem).
+    max_insiders: float = 50.0
+    # Jupiter: hvor mange tokens udvikleren har lavet. Serie-udviklere står bag mange rug pulls.
+    max_dev_mints: float = 50.0
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -284,6 +290,9 @@ PARAM_BOUNDS: dict[str, tuple[float, float]] = {
     "trailing_stop_pct": (0.1, 0.4),
     "max_hold_minutes": (30.0, 2_880.0),
     "stale_minutes": (15.0, 600.0),
+    "min_organic_score": (0.0, 90.0),
+    "max_insiders": (3, 500),
+    "max_dev_mints": (1, 1_000),
 }
 
 PARAM_LABELS: dict[str, str] = {
@@ -307,9 +316,12 @@ PARAM_LABELS: dict[str, str] = {
     "trailing_stop_pct": "Trailing stop fra top",
     "max_hold_minutes": "Maks. holdetid (min.)",
     "stale_minutes": "Sælg hvis intet sker efter (min.)",
+    "min_organic_score": "Min. organisk score (Jupiter, 0-100)",
+    "max_insiders": "Maks. insider-wallets (RugCheck)",
+    "max_dev_mints": "Maks. tokens lavet af udvikleren",
 }
 
-INT_PARAMS = {"min_txns_h1"}
+INT_PARAMS = {"min_txns_h1", "max_insiders", "max_dev_mints"}
 
 
 def clamp_param(name: str, value: float) -> float:
@@ -334,11 +346,15 @@ class SniperSettings:
     stop_loss_pct: float = 0.35
     max_hold_minutes: float = 60.0
     position_usd: float = 1.5
-    min_age_seconds: float = 60.0
+    # Forskning: de første 5 minutters handel afslører de fleste rug pulls. Køb først derefter.
+    min_age_seconds: float = 300.0
     max_age_minutes: float = 30.0
     min_liquidity_usd: float = 8_000.0
     min_holders: int = 25
     max_top10_pct: float = 30.0
+    # 0 = fra. Nye tokens har sjældent en høj score endnu; læringen strammer den, hvis data viser det.
+    min_organic_score: float = 0.0
+    max_dev_mints: int = 20
     require_socials: bool = True
     use_claude: bool = False
 
@@ -357,9 +373,12 @@ SNIPER_BOUNDS: dict[str, tuple[float, float]] = {
     "min_liquidity_usd": (2_000.0, 500_000.0),
     "min_holders": (5, 5_000),
     "max_top10_pct": (10.0, 60.0),
+    "min_organic_score": (0.0, 90.0),
+    "max_dev_mints": (1, 1_000),
 }
+SNIPER_INTS = ("min_holders", "max_dev_mints")
 SNIPER_BOOLS = ("enabled", "require_socials", "use_claude")
-SNIPER_LEARNABLE = ("min_liquidity_usd", "min_holders", "max_top10_pct", "min_age_seconds")
+SNIPER_LEARNABLE = ("min_liquidity_usd", "min_holders", "max_top10_pct", "min_age_seconds", "min_organic_score")
 SNIPER_LABELS: dict[str, str] = {
     "enabled": "Sniper slået til",
     "take_profit_pct": "Sælg ved gevinst",
@@ -372,7 +391,9 @@ SNIPER_LABELS: dict[str, str] = {
     "min_liquidity_usd": "Min. likviditet (USD)",
     "min_holders": "Min. antal holdere",
     "max_top10_pct": "Maks. top-10 ejerandel (%)",
-    "require_socials": "Kræv X, Telegram eller hjemmeside",
+    "min_organic_score": "Min. organisk score (0 = fra)",
+    "max_dev_mints": "Maks. tokens lavet af udvikleren",
+    "require_socials": "Kræv X eller Telegram",
     "use_claude": "Spørg Claude først (langsommere)",
 }
 
@@ -383,7 +404,7 @@ def clamp_sniper(name: str, value: float, cap_usd: float | None = None) -> float
         high = min(high, cap_usd)
         low = min(low, high)
     clamped = min(high, max(low, value))
-    return int(round(clamped)) if name == "min_holders" else clamped
+    return int(round(clamped)) if name in SNIPER_INTS else clamped
 
 
 def sniper_from(data: dict | None, settings: MemeSettings) -> SniperSettings:
@@ -419,6 +440,8 @@ class TopTraderSettings:
     min_liquidity_usd: float = 8_000.0
     max_signal_age_seconds: float = 120.0
     min_leader_sol: float = 0.1
+    # Køb ikke, hvis vores pris er mere end dette over traderens egen købspris (vi kom for sent).
+    max_chase_pct: float = 0.15
     follow_sells: bool = True
     # Stop-loss som sikkerhedsnet, hvis traderen aldrig sælger. Kan slås fra under Top 10.
     stop_loss_on: bool = True
@@ -440,6 +463,7 @@ TOP_BOUNDS: dict[str, tuple[float, float]] = {
     "min_liquidity_usd": (1_000.0, 500_000.0),
     "max_signal_age_seconds": (20.0, 900.0),
     "min_leader_sol": (0.0, 50.0),
+    "max_chase_pct": (0.02, 1.0),
 }
 TOP_INTS = ("count", "days", "max_open", "max_per_day")
 TOP_BOOLS = ("enabled", "follow_sells", "stop_loss_on", "daily_loss_stop")
@@ -455,6 +479,7 @@ TOP_LABELS: dict[str, str] = {
     "min_liquidity_usd": "Mindste likviditet",
     "max_signal_age_seconds": "Køb kun, hvis deres køb er højst",
     "min_leader_sol": "Ignorer køb under",
+    "max_chase_pct": "Maks. pris over traderens købspris",
     "follow_sells": "Sælg når de sælger",
     "daily_loss_stop": "Stop ved dagens tabsgrænse",
     "stop_loss_on": "Brug stop-loss",

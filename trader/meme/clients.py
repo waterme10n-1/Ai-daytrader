@@ -566,6 +566,12 @@ class TokenInfo:
     stats_1h: dict
     created_at_ms: int = 0
     graduated: bool | None = None
+    # Jupiter sætter audit.isSus, når tokenet er markeret som mistænkeligt (feltet findes kun dér).
+    sus: bool = False
+    # Antal tokens udvikler-wallet'en har lavet (audit.devMints). Mange = "token-fabrik".
+    dev_mints: int | None = None
+    dev: str = ""
+    stats_5m: dict = field(default_factory=dict)
 
 
 def _iso_ms(value: Any) -> int:
@@ -617,6 +623,10 @@ def parse_token_info(raw: dict) -> TokenInfo | None:
         stats_1h=dict(raw.get("stats1h") or {}),
         created_at_ms=_iso_ms((raw.get("firstPool") or {}).get("createdAt") or raw.get("createdAt")),
         graduated=bool(raw.get("graduatedPool")) if "graduatedPool" in raw else None,
+        sus="isSus" in audit and audit.get("isSus") is not False,
+        dev_mints=_int(audit.get("devMints")) if audit.get("devMints") is not None else None,
+        dev=str(raw.get("dev") or ""),
+        stats_5m=dict(raw.get("stats5m") or {}),
     )
 
 

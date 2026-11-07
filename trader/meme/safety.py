@@ -77,6 +77,34 @@ def rug_rejections(report: RugReport | None, token: TokenInfo | None, params: St
     return reasons
 
 
+def token_quality_rejections(token: TokenInfo | None, *, min_organic: float, max_dev_mints: float) -> list[str]:
+    """Jupiters egne signaler: mistænkelig-markering, bot-handel og serie-udviklere."""
+    if token is None:
+        return []
+    reasons: list[str] = []
+    if token.sus:
+        reasons.append("Jupiter markerer tokenet som mistænkeligt")
+    if min_organic > 0 and token.organic_score is not None and token.organic_score < min_organic:
+        reasons.append(f"Organisk score {token.organic_score:.0f} under {min_organic:.0f} (handlen er mest bots)")
+    if token.dev_mints is not None and token.dev_mints > max_dev_mints:
+        reasons.append(f"Udvikleren har lavet {token.dev_mints} tokens (maks. {max_dev_mints:.0f}) — typisk en token-fabrik")
+    return reasons
+
+
+def insider_rejections(report: RugReport | None, max_insiders: float) -> list[str]:
+    if report is None or report.insiders <= max_insiders:
+        return []
+    return [f"RugCheck fandt {report.insiders} insider-wallets (maks. {max_insiders:.0f})"]
+
+
+def has_real_socials(pair: PairInfo, token: TokenInfo | None) -> tuple[bool, bool, bool]:
+    """(X, Telegram, hjemmeside). Forskning: Telegram og X hænger sammen med overlevelse, en hjemmeside gør ikke."""
+    has_x = bool(pair.socials.get("twitter") or pair.socials.get("x") or (token and token.twitter))
+    has_tg = bool(pair.socials.get("telegram") or (token and token.telegram))
+    has_web = bool(pair.websites or (token and token.website))
+    return has_x, has_tg, has_web
+
+
 def roundtrip_loss_pct(buy: Quote, sell: Quote) -> float:
     """Hvor meget SOL man taber ved at købe og straks sælge igen. Fanger honeypots og tynde pools."""
     if buy.in_amount <= 0:
@@ -126,8 +154,9 @@ def sniper_rejections(pair: PairInfo, token: TokenInfo | None, cfg: SniperSettin
             reasons.append(f"Topholdere ejer {token.top_holders_pct:.0f} % (maks. {cfg.max_top10_pct:.0f} %)")
         if token.holders is not None and token.holders < cfg.min_holders:
             reasons.append(f"Kun {token.holders} holdere (min. {cfg.min_holders})")
+        reasons.extend(token_quality_rejections(token, min_organic=cfg.min_organic_score, max_dev_mints=cfg.max_dev_mints))
     if cfg.require_socials:
-        has_social = bool(pair.socials or pair.websites or (token and (token.twitter or token.telegram or token.website)))
-        if not has_social:
-            reasons.append("Ingen X, Telegram eller hjemmeside")
+        has_x, has_tg, _web = has_real_socials(pair, token)
+        if not (has_x or has_tg):
+            reasons.append("Hverken X eller Telegram (en hjemmeside alene tæller ikke)")
     return reasons

@@ -322,6 +322,15 @@ def create_app(
         status["security"] = {"totp": totp_enabled(active_settings())}
         return status
 
+    @app.get("/api/meme/export")
+    def meme_export() -> JSONResponse:
+        """Handler, skyggehandler med fakta, indstillinger og lektioner som én fil. Ingen hemmeligheder."""
+        stamp = time.strftime("%Y%m%d-%H%M", time.gmtime())
+        return JSONResponse(
+            meme().export_data(),
+            headers={"Content-Disposition": f'attachment; filename="memebot-{stamp}.json"', "Cache-Control": "no-store"},
+        )
+
     @app.post("/api/meme/kill")
     def meme_kill() -> dict:
         meme().kill()
