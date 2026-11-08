@@ -26,6 +26,7 @@ from trader.desk.config import (
     HARD_MAX_POSITION_PCT,
     HARD_MAX_STOP_PCT,
     HARD_MIN_REWARD_RISK,
+    RETIRED_BY_MARKET,
     RETIRED_DEFAULTS,
     DeskSettings,
     clean_key,
@@ -131,15 +132,17 @@ class DeskEngine:
 
         Trykker man Gem regler, gemmes alle felter. Uden det her ville en gammel standard hænge fast for altid.
         """
+        retired: dict[str, tuple[str, object]] = {name: (name, old) for name, old in RETIRED_DEFAULTS.items()}
+        retired.update(RETIRED_BY_MARKET.get(self.market.key, {}))
         done = list(self.store.get_json("retired_defaults", []) or [])
-        todo = [name for name in RETIRED_DEFAULTS if name not in done]
+        todo = [key for key in retired if key not in done]
         if not todo:
             return
         self.store.set_json("retired_defaults", done + todo)
         params = self.store.get_json("params", {}) or {}
-        dropped = [name for name in todo if name in params and params[name] == RETIRED_DEFAULTS[name]]
-        for name in dropped:
-            params.pop(name)
+        dropped = [key for key in todo if retired[key][0] in params and params[retired[key][0]] == retired[key][1]]
+        for key in dropped:
+            params.pop(retired[key][0], None)
         if dropped:
             self.store.set_json("params", params)
         if announce:
@@ -171,7 +174,7 @@ class DeskEngine:
         for name in ("max_open", "max_flags_per_day", "scan_minutes"):
             if isinstance(params.get(name), int):
                 values[name] = int(params[name])
-        for name in ("auto_approve", "premarket"):
+        for name in ("auto_approve", "premarket", "trial_buys"):
             if isinstance(params.get(name), bool):
                 values[name] = params[name]
         return dataclasses.replace(self.base, **values) if values else self.base
@@ -198,6 +201,10 @@ class DeskEngine:
                 changes.append("før åbning " + ("til: SCOUT og NEWS kigger på gaps fra kl. 10 dansk tid" if early else "fra"))
             else:
                 changes.append("gaps ved åbningen " + ("til" if early else "fra"))
+        if "trial_buys" in body and body["trial_buys"] is not None:
+            trial = body["trial_buys"] in (True, "true", "1", 1, "on")
+            params["trial_buys"] = trial
+            changes.append("prøvekøb " + ("til: siger SKEPTIC WAIT med en klar grund, køber bordet halv størrelse" if trial else "fra"))
         if "auto_approve" in body and body["auto_approve"] is not None:
             auto = body["auto_approve"] in (True, "true", "1", 1, "on")
             params["auto_approve"] = auto
@@ -774,13 +781,35 @@ class DeskEngine:
             proposal_id=pid,
             data=verdict,
         )
-        if verdict["ruling"] != "BUY":
+        # Prøvekøb: WAIT med en klar grund fra NEWS og en ren opstilling fra CHART købes alligevel, til halv størrelse.
+        # SKIP (ingen grund), markeringer kun på volumen og WAIT fra en lært regel købes aldrig.
+        trial = (
+            verdict["ruling"] == "WAIT"
+            and cfg.trial_buys
+            and flag.by_move  # kun rigtige kursbevægelser, ikke markeringer kun på volumen
+            and bool(news.get("has_reason"))
+            and not verdict.get("learned")
+            and not learning.blocking(learned, flag.to_dict(), news, plan.to_dict())
+        )
+        if verdict["ruling"] != "BUY" and not trial:
             self.store.update_proposal(pid, status=verdict["ruling"].lower())
             return
+        if trial:
+            verdict["trial"] = True
+            self.store.update_proposal(pid, skeptic=verdict)
+            self.store.post(
+                "executor",
+                "info",
+                f"Prøvekøb: SKEPTIC sagde WAIT, men grunden og opstillingen er der. Jeg køber {symbol} til halv størrelse "
+                "på papir, så bordet lærer af det rigtige resultat.",
+                symbol=symbol,
+                proposal_id=pid,
+            )
 
         # SIZER
         with self._order_lock:
-            sized = self._size(plan.entry, plan.stop, now, cfg)
+            sizing = dataclasses.replace(cfg, position_pct=cfg.position_pct / 2) if trial else cfg
+            sized = self._size(plan.entry, plan.stop, now, sizing)
             self.store.update_proposal(pid, size=sized.to_dict(), qty=sized.qty)
             self.store.post("sizer", "size", rules.size_text(symbol, sized, self.market.currency), symbol=symbol, proposal_id=pid, data=sized.to_dict())
             if sized.qty < 1:
@@ -794,7 +823,11 @@ class DeskEngine:
             self.store.post(
                 "executor",
                 "info",
-                f"Autopilot: SKEPTIC sagde BUY, så jeg køber {sized.qty} {symbol} uden at spørge (papirpenge).",
+                (
+                    f"Autopilot: prøvekøb af {sized.qty} {symbol} uden at spørge (papirpenge)."
+                    if trial
+                    else f"Autopilot: SKEPTIC sagde BUY, så jeg køber {sized.qty} {symbol} uden at spørge (papirpenge)."
+                ),
                 symbol=symbol,
                 proposal_id=pid,
             )
@@ -1497,6 +1530,7 @@ class DeskEngine:
                 "approval_minutes": cfg.approval_minutes,
                 "scan_minutes": cfg.scan_minutes,
                 "auto_approve": cfg.auto_approve,
+                "trial_buys": cfg.trial_buys,
                 "premarket": cfg.premarket,
                 "gap_pct": cfg.gap_pct,
                 "daily_loss_pct": cfg.daily_loss_pct,
@@ -1582,6 +1616,7 @@ def _proposal(row: dict) -> dict:
         "news": row.get("news"),
         "chart": row.get("chart"),
         "skeptic": row.get("skeptic"),
+        "trial": bool((row.get("skeptic") or {}).get("trial")),
         "size": row.get("size"),
         "shadow": row.get("shadow"),
     }

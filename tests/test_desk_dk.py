@@ -366,3 +366,21 @@ def test_a_morning_line_says_the_desk_is_awake_and_the_switch_knows_who_is_open(
         _login(client)
         listed = {m["key"]: m for m in client.get("/api/desk/markets").json()["markets"]}
         assert listed["dk"]["is_open"] and listed["dk"]["label"] == "Åbent" and "pnl_today" in listed["us"]
+
+
+def test_copenhagen_moves_at_1_5_percent_and_an_old_saved_2_percent_gives_way(tmp_path):
+    assert DeskSettings.from_env_dk().move_pct == 1.5
+    store = DeskStore(str(tmp_path / "desk_dk.db"))
+    store.set_state("welcome", "1")
+    store.set_json("retired_defaults", ["move_pct", "max_flags_per_day", "watchlist"])  # den første oprydning er sket
+    store.set_json("params", {"move_pct": 2.0, "position_pct": 3.0})
+    cfg = replace(DeskSettings(), market="dk", move_pct=1.5, db_path=str(tmp_path / "desk_dk.db"))
+    desk = DeskEngine(cfg, _settings(tmp_path), store=store, broker=DanishPaper(store, data=FakeYahoo({})), background_replies=False)
+    assert desk.cfg.move_pct == 1.5 and desk.cfg.position_pct == 3.0
+    # New York rører den danske regel ikke: en gemt 2 % i USA bliver stående.
+    from test_desk import FakeBroker, make_desk
+
+    us_store = DeskStore(str(tmp_path / "desk_us.db"))
+    us_store.set_json("params", {"move_pct": 2.5})
+    us, _ = make_desk(tmp_path, FakeBroker({}), db_path=str(tmp_path / "desk_us.db"))
+    assert us.cfg.move_pct == 2.5

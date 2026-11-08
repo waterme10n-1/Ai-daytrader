@@ -313,6 +313,65 @@ def test_flatten_at_1550_and_day_log_with_shadow(tmp_path):
     assert sum(1 for m in desk.store.messages(limit=500) if m["kind"] == "log") == 1
 
 
+# ---------------------------------------------------------------------- prøvekøb
+def late_ramp() -> list[Bar]:
+    """Stiger 3,5 % fra 14:00 til 15:00 ET. Kl. 15:05 siger reglerne WAIT (under en time til lukning), men opstillingen er ren."""
+    return ramp_bars(ramp_from=(14, 0), ramp_to=(15, 0))
+
+
+def test_trial_buys_turn_a_wait_with_a_reason_into_a_half_size_buy(tmp_path):
+    broker = FakeBroker({"NVDA": late_ramp()}, news={"NVDA": fresh_news("NVDA")})
+    desk, clock = make_desk(tmp_path, broker, watchlist=("NVDA",))
+    assert desk.cfg.trial_buys and desk.status()["params"]["trial_buys"]
+    clock["now"] = at(15, 5)
+    assert desk.scan() == 1
+    row = desk.store.proposals_on(DAY.isoformat())[0]
+    assert row["ruling"] == "WAIT" and row["skeptic"]["trial"] and row["status"] == "awaiting"
+    # Halv størrelse: 2,5 % af 100.000 i stedet for 5 %.
+    assert row["size"]["pct"] <= 2.6 and row["qty"] == int(2_500 // row["entry"])
+    assert any(m["text"].startswith("Prøvekøb: SKEPTIC sagde WAIT") for m in desk.store.messages(limit=50))
+    assert desk.status()["approvals"][0]["trial"]
+
+
+def test_trial_buys_never_buy_without_a_reason_on_volume_alone_or_when_switched_off(tmp_path):
+    # Ingen nyhed: SKIP, også med prøvekøb.
+    broker = FakeBroker({"NVDA": late_ramp()})
+    desk, clock = make_desk(tmp_path / "a", broker, watchlist=("NVDA",))
+    clock["now"] = at(15, 5)
+    desk.scan()
+    assert desk.store.proposals_on(DAY.isoformat())[0]["status"] == "skip"
+    # Slået fra: WAIT forbliver WAIT.
+    broker = FakeBroker({"NVDA": late_ramp()}, news={"NVDA": fresh_news("NVDA")})
+    desk, clock = make_desk(tmp_path / "b", broker, watchlist=("NVDA",))
+    desk.update_params({"trial_buys": False})
+    assert desk.store.get_json("params") == {"trial_buys": False} and not desk.cfg.trial_buys
+    clock["now"] = at(15, 5)
+    desk.scan()
+    row = desk.store.proposals_on(DAY.isoformat())[0]
+    assert row["status"] == "wait" and not (row["skeptic"] or {}).get("trial")
+    # Kun volumen: kursen har ikke bekræftet noget, så ingen prøvekøb.
+    loud = ramp_bars(end=100.5, volume=3000.0, ramp_volume=3000.0)
+    broker = FakeBroker({"NVDA": loud}, news={"NVDA": fresh_news("NVDA")})
+    desk, clock = make_desk(tmp_path / "c", broker, watchlist=("NVDA",))
+    desk.scan()
+    rows = desk.store.proposals_on(DAY.isoformat())
+    assert rows and all(row["status"] != "awaiting" for row in rows)
+
+
+def test_a_learned_rule_stops_trial_buys_too(tmp_path):
+    broker = FakeBroker({"NVDA": late_ramp()}, news={"NVDA": fresh_news("NVDA")})
+    desk, clock = make_desk(tmp_path, broker, watchlist=("NVDA",))
+    # Tre tabte køb sent på dagen: reglen "late_day" er lært.
+    for index in range(3):
+        pid = desk.store.create_proposal("2026-11-03", f"X{index}", {"symbol": f"X{index}", "move_pct": 3, "by_move": True, "to_close_min": 60})
+        desk.store.update_proposal(pid, status="closed", fill_price=100.0, exit_price=98.0, pnl=-20.0, ruling="BUY")
+    assert any(rule["key"] == "late_day" and rule["active"] for rule in desk.learned())
+    clock["now"] = at(15, 5)
+    desk.scan()
+    row = desk.store.proposals_on(DAY.isoformat())[0]
+    assert row["status"] == "wait" and not (row["skeptic"] or {}).get("trial")
+
+
 def test_max_flags_and_max_open_are_respected(tmp_path):
     names = ["A", "B", "C", "D", "E", "F", "G"]
     broker = FakeBroker({n: ramp_bars() for n in names}, news={n: fresh_news(n) for n in names})

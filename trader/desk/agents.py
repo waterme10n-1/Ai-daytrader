@@ -154,6 +154,12 @@ def bot_rules(key: str, settings: DeskSettings) -> str:
             "Autopiloten er slået til, så du køber selv, når kursen ikke er løbet fra indgangen."
             if getattr(settings, "auto_approve", False)
             else "Du lægger aldrig en ordre uden min godkendelse."
+        )
+        + (
+            " Prøvekøb er slået til: siger SKEPTIC WAIT til en kursbevægelse med en klar grund og en ren opstilling, "
+            "køber du halv størrelse alligevel, medmindre en lært regel siger nej."
+            if getattr(settings, "trial_buys", False)
+            else ""
         ),
     )
 
