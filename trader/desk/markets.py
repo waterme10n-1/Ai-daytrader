@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, time
 from zoneinfo import ZoneInfo
 
-from trader.desk import calendar
+from trader.desk import calendar, fmt
 
 
 def _shift(moment: time, minutes: int) -> tuple[int, int]:
@@ -95,8 +95,7 @@ class Market:
         return f"{self.hhmm(moment)} ET ({dk:%H:%M} dansk tid)"
 
     def money(self, value: float, *, signed: bool = True) -> str:
-        text = f"{value:+,.2f}" if signed else f"{value:,.2f}"
-        return f"{text} {self.currency}"
+        return fmt.money(value, self.currency, sign=signed)
 
 
 US = Market(

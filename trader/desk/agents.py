@@ -14,6 +14,7 @@ from zoneinfo import ZoneInfo
 from pydantic import BaseModel, Field
 
 from trader.desk import markets
+from trader.desk.fmt import short
 from trader.desk.alpaca import ET_NAME
 from trader.desk.config import DeskSettings
 from trader.desk.store import DeskStore
@@ -35,8 +36,8 @@ BOTS: dict[str, dict[str, str]] = {
         "engine": "kode",
         "rules": (
             "Du er SCOUT på et handelsbord med seks bots. I {market_name}s åbningstid holder du øje med tickerne på "
-            "watchlisten. Du markerer en ticker, der bevæger sig mere end {move_pct:g}% på en time, eller handler mere end "
-            "{volume_x:g} gange sin normale volumen. Du skriver ticker, bevægelse og volumen i gruppen. Højst "
+            "watchlisten. Du markerer en ticker, der bevæger sig mere end {move_pct} % på en time, eller handler mere end "
+            "{volume_x} gange sin normale volumen. Du skriver ticker, bevægelse og volumen i gruppen. Højst "
             "{max_flags} markeringer om dagen på kursbevægelse. Markeringer kun på volumen har deres egen kvote på "
             "lige så mange, og en ticker markeret på volumen kan markeres igen, når kursen flytter sig.{premarket} "
             "Du vurderer aldrig, om en bevægelse er god."
@@ -61,8 +62,8 @@ BOTS: dict[str, dict[str, str]] = {
         "engine": "kode",
         "rules": (
             "Du er CHART på et handelsbord med seks bots. For hver ticker, SCOUT markerer, og NEWS forklarer, læser du "
-            "chartet og skriver tre tal: indgang, mål og stop. Stoppet er aldrig mere end {stop_max_pct:g}% under "
-            "indgangen, og målet er mindst {reward_risk:g} gange så langt fra indgangen som stoppet. Er der ingen ren "
+            "chartet og skriver tre tal: indgang, mål og stop. Stoppet er aldrig mere end {stop_max_pct} % under "
+            "indgangen, og målet er mindst {reward_risk} gange så langt fra indgangen som stoppet. Er der ingen ren "
             "opstilling, skriver du \"Ingen setup\" og går videre."
         ),
     },
@@ -85,7 +86,7 @@ BOTS: dict[str, dict[str, str]] = {
         "engine": "kode",
         "rules": (
             "Du er SIZER på et handelsbord med seks bots. For hver handel, SKEPTIC afgør BUY, sætter du beløbet. Aldrig "
-            "mere end {position_pct:g}% af papirkontoen på én handel, og aldrig mere end {max_open} handler åbne på én "
+            "mere end {position_pct} % af papirkontoen på én handel, og aldrig mere end {max_open} handler åbne på én "
             "gang. Er en af grænserne ramt, er svaret nul. Du sætter kun størrelsen og vælger aldrig handler."
         ),
     },
@@ -129,30 +130,36 @@ def bot_rules(key: str, settings: DeskSettings) -> str:
     elif market.premarket_trading:
         premarket = (
             f" Før åbning (4:00-9:30 ET, 10:00-15:30 dansk tid) kigger du hvert 5. minut efter aktier, der er steget "
-            f"{gap:g}% eller mere siden i går, så NEWS kan finde grunden i god tid. Fra {start} til {until} ET markerer du et "
-            f"gap, der holder sig over VWAP, selv om det ikke har flyttet sig {settings.move_pct:g}% på en time."
+            f"{short(gap)} % eller mere siden i går, så NEWS kan finde grunden i god tid. Fra {start} til {until} ET markerer du et "
+            f"gap, der holder sig over VWAP, selv om det ikke har flyttet sig {short(settings.move_pct)} % på en time."
         )
     else:
         premarket = (
-            f" Fra {start} til {until} markerer du en aktie, der er steget {gap:g}% eller mere siden i går og holder sig "
-            f"over VWAP, selv om den ikke har flyttet sig {settings.move_pct:g}% på en time."
+            f" Fra {start} til {until} markerer du en aktie, der er steget {short(gap)} % eller mere siden i går og holder sig "
+            f"over VWAP, selv om den ikke har flyttet sig {short(settings.move_pct)} % på en time."
         )
     account = "bordets egen papirkonto i kroner" if market.broker == "intern" else "papirkontoen hos Alpaca"
     return BOTS[key]["rules"].format(
         premarket=premarket,
         market_name=market.name,
         account=account,
-        move_pct=settings.move_pct,
-        volume_x=settings.volume_x,
+        move_pct=short(settings.move_pct),
+        volume_x=short(settings.volume_x),
         max_flags=settings.max_flags_per_day,
-        stop_max_pct=settings.stop_max_pct,
-        reward_risk=settings.reward_risk,
-        position_pct=settings.position_pct,
+        stop_max_pct=short(settings.stop_max_pct),
+        reward_risk=short(settings.reward_risk),
+        position_pct=short(settings.position_pct),
         max_open=settings.max_open,
         approval=(
             "Autopiloten er slået til, så du køber selv, når kursen ikke er løbet fra indgangen."
             if getattr(settings, "auto_approve", False)
             else "Du lægger aldrig en ordre uden min godkendelse."
+        )
+        + (
+            " Prøvekøb er slået til: siger SKEPTIC WAIT til en kursbevægelse med en klar grund og en ren opstilling, "
+            "køber du halv størrelse alligevel, medmindre en lært regel siger nej."
+            if getattr(settings, "trial_buys", False)
+            else ""
         ),
     )
 
@@ -227,7 +234,7 @@ class DeskBrain:
         if not self.configured:
             return "ANTHROPIC_API_KEY mangler i Railway, så Claude er slået fra."
         if self.limited and self.budget_left() < CHAT_COST:
-            return f"Dagens AI-budget på {self.settings.ai_daily_budget_usd:g} USD er brugt (DESK_AI_DAILY_BUDGET_USD)."
+            return f"Dagens AI-budget på {short(self.settings.ai_daily_budget_usd)} $ er brugt (DESK_AI_DAILY_BUDGET_USD)."
         if self.last_error:
             return self.last_error
         return ""

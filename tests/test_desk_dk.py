@@ -180,8 +180,8 @@ def test_copenhagen_desk_flags_buys_and_closes_on_its_own_paper_account(tmp_path
     assert row["symbol"] == "NOVO-B" and row["ruling"] == "BUY" and row["status"] == "placed"
     assert row["flag"]["to_close_min"] == 360
     texts = [m["text"] for m in desk.store.messages(limit=80)]
-    assert any("inkl. 0.1 % kurtage" in t for t in texts) and any("Yahoo Finance" in t for t in texts)
-    assert any(t.startswith("NOVO-B:") and "DKK" in t and "USD" not in t for t in texts if "aktier for" in t)
+    assert any("inkl. 0,1 % kurtage" in t for t in texts) and any("Yahoo Finance" in t for t in texts)
+    assert any(t.startswith("NOVO-B:") and " kr." in t and "$" not in t for t in texts if "aktier for" in t)
     # Målet rammes en halv time senere.
     target = float(row["target"])
     data.intraday["NOVO-B"] = ramp()[:150] + ramp(start=103.5, end=target + 0.5, ramp_from=(11, 30), ramp_to=(11, 40))[150:]
@@ -189,7 +189,7 @@ def test_copenhagen_desk_flags_buys_and_closes_on_its_own_paper_account(tmp_path
     desk.tick()
     closed = desk.store.proposal(row["id"])
     assert closed["status"] == "closed" and closed["exit_reason"] == "target" and closed["pnl"] > 0
-    assert any("DKK" in m["text"] for m in desk.store.messages(limit=80) if m["kind"] == "close")
+    assert any(" kr." in m["text"] for m in desk.store.messages(limit=80) if m["kind"] == "close")
     desk.tick(force=True)  # baggrundsløkken henter saldoen igen
     status = desk.status()
     assert status["market_info"]["currency"] == "DKK" and status["market_info"]["benchmark_name"] == "C25-indekset"
@@ -288,3 +288,99 @@ def test_late_day_rule_counts_minutes_to_the_close():
     assert late({"to_close_min": 90}, {}, {}) and not late({"to_close_min": 300}, {}, {})
     # København kl. 15:30 er 90 minutter før lukning; en gammel New York-markering kl. 14:10 uden minuttal tæller også.
     assert late({"ts": "2026-11-04T14:10:00-05:00"}, {}, {}) and not late({"ts": "2026-11-04T11:00:00-05:00"}, {}, {})
+
+
+def test_bot_messages_use_danish_numbers():
+    from trader.desk import fmt
+
+    assert fmt.num(1234.5) == "1.234,50" and fmt.pct(3.456) == "+3,5 %" and fmt.pct(-0.004, 2) == "0,00 %"
+    assert fmt.money(-12.3, "DKK") == "-12,30 kr." and fmt.money(4965.4, "USD", decimals=0) == "4.965 $"
+    assert fmt.short(2.0) == "2" and fmt.short(0.5) == "0,5"
+    assert fmt.tidy("Største tab ved stop: 42 kr.. Åbne") == "Største tab ved stop: 42 kr. Åbne"
+    flag = rules.scout("NOVO-B", ramp(), daily(), at(11, 0), move_pct=2, volume_x=2, session_minutes=480)
+    text = rules.scout_text(flag)
+    assert "+3,5 %" in text and "10,0x" in text and text.endswith("Kurs 103,44.")
+
+
+def test_yahoo_parser_reads_the_real_format_and_falls_back_to_the_second_host():
+    import httpx
+
+    from trader.desk.denmark import YahooData
+
+    open_ts = int(at(9, 0).timestamp())
+    body = {
+        "chart": {
+            "result": [
+                {
+                    "meta": {"currency": "DKK", "symbol": "NOVO-B.CO", "regularMarketPrice": 512.4, "regularMarketTime": open_ts + 120, "chartPreviousClose": 505.0},
+                    "timestamp": [open_ts, open_ts + 60, open_ts + 120],
+                    "indicators": {"quote": [{"open": [505.5, None, 506.0], "high": [507.0, None, 512.9], "low": [505.0, None, 505.8], "close": [506.0, None, 512.4], "volume": [12000, None, 800]}]},
+                }
+            ],
+            "error": None,
+        }
+    }
+    seen: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request.url.host)
+        if "search" in request.url.path:
+            return httpx.Response(200, json={"news": [{"title": "Novo løfter prognosen", "publisher": "Børsen", "providerPublishTime": open_ts, "link": "https://example.com/novo"}]})
+        if "UKENDT" in request.url.path:
+            return httpx.Response(404, json={"chart": {"result": None, "error": {"description": "No data found"}}})
+        if request.url.host == "query1.finance.yahoo.com":
+            return httpx.Response(429, text="Too Many Requests")
+        return httpx.Response(200, json=body)
+
+    data = YahooData(httpx.Client(transport=httpx.MockTransport(handler)))
+    bars, meta = data.chart("NOVO-B", "1m", "1d")
+    assert seen[:2] == ["query1.finance.yahoo.com", "query2.finance.yahoo.com"]
+    assert [bar.close for bar in bars] == [506.0, 512.4]  # minuttet uden handel springes over
+    assert bars[0].ts == at(9, 0) and bars[0].volume == 12000 and meta["chartPreviousClose"] == 505.0
+    with pytest.raises(BrokerError, match="kender ikke"):
+        data.chart("UKENDT", "1m", "1d")
+    news = data.news("NOVO-B")
+    assert news[0].headline == "Novo løfter prognosen" and news[0].url == "https://example.com/novo"
+
+
+def test_a_morning_line_says_the_desk_is_awake_and_the_switch_knows_who_is_open(tmp_path):
+    from test_desk import FakeBroker, make_desk
+
+    data = FakeYahoo({"NOVO-B": ramp(), "DSV": ramp(end=100.2, ramp_volume=1000)}, news={"NOVO-B": fresh("NOVO-B")})
+    desk, _paper, clock = make_dk(tmp_path, data)
+    desk.tick()  # første dag: velkomsten om papirkontoen
+    clock["now"] = at(9, 1, DAY + timedelta(days=1))
+    desk.tick()
+    opened = [m for m in desk.store.messages(limit=200) if m["kind"] == "open"]
+    assert len(opened) == 1
+    assert opened[0]["text"].startswith("Københavns børs er åben. SCOUT kigger 9:15–16:30 på 2 aktier. Papirkontoen:")
+    clock["now"] = at(9, 2, DAY + timedelta(days=1))
+    desk.tick()
+    assert sum(1 for m in desk.store.messages(limit=200) if m["kind"] == "open") == 1  # kun én gang om dagen
+    summary = desk.summary()
+    assert summary["is_open"] and summary["phase"] == "open" and summary["open_trades"] in (0, 1)
+    us, _ = make_desk(tmp_path / "us", FakeBroker({}))
+    assert us._window_text(datetime(2026, 11, 4, 10, 0, tzinfo=ZoneInfo("America/New_York"))) == "15:45–21:30 dansk tid"
+    app = create_app(settings=_settings(tmp_path), meme_engine=quiet_engine(), desk_engine=us, desk_dk_engine=desk)
+    with TestClient(app) as client:
+        _login(client)
+        listed = {m["key"]: m for m in client.get("/api/desk/markets").json()["markets"]}
+        assert listed["dk"]["is_open"] and listed["dk"]["label"] == "Åbent" and "pnl_today" in listed["us"]
+
+
+def test_copenhagen_moves_at_1_5_percent_and_an_old_saved_2_percent_gives_way(tmp_path):
+    assert DeskSettings.from_env_dk().move_pct == 1.5
+    store = DeskStore(str(tmp_path / "desk_dk.db"))
+    store.set_state("welcome", "1")
+    store.set_json("retired_defaults", ["move_pct", "max_flags_per_day", "watchlist"])  # den første oprydning er sket
+    store.set_json("params", {"move_pct": 2.0, "position_pct": 3.0})
+    cfg = replace(DeskSettings(), market="dk", move_pct=1.5, db_path=str(tmp_path / "desk_dk.db"))
+    desk = DeskEngine(cfg, _settings(tmp_path), store=store, broker=DanishPaper(store, data=FakeYahoo({})), background_replies=False)
+    assert desk.cfg.move_pct == 1.5 and desk.cfg.position_pct == 3.0
+    # New York rører den danske regel ikke: en gemt 2 % i USA bliver stående.
+    from test_desk import FakeBroker, make_desk
+
+    us_store = DeskStore(str(tmp_path / "desk_us.db"))
+    us_store.set_json("params", {"move_pct": 2.5})
+    us, _ = make_desk(tmp_path, FakeBroker({}), db_path=str(tmp_path / "desk_us.db"))
+    assert us.cfg.move_pct == 2.5

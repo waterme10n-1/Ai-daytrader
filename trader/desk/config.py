@@ -36,6 +36,10 @@ RETIRED_DEFAULTS: dict[str, object] = {
     "max_flags_per_day": 5,
     "watchlist": ["NVDA", "AAPL", "MSFT", "AMZN", "META", "GOOGL", "TSLA", "AMD", "AVGO", "NFLX", "PLTR", "COIN"],
 }
+# Gamle standarder for én børs: nøgle → (indstilling, gammel værdi). Nøglen skal være ny for hver ændring.
+RETIRED_BY_MARKET: dict[str, dict[str, tuple[str, object]]] = {
+    "dk": {"dk_move_pct_2": ("move_pct", 2.0)},  # København: 2 % blev til 1,5 %
+}
 TICKER = re.compile(r"^[A-Z]{1,5}(\.[A-Z])?$")
 # Københavns børs: NOVO-B, MAERSK-B, NDA-DK, GN, ROCK-B (som hos Yahoo, uden .CO).
 DK_TICKER = re.compile(r"^(?=[A-Z0-9-]*[A-Z])[A-Z0-9]{1,8}(-[A-Z]{1,3})?$")
@@ -125,6 +129,9 @@ class DeskSettings:
     approval_minutes: int = 10
     scan_minutes: int = 1
     auto_approve: bool = True
+    # Prøvekøb: siger SKEPTIC WAIT til en handel med en klar grund og en ren opstilling, køber bordet halv størrelse
+    # alligevel. Så kommer der flere handler på papir, og bordet lærer af rigtige resultater i stedet for kun skygger.
+    trial_buys: bool = True
     max_chase_pct: float = 0.5
     alpaca_api_key: str = ""
     alpaca_secret_key: str = ""
@@ -167,6 +174,7 @@ class DeskSettings:
             approval_minutes=max(2, min(60, _int(os.getenv("DESK_APPROVAL_MINUTES"), 10))),
             scan_minutes=max(1, min(30, _int(os.getenv("DESK_SCAN_MINUTES"), 1))),
             auto_approve=_flag(os.getenv("DESK_AUTO_APPROVE"), True),
+            trial_buys=_flag(os.getenv("DESK_TRIAL_BUYS"), True),
             max_chase_pct=min(2.0, max(0.1, _float(os.getenv("DESK_MAX_CHASE_PCT"), 0.5))),
             # Egen papirkonto til bordet. ALPACA_API_KEY bruges, hvis du allerede har den sat.
             alpaca_api_key=clean_key(os.getenv("DESK_ALPACA_API_KEY") or os.getenv("ALPACA_API_KEY")),
@@ -195,6 +203,8 @@ class DeskSettings:
             enabled=_flag(os.getenv("DESK_DK_ENABLED"), True),
             market="dk",
             watchlist=tuple(watch),
+            # Store danske aktier flytter sig mindre end de livlige amerikanske, så grænsen er lavere.
+            move_pct=min(20.0, max(0.5, _float(os.getenv("DESK_DK_MOVE_PCT"), 1.5))),
             start_cash=min(10_000_000.0, max(10_000.0, _float(os.getenv("DESK_DK_START_CASH"), 100_000.0))),
             fee_pct=min(1.0, max(0.0, _float(os.getenv("DESK_DK_FEE_PCT"), 0.1))),
             alpaca_api_key="",

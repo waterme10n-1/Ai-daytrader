@@ -526,7 +526,12 @@ def create_app(
         for key, name in (("us", "desk"), ("dk", "desk_dk")):
             engine_ = getattr(app.state, name, None)
             if engine_ is not None:
-                out.append({"key": key, "name": engine_.market.name, "country": engine_.market.country, "currency": engine_.market.currency})
+                item = {"key": key, "name": engine_.market.name, "country": engine_.market.country, "currency": engine_.market.currency}
+                try:
+                    item.update(engine_.summary())
+                except Exception:  # skifteren må aldrig vælte, fordi en motor driller
+                    logger.exception("Overblik for %s fejlede", key)
+                out.append(item)
         return {"markets": out}
 
     @app.get("/desk")

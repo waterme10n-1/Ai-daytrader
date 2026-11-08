@@ -291,7 +291,7 @@ Bygget efter guiden "How to build a trading desk in one group chat", men på Cla
 
 | Bot | Job | Kører på |
 |---|---|---|
-| **SCOUT** | Markerer en ticker på watchlisten, der flytter sig mindst 2 % på en time eller handler mindst 2 gange normal volumen. Højst 8 markeringer om dagen på kursbevægelse; markeringer kun på volumen har deres egen kvote, så de ikke bruger pladserne op i første time. Før åbning finder den gaps (se nedenfor). | fast kode |
+| **SCOUT** | Markerer en ticker på watchlisten, der flytter sig mindst 2 % på en time (1,5 % i København) eller handler mindst 2 gange normal volumen. Højst 8 markeringer om dagen på kursbevægelse; markeringer kun på volumen har deres egen kvote, så de ikke bruger pladserne op i første time. Før åbning finder den gaps (se nedenfor). | fast kode |
 | **NEWS** | Finder grunden med websøgning og Alpaca-nyheder og skriver den på to linjer med link. Uden kilde: "Ingen klar grund". | Claude |
 | **CHART** | Sætter indgang, mål og stop. Stoppet er højst 2 % under indgangen, og målet er mindst 2 gange så langt væk. Ellers "Ingen setup". Kun køb, ingen short. | fast kode |
 | **SKEPTIC** | Giver de tre stærkeste grunde til, at handlen fejler, og afgør BUY, WAIT eller SKIP. Uden klar grund fra NEWS er svaret altid SKIP. Det håndhæves i koden, også hvis Claude siger BUY. | Claude |
@@ -303,6 +303,8 @@ SCOUT, CHART og SIZER er bevidst almindelig kode. Tal fra en sprogmodel kan vær
 ## Autopilot eller godkendelser
 
 **Autopilot er slået til som standard** (`DESK_AUTO_APPROVE=true`, eller fluebenet under **Bots**): når SKEPTIC siger BUY og SIZER har sat et beløb, køber EXECUTOR selv på papirkontoen uden at spørge. Samme tjek som ved en manuel godkendelse gælder stadig (kursen må ikke være løbet, lofterne skal holde), og **Stop nu** sætter alt på pause. SCOUT kigger hvert minut (`DESK_SCAN_MINUTES=1`).
+
+**Prøvekøb er også slået til som standard** (`DESK_TRIAL_BUYS=true`, eller **Prøvekøb** under **Bots → Indstillinger**). Siger SKEPTIC WAIT til en aktie, der har flyttet sig, og NEWS har en klar grund, og CHART en ren opstilling, køber bordet alligevel, men kun halv størrelse (2,5 % af kontoen i stedet for 5 %). Det giver flere handler at se på papir, og bordet lærer af rigtige resultater i stedet for kun skyggeregnskab. Prøvekøb sker aldrig uden en grund fra NEWS (SKIP), aldrig på en markering kun på volumen og aldrig, når en lært regel siger nej. Lofterne for åbne handler og dagens tab gælder som altid. Prøvekøb står som "prøvekøb" ved handlen og i Gruppen.
 
 Slår du autopiloten fra, ender hver BUY som et kort under **Godkend** (og i chatten) med hele kæden: markering, nyhed med link, de tre modargumenter og beløbet. Du har 10 minutter. Når du trykker **Godkend køb**, tjekker EXECUTOR igen, at kursen ikke er løbet mere end 0,5 % over indgangen og stadig ligger mellem stop og mål, og at SIZER's grænser holder. Ellers lægges ordren ikke. Er Telegram sat op, får du også en besked på telefonen.
 
@@ -322,11 +324,16 @@ Fanen **Læring** viser reglerne med tal, lektionerne og bordets resultat mod at
 
 ## Siden
 
-Forsiden **Overblik** viser papirkontoen, en nedtælling til New York-børsen åbner eller lukker, nøgletal, en radar over watchlisten, systemstatus, seneste forslag trin for trin, åbne positioner og watchlisten med kurver.
+Forsiden **Overblik** viser papirkontoen, en nedtælling til børsen (New York eller København) åbner eller lukker, nøgletal, en radar over watchlisten, systemstatus, seneste forslag trin for trin, åbne positioner og watchlisten med kurver.
 
 - **Nedtællingen virker altid.** Bordet har sin egen kalender over børsens åbningstider med helligdage og halve dage (regnet ud fra NYSE's regler). Svarer Alpaca, bruges Alpacas ur i stedet, fordi det også kender ekstraordinære lukninger.
 - **Kurser hele døgnet.** Når børsen er lukket, henter bordet sidste handelsdags kurser hos Alpaca hvert 10. minut, så radar, kursbånd og watchlist altid har noget at vise.
 - Tryk på en prik i radaren eller en række i watchlisten for at se aktien og spørge SKEPTIC eller NEWS. ⌘K/Ctrl+K åbner kommandolinjen, og tasterne 1–5 skifter fane.
+- **Hvem handler lige nu.** I skifteren øverst får **USA** og **Danmark** en grøn prik, når den børs handler, og en gul før åbning. Hold musen over for at se åbne handler og dagens resultat.
+- **Godmorgen i Gruppen.** Når en børs åbner, skriver bordet én linje: hvornår SCOUT kigger, hvor mange aktier og saldoen. Står bordet på pause, siger beskeden det.
+- **Mangler kurserne, står grunden der.** Kan kurserne ikke hentes (fx hvis Yahoo eller Alpaca ikke svarer), viser watchlisten og statuslinjen hvorfor, og bordet prøver igen hvert minut. Yahoo prøves på to adresser, før bordet giver op.
+- På telefonen står kontoen øverst, så børsen med nedtællingen og åbne handler, og derefter resten.
+- Bottenes beskeder skriver tal på dansk: `+3,5 %`, `103,44`, `4.965 kr.`.
 
 ## Opsætning
 
@@ -373,6 +380,6 @@ København er lukket på danske helligdage: nytår, skærtorsdag, langfredag, 2.
 
 Der er ingen handel før åbning i København, så kortet **Før åbning** findes kun for New York. Gaps ved åbningen gælder begge steder.
 
-Watchlisten er 16 likvide C25-aktier: NOVO-B, DSV, DANSKE, ORSTED, VWS, GMAB, PNDORA, CARL-B, COLO-B, NSIS-B, DEMANT, GN, NKT, BAVA, ZEAL og AMBU-B. Skriv tickers, som Yahoo skriver dem, uden `.CO` (fx `NOVO-B`). Bordet måles mod C25-indekset.
+SCOUT markerer i København fra 1,5 % på en time (`DESK_DK_MOVE_PCT`), fordi store danske aktier flytter sig mindre end de livlige amerikanske. Watchlisten er 16 likvide C25-aktier: NOVO-B, DSV, DANSKE, ORSTED, VWS, GMAB, PNDORA, CARL-B, COLO-B, NSIS-B, DEMANT, GN, NKT, BAVA, ZEAL og AMBU-B. Skriv tickers, som Yahoo skriver dem, uden `.CO` (fx `NOVO-B`). Bordet måles mod C25-indekset.
 
 `DESK_DK_ENABLED=false` slår København fra.
