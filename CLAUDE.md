@@ -9,6 +9,8 @@ Noter til Claude Code om dette repo. Brugerens dokumentation står i `LÆS_MIG.m
 - **Memebot** (`/meme`, `trader/meme/`): memecoins på Solana. Papirpenge med rigtige kurser fra DexScreener og Jupiter, indtil live-kravene er opfyldt.
 - **Handelsbordet** (`/desk`, `trader/desk/`): seks bots (SCOUT, NEWS, CHART, SKEPTIC, SIZER, EXECUTOR). USA handler på Alpacas papirkonto. Danmark (siden `?m=dk`, API-kaldene `?market=dk`) har sin egen papirkonto i kroner med kurser fra Yahoo (`denmark.py`).
 
+Selvstændige værktøjer (ikke koblet på botterne) ligger i `trader/quant/`: `risk_engine.py`, `memecoin_filter.py` og `strategy_engine.py` (kræver `requirements-quant.txt`).
+
 Vigtige filer: `trader/app.py` (alle ruter), `trader/auth.py` (login, CSRF, TOTP), `trader/meme/engine.py` og `trader/desk/engine.py` (motorerne), `trader/static/meme.html` og `desk.html` (hele brugerfladen i én fil hver, uden build-trin).
 
 ## Kommandoer

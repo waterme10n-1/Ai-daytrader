@@ -383,3 +383,49 @@ Der er ingen handel før åbning i København, så kortet **Før åbning** finde
 Yahoo er gratis, men svarer 429 ("for mange forespørgsler"), hvis bordet spørger for tit. Derfor kigger SCOUT i København hvert 5. minut (`DESK_DK_SCAN_MINUTES`). Det er nok til bevægelser på en time. Mellem scanningerne spørger bordet ikke Yahoo, åbne handler tjekkes hvert 2. minut mod alle minutter siden sidst (så intet stop overses), og når børsen er lukket, hentes kurserne hvert 30. minut. SCOUT markerer i København fra 1,5 % på en time (`DESK_DK_MOVE_PCT`), fordi store danske aktier flytter sig mindre end de livlige amerikanske. Watchlisten er 16 likvide C25-aktier: NOVO-B, DSV, DANSKE, ORSTED, VWS, GMAB, PNDORA, CARL-B, COLO-B, NSIS-B, DEMANT, GN, NKT, BAVA, ZEAL og AMBU-B. Skriv tickers, som Yahoo skriver dem, uden `.CO` (fx `NOVO-B`). Bordet måles mod C25-indekset.
 
 `DESK_DK_ENABLED=false` slår København fra.
+
+# Værktøjer: risiko, memecoin-filter og morgen-screener
+
+Tre selvstændige moduler i `trader/quant/`. De er **ikke** koblet på memebotten eller handelsbordet, som har deres egne regler. Brug dem fra din egen kode eller kommandolinjen.
+
+## Risikomotor (`trader/quant/risk_engine.py`)
+
+`RiskEngine.evaluate(signal, portefølje, nu)` svarer ja eller nej til et købssignal og siger, hvor meget der må købes:
+
+- **Positionsstørrelse**: højst 1 % af porteføljen i risiko pr. handel (`RiskConfig(risk_per_trade_pct=0.02)` for 2 %, aldrig mere). Risikoen er afstanden til stop-loss gange antal plus gebyrerne begge veje. Aktier købes i hele styk.
+- **Memecoins**: højst 0,5 % af porteføljen pr. handel, og altid en gevinstsikring ved 2x, hvor så mange tokens sælges, at indsatsen og gebyrerne er hjemme. Resten kan løbe videre.
+- **Dagligt tabsstop**: falder porteføljen mere end 5 % på en dag, svarer `check_daily_drawdown` med `close_all`, og der godkendes ingen handler i 24 timer.
+- **Gebyrer**: kurtage og spread (USA og Danmark, inkl. SEC- og FINRA-afgifter ved salg i USA) og Solana-gebyrer (transaktion, prioritet, Jito-tip, pool-gebyr og slippage). Et signal godkendes kun, hvis gevinst mod risiko efter gebyrer er mindst 1:1,5, og gebyrerne højst æder 25 % af den mulige gevinst. Satserne er eksempler: sæt din egen mæglers pris i `StockFees` og den aktuelle SOL-kurs i `SolanaFees`.
+- **Skat**: `net_reward_after_tax` er et groft skøn (aktier 27 %, krypto som personlig indkomst, sat til 37 %). Det er ikke skatterådgivning; tjek dine satser på skat.dk.
+
+Kurser i en anden valuta end porteføljen omregnes med `fx_to_base` på signalet.
+
+## Memecoin-filter (`trader/quant/memecoin_filter.py`)
+
+```bash
+python -m trader.quant.memecoin_filter <MINT> [--ticker BONK] [--exclude BØRS-WALLET ...]
+```
+
+Svarer med JSON: `safety_score` (0-100), `trade_allowed` og grundene. Fire tjek med 25 point hver:
+
+1. **Likviditet**: mindst 95 % af poolens LP er brændt eller låst, og en lås holder mindst 182 dage endnu.
+2. **Ejerfordeling**: de 10 største ejere har højst 20 %. Pools, låse, brændte konti og børs-wallets, RugCheck kender, tæller ikke med, og `--exclude` tilføjer dine egne.
+3. **Authorities**: mint og freeze authority er opgivet.
+4. **X**: de seneste op til 100 opslag vurderes for bots (nye konti, få følgere, kopieret tekst, samme konto igen og igen, mange opslag i samme minut, ingen reaktioner). Er over halvdelen bots, afvises tokenet.
+
+Handel er kun tilladt, når 1-3 består, omtalen ikke er domineret af bots, og scoren er mindst 70. Kan RugCheck ikke svare, er svaret nej. X kræver `X_BEARER_TOKEN` og et X-abonnement med søgning; uden det vurderes omtalen ikke, og scoren er højst 75. `RUGCHECK_API_KEY` er valgfri.
+
+## Morgen-screener (`trader/quant/strategy_engine.py`)
+
+```bash
+pip install -r requirements-quant.txt
+python -m trader.quant.strategy_engine --market us
+python -m trader.quant.strategy_engine --market dk NOVO-B MAERSK-B
+```
+
+1. **Momentum**: aktier med relativ volumen over 2,0 og mindst ±3 % i forhold til gårsdagens lukkekurs. I USA måles handlen før åbningen. København har ingen handel før åbningen, så dér måles de første 15 minutter, og screeneren giver først mening fra 9:15.
+2. **Indikatorer** på 5-minutters lys: EMA 9, EMA 20, VWAP fra åbningen og RSI 14 (med TA-Lib, hvis det er installeret, ellers de samme formler i ren Python).
+3. **Købssignal**: et lys lukker over VWAP efter at have ligget under, EMA 9 er over EMA 20, og RSI er mellem 50 og 70.
+4. **Svar**: entry, stop-loss 0,1 % under seneste swing-bund og et kursmål på mindst 2 gange risikoen. Er stoppet under 0,1 % eller over 5 % fra entry, springes signalet over.
+
+New York åbner 15:30 dansk tid, men 14:30 i de uger forår og efterår, hvor USA og Europa skifter sommertid på forskellige datoer. Screeneren regner i børsens egen tid, så det passer af sig selv. Uden tickere bruges bordets watchlist. Data kommer fra Yahoo Finance via yfinance og kan være forsinkede. Yahoo begrænser, hvor ofte der må spørges: kør den på din egen computer eller højst et par gange om morgenen, så handelsbordet på samme server ikke bliver bremset.

@@ -1,0 +1,5 @@
+# Kun til trader/quant/strategy_engine.py (morgen-screeneren). Appen på Railway bruger dem ikke.
+-r requirements.txt
+yfinance==1.8.0
+# Valgfrit: uden TA-Lib bruges de samme formler i ren Python. Fjern linjen, hvis den ikke kan installeres.
+TA-Lib==0.8.3
