@@ -331,7 +331,7 @@ Forsiden **Overblik** viser papirkontoen, en nedtælling til børsen (New York e
 - Tryk på en prik i radaren eller en række i watchlisten for at se aktien og spørge SKEPTIC eller NEWS. ⌘K/Ctrl+K åbner kommandolinjen, og tasterne 1–5 skifter fane.
 - **Hvem handler lige nu.** I skifteren øverst får **USA** og **Danmark** en grøn prik, når den børs handler, og en gul før åbning. Hold musen over for at se åbne handler og dagens resultat.
 - **Godmorgen i Gruppen.** Når en børs åbner, skriver bordet én linje: hvornår SCOUT kigger, hvor mange aktier og saldoen. Står bordet på pause, siger beskeden det.
-- **Mangler kurserne, står grunden der.** Kan kurserne ikke hentes (fx hvis Yahoo eller Alpaca ikke svarer), viser watchlisten og statuslinjen hvorfor, og bordet prøver igen hvert minut. Yahoo prøves på to adresser, før bordet giver op.
+- **Mangler kurserne, står grunden der.** Kan kurserne ikke hentes (fx hvis Yahoo eller Alpaca ikke svarer), viser watchlisten og statuslinjen hvorfor, og bordet prøver igen hvert minut. Er Yahoo nede, prøves Yahoos anden adresse. Beder Yahoo bordet vente (fejl 429), holder bordet pause med de danske kurser i 2, 4, 8 … op til 30 minutter (eller så længe Yahoo selv beder om) i stedet for at spørge igen hvert minut.
 - På telefonen står kontoen øverst, så børsen med nedtællingen og åbne handler, og derefter resten.
 - Bottenes beskeder skriver tal på dansk: `+3,5 %`, `103,44`, `4.965 kr.`.
 

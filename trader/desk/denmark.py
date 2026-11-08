@@ -37,8 +37,12 @@ from trader.desk.markets import DK, Market
 
 logger = logging.getLogger("trader.desk.dk")
 
-# Yahoo har to ens adresser. Svarer den ene ikke (eller beder os vente), prøves den anden.
+# Yahoo har to ens adresser. Er den ene nede (netværksfejl eller 5xx), prøves den anden. Ved 429 respekteres
+# Yahoos "vent": bordet prøver ikke den anden adresse, men holder pause.
 HOSTS = ("https://query1.finance.yahoo.com", "https://query2.finance.yahoo.com")
+# Pause efter 429: 2, 4, 8, 16 og højst 30 minutter, eller så længe Yahoo selv beder om (Retry-After).
+BACKOFF_FIRST = 120.0
+BACKOFF_MAX = 1800.0
 CHART_PATH = "/v8/finance/chart/{symbol}"
 SEARCH_PATH = "/v1/finance/search"
 # Yahoo afviser kald uden en almindelig browser-User-Agent. Ingen personlige oplysninger sendes med.
@@ -58,15 +62,43 @@ def yahoo_symbol(symbol: str) -> str:
 class YahooData:
     """Minutbarer, dagsbarer, seneste kurs og overskrifter fra Yahoo Finance. Gratis og uden nøgle."""
 
-    def __init__(self, client: httpx.Client | None = None, *, market: Market = DK) -> None:
+    def __init__(
+        self, client: httpx.Client | None = None, *, market: Market = DK, clock: Callable[[], float] = clock_time.monotonic
+    ) -> None:
         self._client = client or httpx.Client(timeout=12.0, headers={"User-Agent": USER_AGENT, "Accept": "application/json"})
         self.tz = market.tz
+        self._clock = clock
+        self._lock = threading.Lock()
+        self._blocked_until = float("-inf")
+        self._backoff = 0.0
+
+    def blocked_for(self) -> float:
+        """Sekunder, til bordet må spørge Yahoo igen efter en 429. 0, når det må."""
+        return max(0.0, self._blocked_until - self._clock())
+
+    def _pause(self, retry_after: str | None) -> float:
+        """Næste pause: dobbelt så lang som sidst, eller så lang som Yahoo beder om, hvis det er længere."""
+        with self._lock:
+            self._backoff = min(BACKOFF_MAX, self._backoff * 2 if self._backoff else BACKOFF_FIRST)
+            try:
+                asked = float(retry_after) if retry_after else 0.0
+            except ValueError:
+                asked = 0.0
+            wait = max(self._backoff, min(asked, BACKOFF_MAX))
+            self._blocked_until = self._clock() + wait
+            return wait
 
     def close(self) -> None:
         self._client.close()
 
     def _get(self, path: str, params: dict[str, Any], what: str) -> dict:
-        """Ét kald til Yahoo. Netværksfejl, 429 og 5xx prøves én gang til på den anden adresse."""
+        """Ét kald til Yahoo. Netværksfejl og 5xx prøves på den anden adresse. 429 giver en pause."""
+        wait = self.blocked_for()
+        if wait > 0:
+            raise BrokerError(
+                f"Yahoo Finance bad bordet vente (429). Bordet holder pause med kurserne og prøver igen om "
+                f"{max(1, round(wait / 60))} min."
+            )
         problem: BrokerError | None = None
         for host in HOSTS:
             try:
@@ -75,8 +107,11 @@ class YahooData:
                 problem = BrokerError(f"Yahoo Finance svarede ikke ({what}): {exc.__class__.__name__}.")
                 continue
             if response.status_code == 429:
-                problem = BrokerError("Yahoo Finance beder bordet vente lidt (429). Kurserne kommer igen om et øjeblik.")
-                continue
+                paused = self._pause(response.headers.get("Retry-After"))
+                raise BrokerError(
+                    f"Yahoo Finance beder bordet vente (429). Bordet holder pause med kurserne i "
+                    f"{max(1, round(paused / 60))} min og prøver så igen."
+                )
             if response.status_code >= 500:
                 problem = BrokerError(f"Yahoo Finance har en fejl lige nu ({response.status_code}) for {what}.")
                 continue
@@ -90,6 +125,8 @@ class YahooData:
                 data = response.json()
             except ValueError as exc:
                 raise BrokerError(f"Yahoo Finance sendte et svar, bordet ikke kan læse ({what}).") from exc
+            with self._lock:
+                self._backoff = 0.0  # Yahoo svarer igen: næste pause starter forfra
             return data if isinstance(data, dict) else {}
         raise problem or BrokerError(f"Yahoo Finance svarede ikke ({what}).")
 

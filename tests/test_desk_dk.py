@@ -302,7 +302,7 @@ def test_bot_messages_use_danish_numbers():
     assert "+3,5 %" in text and "10,0x" in text and text.endswith("Kurs 103,44.")
 
 
-def test_yahoo_parser_reads_the_real_format_and_falls_back_to_the_second_host():
+def test_yahoo_parser_reads_the_real_format_and_uses_the_second_host_when_the_first_is_down():
     import httpx
 
     from trader.desk.denmark import YahooData
@@ -329,7 +329,7 @@ def test_yahoo_parser_reads_the_real_format_and_falls_back_to_the_second_host():
         if "UKENDT" in request.url.path:
             return httpx.Response(404, json={"chart": {"result": None, "error": {"description": "No data found"}}})
         if request.url.host == "query1.finance.yahoo.com":
-            return httpx.Response(429, text="Too Many Requests")
+            return httpx.Response(503, text="Service Unavailable")
         return httpx.Response(200, json=body)
 
     data = YahooData(httpx.Client(transport=httpx.MockTransport(handler)))
@@ -384,3 +384,42 @@ def test_copenhagen_moves_at_1_5_percent_and_an_old_saved_2_percent_gives_way(tm
     us_store.set_json("params", {"move_pct": 2.5})
     us, _ = make_desk(tmp_path, FakeBroker({}), db_path=str(tmp_path / "desk_us.db"))
     assert us.cfg.move_pct == 2.5
+
+
+def test_yahoo_429_pauses_politely_instead_of_asking_again_and_again():
+    import httpx
+
+    from trader.desk.denmark import YahooData
+
+    now = {"t": 1000.0}
+    calls: list[str] = []
+    answer = {"status": 429, "retry": None}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request.url.host)
+        if answer["status"] == 429:
+            headers = {"Retry-After": answer["retry"]} if answer["retry"] else {}
+            return httpx.Response(429, text="Too Many Requests", headers=headers)
+        return httpx.Response(200, json={"chart": {"result": [{"meta": {}, "timestamp": [], "indicators": {"quote": [{}]}}]}})
+
+    data = YahooData(httpx.Client(transport=httpx.MockTransport(handler)), clock=lambda: now["t"])
+    with pytest.raises(BrokerError, match="pause med kurserne i 2 min"):
+        data.chart("NOVO-B", "1m", "1d")
+    assert calls == ["query1.finance.yahoo.com"]  # ingen omvej via den anden adresse
+    # Under pausen spørger bordet slet ikke.
+    now["t"] += 60
+    with pytest.raises(BrokerError, match="prøver igen om 1 min"):
+        data.chart("DSV", "1m", "1d")
+    assert len(calls) == 1 and data.blocked_for() == 60
+    # Næste 429 giver dobbelt så lang pause, og Retry-After vinder, hvis Yahoo beder om mere.
+    now["t"] += 61
+    answer["retry"] = "600"
+    with pytest.raises(BrokerError, match="10 min"):
+        data.chart("DSV", "1m", "1d")
+    # Når Yahoo svarer igen, starter pausen forfra.
+    now["t"] += 601
+    answer["status"] = 200
+    data.chart("DSV", "1m", "1d")
+    answer["status"], answer["retry"] = 429, None
+    with pytest.raises(BrokerError, match="2 min"):
+        data.chart("DSV", "1m", "1d")
