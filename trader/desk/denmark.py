@@ -49,6 +49,7 @@ SEARCH_PATH = "/v1/finance/search"
 USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
 LEDGER = "paper_ledger"
 BAR_CACHE_SECONDS = 20.0
+ORDER_CHECK_SECONDS = 110.0  # et åbent køb tjekkes mod nye minutter ca. hvert 2. minut
 MINUTE = timedelta(minutes=1)
 
 
@@ -210,7 +211,8 @@ class DanishPaper:
         self._lock = threading.RLock()
         self._bars: dict[str, tuple[float, str, list[Bar]]] = {}
         self._last: dict[str, float] = {}
-        self._pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="desk-dk-data")
+        self._pool = ThreadPoolExecutor(max_workers=2, thread_name_prefix="desk-dk-data")  # få samtidige kald til Yahoo
+        self._checked: dict[str, float] = {}  # ordre-id → hvornår stop og mål sidst blev tjekket
         with self._lock:
             if self.store.get_json(LEDGER) is None:
                 self.store.set_json(LEDGER, {"cash": float(start_cash), "start": float(start_cash), "orders": {}, "next": 1})
@@ -424,14 +426,20 @@ class DanishPaper:
         self._last[symbol] = raw
         return self._order(row)
 
-    def get_order(self, order_id: str) -> Order:
+    def get_order(self, order_id: str, *, force: bool = False) -> Order:
         with self._lock:
             row = self._ledger()["orders"].get(order_id)
         if row is None:
             raise BrokerError(f"Ukendt ordre {order_id}.")
         if row["status"] != "open":
             return self._order(row)
+        # Stop og mål tjekkes mod alle minutter siden sidst, så et tjek hvert 2. minut giver samme resultat som hvert
+        # minut, med halvt så mange kald til Yahoo.
         now = self._now().astimezone(self.tz)
+        stamp = now.timestamp()
+        if not force and stamp - self._checked.get(order_id, float("-inf")) < ORDER_CHECK_SECONDS:
+            return self._order(row)
+        self._checked[order_id] = stamp
         try:
             bars = self._session_bars(self._fetch_today(row["symbol"]), now.date(), now)
         except BrokerError as exc:
@@ -458,6 +466,11 @@ class DanishPaper:
             return self._order(row)
 
     def close_position(self, symbol: str, reason: str = "manual") -> None:
+        # Først de seneste minutter: ramte et stop eller mål lige før, er det den rigtige salgskurs.
+        with self._lock:
+            pending = [row["id"] for row in self._ledger()["orders"].values() if row["symbol"] == symbol and row["status"] == "open"]
+        for order_id in pending:
+            self.get_order(order_id, force=True)
         price = self._price(symbol)
         now = self._now().astimezone(self.tz)
         with self._lock:
