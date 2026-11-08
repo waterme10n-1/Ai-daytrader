@@ -33,6 +33,8 @@ from trader.meme.config import (
     LAMPORTS_PER_SOL,
     MEME_LIVE_PHRASE,
     PARAM_BOUNDS,
+    PARAM_EXITS,
+    PARAM_KINDS,
     PARAM_LABELS,
     QUOTE_MINTS,
     SNIPER_BOOLS,
@@ -68,6 +70,7 @@ from trader.meme.learning import (
     adapt_params,
     adapt_sniper,
     build_features,
+    explain_trade,
     MOMENTUM_STOP_GRID,
     MOMENTUM_TARGET_GRID,
     FACT_MIN_ROWS,
@@ -159,6 +162,13 @@ SNIPER_RESEARCH_MIN_AGE_SECONDS = 300.0
 ANALYSIS_ROWS = 1500
 ANALYSIS_CACHE_SECONDS = 300
 TIGHTEN_LOG_KEPT = 20
+# Indstillinger gemt som brøk (0,25 = 25 %).
+FRACTION_PARAMS = {"stop_loss_pct", "take_profit_pct", "partial_fraction", "trail_activation_pct", "trailing_stop_pct", "min_buy_ratio_h1", "sell_fraction"}
+# Én gang: strategi-vagten slås til, og Top 10 slås fra, til tallene viser overskud.
+UPGRADE_V2 = "vagt-top10-nov-2026"
+# En indstilling, du selv har sat (eller hvor du har fortrudt en automatisk ændring), rører læringen ikke i en uge.
+PARAM_LOCK_DAYS = 7
+CHANGE_LOG_KEPT = 60
 PAPER_MIN_USD, PAPER_MAX_USD = 5.0, 100_000.0
 AUTO_TARGET_MIN_PATHS = 40
 AUTO_TARGET_GAIN = 0.02
@@ -356,6 +366,7 @@ class MemeEngine:
         self._restore_mode()
         self.settings = self._mode_settings(self.mode)
         self._maybe_research_upgrade()
+        self._maybe_upgrade_v2()
         self._maybe_restart_once()
 
     # ------------------------------------------------------------------ livscyklus
@@ -533,6 +544,10 @@ class MemeEngine:
             old = self.sniper.min_age_seconds
             self.sniper.min_age_seconds = SNIPER_RESEARCH_MIN_AGE_SECONDS
             self._save_sniper()
+            self._log_change(
+                "sniper", [("min_age_seconds", old, SNIPER_RESEARCH_MIN_AGE_SECONDS)],
+                "De første 5 minutters handel afslører de fleste rug pulls.", "opgradering",
+            )
             notes.append(f"Sniperen venter nu {SNIPER_RESEARCH_MIN_AGE_SECONDS:.0f} s i stedet for {old:.0f} s efter lancering")
         text = (
             "Nye værn mod tab (research nov. 2026): Jupiters mistænkelig-markering og serie-udviklere afvises, "
@@ -544,6 +559,161 @@ class MemeEngine:
         if self.store.get_json("params") is not None or notes:  # kun for en bot, der har kørt før
             self.store.add_lesson("parameter", text)
             self.store.add_event("info", text)
+
+    def _maybe_upgrade_v2(self) -> None:
+        """Én gang: strategi-vagten slås til, og Top 10 holder pause, til tallene viser overskud."""
+        if self.store.get_state("upgrade_v2") == UPGRADE_V2:
+            return
+        self.store.set_state("upgrade_v2", UPGRADE_V2)
+        notes = []
+        if not self.guard_on:
+            self.guard_on = True
+            self.store.set_state("strategy_guard", "1")
+            notes.append("Strategi-vagten er slået til: en strategi, der bliver ved med at tabe, holder selv pause og lærer videre som skyggehandler.")
+        if self.top_cfg.enabled:
+            self.update_toptraders({"enabled": False})
+            notes.append("Top 10 er slået fra, fordi kopiering med forsinkelse sjældent giver overskud. Tænd den igen under Strategi → Top 10, hvis tallene viser noget andet.")
+        if notes and self.store.get_json("params") is not None:
+            text = " ".join(notes)
+            self.store.add_lesson("parameter", text)
+            self.store.add_event("info", text)
+
+    # ------------------------------------------------------------------ låste indstillinger og ændringslog
+    def _locks(self) -> dict[str, float]:
+        now = time.time()
+        return {key: float(until) for key, until in (self.store.get_json("param_locks", {}) or {}).items() if float(until) > now}
+
+    def _locked(self, strategy: str) -> set[str]:
+        prefix = f"{strategy}:"
+        return {key[len(prefix):] for key in self._locks() if key.startswith(prefix)}
+
+    def _lock_params(self, strategy: str, names, days: float = PARAM_LOCK_DAYS) -> None:
+        locks = self._locks()
+        for name in names:
+            locks[f"{strategy}:{name}"] = time.time() + days * 86400
+        self.store.set_json("param_locks", locks)
+
+    def _unlock_strategy(self, strategy: str) -> None:
+        self.store.set_json("param_locks", {key: until for key, until in self._locks().items() if not key.startswith(f"{strategy}:")})
+
+    def _log_change(self, strategy: str, changes, why: str, source: str) -> None:
+        """Gem en automatisk ændring, så den kan ses samlet og fortrydes fra siden."""
+        labels = SNIPER_LABELS if strategy == "sniper" else PARAM_LABELS
+        items = [
+            {"param": name, "label": labels.get(name, name), "old": float(old), "new": float(new)}
+            for name, old, new in changes
+            if abs(float(old) - float(new)) > 1e-9
+        ]
+        if not items:
+            return
+        seq = int(self.store.get_state("auto_change_seq", "0") or 0) + 1
+        self.store.set_state("auto_change_seq", str(seq))
+        log = list(self.store.get_json("auto_changes", []) or [])
+        log.append({"id": seq, "at": now_iso(), "strategy": strategy, "changes": items, "why": str(why)[:400], "source": source, "undone_at": None})
+        self.store.set_json("auto_changes", log[-CHANGE_LOG_KEPT:])
+
+    def _target_value(self, strategy: str, name: str) -> float:
+        value = getattr(self.sniper if strategy == "sniper" else self.params, name, None)
+        return float(value) if isinstance(value, (int, float)) else float("nan")  # en indstilling, der ikke findes mere
+
+    @staticmethod
+    def _value_text(name: str, value: float) -> str:
+        """Et tal, som siden viser det: brøker som procent, sekunder og minutter med enhed."""
+        if name in FRACTION_PARAMS:
+            return f"{_dk(value * 100, 0)} %"
+        if name == "min_age_seconds":
+            return f"{_dk(value, 0)} sek."
+        if name in {"min_age_minutes", "max_hold_minutes", "stale_minutes", "max_age_minutes"}:
+            return f"{_dk(value, 0)} min."
+        if name.endswith("_usd"):
+            return f"{_dk(value, 0)} $"
+        if name in {"max_change_h1_pct", "max_top10_pct", "max_roundtrip_loss_pct"}:
+            return f"{_dk(value, 0)} %"
+        return _dk(value, 2 if abs(value) < 10 and value != int(value) else 0)
+
+    def _change_view(self, entry: dict) -> dict:
+        undone = bool(entry.get("undone_at"))
+        current = all(abs(self._target_value(entry["strategy"], item["param"]) - item["new"]) < 1e-6 for item in entry["changes"])
+        return {
+            **entry,
+            "changes": [
+                {**item, "old_text": self._value_text(item["param"], item["old"]), "new_text": self._value_text(item["param"], item["new"])}
+                for item in entry["changes"]
+            ],
+            "strategy_label": STRATEGY_LABELS.get(entry["strategy"], entry["strategy"]),
+            "can_undo": not undone and current,
+            "changed_since": not undone and not current,
+        }
+
+    def undo_change(self, change_id: int) -> str:
+        """Fortryd en automatisk ændring. Indstillingen låses derefter, så læringen ikke laver den om igen med det samme."""
+        log = list(self.store.get_json("auto_changes", []) or [])
+        entry = next((item for item in log if int(item.get("id", -1)) == int(change_id)), None)
+        if entry is None:
+            raise ValueError("Ændringen findes ikke længere.")
+        if entry.get("undone_at"):
+            raise ValueError("Ændringen er allerede fortrudt.")
+        strategy = entry["strategy"]
+        for item in entry["changes"]:
+            if not abs(self._target_value(strategy, item["param"]) - item["new"]) <= 1e-6:  # også når den ikke findes (NaN)
+                raise ValueError(f"{item['label']} er ændret igen siden. Ret den direkte under Strategi.")
+        with self._lock:
+            if strategy == "sniper":
+                updated = dataclasses.replace(self.sniper)
+                for item in entry["changes"]:
+                    setattr(updated, item["param"], clamp_sniper(item["param"], item["old"], self.settings.position_usd))
+                self.sniper = updated
+                self._optimizer_cache = None
+                self._save_sniper()
+            else:
+                for item in entry["changes"]:
+                    setattr(self.params, item["param"], clamp_param(item["param"], item["old"]))
+                self._save_learning()
+                self._mopt_cache = None
+            self._lock_params(strategy, [item["param"] for item in entry["changes"]])
+            entry["undone_at"] = now_iso()
+            self.store.set_json("auto_changes", log)
+        what = ", ".join(f"{item['label']} {_dk(item['new'])} → {_dk(item['old'])}" for item in entry["changes"])
+        message = f"Fortrudt ({STRATEGY_LABELS.get(strategy, strategy)}): {what}. Læringen rører det ikke i {PARAM_LOCK_DAYS} dage."
+        self.store.add_event("info", message)
+        self.store.add_lesson("parameter", message)
+        return message
+
+    def update_params(self, changes: dict) -> None:
+        """Fra siden: den almindelige strategis filtre og salgsregler. Altid inden for de faste grænser."""
+        if not isinstance(changes, dict):
+            raise ValueError("Ugyldige indstillinger.")
+        values = {}
+        for key, value in changes.items():
+            if key not in PARAM_BOUNDS:
+                continue
+            try:
+                number = float(value)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"{PARAM_LABELS.get(key, key)} skal være et tal.") from exc
+            if number != number or number in (float("inf"), float("-inf")):
+                raise ValueError(f"{PARAM_LABELS.get(key, key)} skal være et tal.")
+            values[key] = clamp_param(key, number)
+        with self._lock:
+            changed = [key for key, value in values.items() if abs(float(getattr(self.params, key)) - float(value)) > 1e-9]
+            if not changed:
+                return
+            for key in changed:
+                setattr(self.params, key, values[key])
+            self._save_learning()
+            self._mopt_cache = None
+            self._analysis_cache = None
+            self._lock_params("momentum", changed)
+        labels = ", ".join(PARAM_LABELS.get(key, key) for key in changed)
+        self.store.add_event("info", f"Almindelig strategi ændret af dig: {labels}. Læringen rører dem ikke i {PARAM_LOCK_DAYS} dage.")
+
+    def reset_params(self) -> None:
+        with self._lock:
+            self.params = StrategyParams()
+            self._save_learning()
+            self._mopt_cache = None
+            self._unlock_strategy("momentum")
+        self.store.add_event("info", "Den almindelige strategis filtre og salgsregler er sat tilbage til standard.")
 
     def _restore_mode(self) -> None:
         stored = self.store.get_state("mode", "paper") or "paper"
@@ -1046,16 +1216,32 @@ class MemeEngine:
             self.store.add_lesson("handel", trade_lesson(pos, features, before, changes), int(pos["id"]))
             changed = True
             strategy = pos.get("strategy") or "momentum"
-            same = [row for row in self.store.closed_positions(pos["mode"]) if (row.get("strategy") or "momentum") == strategy]
+            # Tæl kun op til denne handel: lukker flere i samme runde, justeres der stadig kun hver 5. handel.
+            same = [
+                row for row in self.store.closed_positions(pos["mode"])
+                if (row.get("strategy") or "momentum") == strategy and int(row["id"]) <= int(pos["id"])
+            ]
             if len(same) % ADAPT_EVERY == 0:
+                target = self.sniper if strategy == "sniper" else self.params
+                before = target.to_dict()
                 if strategy == "sniper":
                     notes = adapt_sniper(self.sniper, same)
-                    if notes:
-                        self._save_sniper()
                 elif strategy == "momentum":
                     notes = adapt_params(self.params, same)
                 else:
                     notes = []  # Top 10 følger traderne, ikke de almindelige parametre
+                locked = self._locked(strategy)
+                labels = SNIPER_LABELS if strategy == "sniper" else PARAM_LABELS
+                for name in locked:
+                    if name in before and getattr(target, name) != before[name]:
+                        setattr(target, name, before[name])  # du har selv sat den: læringen venter
+                        notes = [note for note in notes if labels.get(name, name) not in note]
+                moved = [(name, before[name], getattr(target, name)) for name in before
+                         if isinstance(before[name], (int, float)) and not isinstance(before[name], bool) and getattr(target, name) != before[name]]
+                if moved:
+                    if strategy == "sniper":
+                        self._save_sniper()
+                    self._log_change(strategy, moved, " ".join(notes), "læring")
                 for note in notes:
                     self.store.add_lesson("parameter", note, int(pos["id"]))
         if changed:
@@ -1367,15 +1553,14 @@ class MemeEngine:
                 if len(score_rows) >= 10:
                     missed_share = sum(1 for row in score_rows if row["verdict"] == "missed") / len(score_rows)
                     average = sum(float(row["sim_pnl_pct"] or 0) for row in score_rows) / len(score_rows)
-                    if missed_share >= 0.5 and average >= 0.1:
+                    if missed_share >= 0.5 and average >= 0.1 and "min_score" not in self._locked("momentum"):
                         old = self.params.min_score
                         self.params.min_score = clamp_param("min_score", old - 0.01)
                         if self.params.min_score != old:
-                            self.store.add_lesson(
-                                "parameter",
-                                f"Min. score for køb: {old:.2f} → {self.params.min_score:.2f} "
-                                f"(halvdelen af de afviste tokens steg bagefter, i snit {average * 100:+.0f} %).",
-                            )
+                            why = (f"Min. score for køb: {old:.2f} → {self.params.min_score:.2f} "
+                                   f"(halvdelen af de afviste tokens steg bagefter, i snit {average * 100:+.0f} %).")
+                            self.store.add_lesson("parameter", why)
+                            self._log_change("momentum", [("min_score", old, self.params.min_score)], why, "skygger")
                             changed = True
         if changed:
             self._save_learning()
@@ -2020,18 +2205,21 @@ class MemeEngine:
         self._auto_momentum_targets(now)
         if now - float(self.store.get_state("auto_target_at", "0") or 0) < AUTO_TARGET_EVERY_SECONDS:
             return
+        if self._locked("sniper") & {"take_profit_pct", "stop_loss_pct"}:
+            return  # du har selv sat målet eller stoppet
         opt = self._optimizer()
         best, current = opt.get("best") or {}, opt.get("current") or {}
         if not self._clearly_better(opt):
             return
         old_tp, old_sl = self.sniper.take_profit_pct, self.sniper.stop_loss_pct
-        self.update_sniper({"take_profit_pct": best["tp"], "stop_loss_pct": best["sl"]})
+        self.update_sniper({"take_profit_pct": best["tp"], "stop_loss_pct": best["sl"]}, manual=False)
         self.store.set_state("auto_target_at", repr(now))
         message = (
             f"Sniperens mål er ændret fra +{old_tp * 100:.0f} % / -{old_sl * 100:.0f} % til "
             f"+{self.sniper.take_profit_pct * 100:.0f} % / -{self.sniper.stop_loss_pct * 100:.0f} %. "
             f"På de seneste {opt['n']} kursforløb gav det {best['avg'] * 100:+.1f} % pr. snipe i stedet for {current['avg'] * 100:+.1f} %."
         )
+        self._log_change("sniper", [("take_profit_pct", old_tp, self.sniper.take_profit_pct), ("stop_loss_pct", old_sl, self.sniper.stop_loss_pct)], message, "mål")
         self.store.add_event("info", message)
         self.store.add_lesson("parameter", message)
 
@@ -2048,6 +2236,8 @@ class MemeEngine:
         """Den almindelige strategi lærer også sit mål og stop af de kursforløb, botten har fulgt."""
         if now - float(self.store.get_state("auto_target_at:momentum", "0") or 0) < AUTO_TARGET_EVERY_SECONDS:
             return
+        if self._locked("momentum") & {"take_profit_pct", "stop_loss_pct"}:
+            return
         opt = self._momentum_optimizer()
         if not self._clearly_better(opt):
             return
@@ -2063,6 +2253,7 @@ class MemeEngine:
             f"+{self.params.take_profit_pct * 100:.0f} % / -{self.params.stop_loss_pct * 100:.0f} %. "
             f"På de seneste {opt['n']} kursforløb gav det {best['avg'] * 100:+.1f} % pr. handel i stedet for {current['avg'] * 100:+.1f} %."
         )
+        self._log_change("momentum", [("take_profit_pct", old_tp, self.params.take_profit_pct), ("stop_loss_pct", old_sl, self.params.stop_loss_pct)], message, "mål")
         self.store.add_event("info", message)
         self.store.add_lesson("parameter", message)
 
@@ -2083,12 +2274,12 @@ class MemeEngine:
                 continue
             rules = TIGHTEN_RULES[strategy]
             current = {rule["param"]: float(getattr(target, rule["param"])) for rule in rules}
-            best = tighten_suggestion(self._shadow_rows(strategy), current, rules)
+            best = tighten_suggestion(self._shadow_rows(strategy), current, rules, frozen=self._locked(strategy))
             if not best:
                 continue
             name = best["param"]
             if strategy == "sniper":
-                self.update_sniper({name: best["new"]})
+                self.update_sniper({name: best["new"]}, manual=False)
                 new, label = getattr(self.sniper, name), SNIPER_LABELS.get(name, name)
             else:
                 setattr(self.params, name, clamp_param(name, best["new"]))
@@ -2106,6 +2297,7 @@ class MemeEngine:
             log = list(self.store.get_json("auto_tighten_log", []) or [])
             log.append({"at": now_iso(), "strategy": strategy, "label": label, **best, "new": float(new)})
             self.store.set_json("auto_tighten_log", log[-TIGHTEN_LOG_KEPT:])
+            self._log_change(strategy, [(name, best["old"], float(new))], message, "strammer")
             self._analysis_cache = None
             self.store.add_event("info", message)
             self.store.add_lesson("parameter", message)
@@ -2516,7 +2708,8 @@ class MemeEngine:
     def _save_sniper(self) -> None:
         self.store.set_json("sniper", self.sniper.to_dict())
 
-    def update_sniper(self, changes: dict) -> None:
+    def update_sniper(self, changes: dict, *, manual: bool = True) -> None:
+        """manual=True: ændret af dig (siden eller Telegram). Så rører læringen ikke tallene i en uge."""
         if not isinstance(changes, dict):
             raise ValueError("Ugyldige indstillinger.")
         # Byg en ny kopi og skift den ind på én gang: ingen halve ændringer, og ingen ventetid på runden.
@@ -2537,9 +2730,12 @@ class MemeEngine:
                 notes.append(SNIPER_LABELS.get(key, key))
         if not notes:
             return
+        changed = [key for key in SNIPER_BOUNDS if getattr(updated, key) != getattr(self.sniper, key)]
         self.sniper = updated
         self._optimizer_cache = None
         self._save_sniper()
+        if manual and changed:
+            self._lock_params("sniper", changed)
         self.store.add_event(
             "info",
             f"Sniper-indstillinger ændret: {', '.join(notes)}. Gælder også åbne snipes.",
@@ -2549,6 +2745,7 @@ class MemeEngine:
 
     def reset_sniper(self) -> None:
         self.sniper = sniper_from({"enabled": self.sniper.enabled}, self.settings)
+        self._unlock_strategy("sniper")
         self._optimizer_cache = None
         self._save_sniper()
         self.store.add_event("info", "Sniper-indstillingerne er sat tilbage til standard.")
@@ -3071,6 +3268,9 @@ class MemeEngine:
         pubkey, _key_error = self._wallet_pubkey()
         defaults = StrategyParams()
         initial = Model()
+        locks = self._locks()
+        analysis = self._analysis() if self.settings.shadows else None
+        why_from = {item["strategy"]: item["facts"] for item in (analysis or {}).get("strategies", [])}
         holds = [value for value in (_hold_minutes(row) for row in closed) if value is not None]
         streak_kind, streak = "", 0
         for value in reversed(pnl):
@@ -3157,7 +3357,7 @@ class MemeEngine:
                 "summary": shadow_summary([row for row in self.store.done_shadows(mode, limit=500)]),
                 "recent": [self._shadow_view(row) for row in self.store.recent_shadows(mode, 60)],
                 "optimizer": self._optimizer() if self.settings.shadows else None,
-                "analysis": self._analysis() if self.settings.shadows else None,
+                "analysis": analysis,
             },
             "equity": {
                 "24h": _downsample([row for row in series if row["ts"] >= cut_day], 300),
@@ -3175,7 +3375,7 @@ class MemeEngine:
                 "stale_minutes": self.params.stale_minutes,
             },
             "positions": [self._position_view(row) for row in self.store.open_positions(mode)],
-            "trades": [self._position_view(row) for row in self.store.list_positions(mode, 200) if row["status"] == "closed"],
+            "trades": [self._position_view(row, why_from=why_from) for row in self.store.list_positions(mode, 200) if row["status"] == "closed"],
             "candidates": [self._candidate_view(row) for row in self.store.recent_candidates(mode, 300)],
             "lessons": self.store.recent_lessons(60),
             "model": {
@@ -3198,9 +3398,14 @@ class MemeEngine:
                     "value": getattr(self.params, name),
                     "default": getattr(defaults, name),
                     "bounds": list(PARAM_BOUNDS[name]),
+                    "kind": PARAM_KINDS.get(name, "num"),
+                    "group": "exit" if name in PARAM_EXITS else "filter",
+                    "locked_until": locks.get(f"momentum:{name}"),
                 }
                 for name in PARAM_BOUNDS
             ],
+            "param_lock_days": PARAM_LOCK_DAYS,
+            "auto_changes": [self._change_view(entry) for entry in reversed(self.store.get_json("auto_changes", []) or [])][:25],
             "sources": [
                 {"source": source, "label": source_label(source), **entry}
                 for source, entry in sorted(stats.items(), key=lambda item: item[1]["pnl"], reverse=True)
@@ -3352,7 +3557,7 @@ class MemeEngine:
             alerts.append({"level": "error", "text": f"Seneste fejl: {self.last_error}"})
         return alerts
 
-    def _position_view(self, row: dict) -> dict:
+    def _position_view(self, row: dict, why_from: dict | None = None) -> dict:
         token_raw = max(1, int(row["token_raw"]))
         fraction = int(row["remaining_raw"]) / token_raw
         mark = float(row["cost_usd"]) * fraction * float(row["last_ratio"] or 1.0)
@@ -3414,7 +3619,24 @@ class MemeEngine:
             "pair_url": row["pair_url"],
             "liquidity_usd": row["liquidity_last"],
             "signatures": [sig for sig in (loads(row["signatures"], []) or []) if sig and sig != "papir"],
+            "why": self._why(row, safety, why_from) if row["status"] == "closed" and why_from is not None else [],
         }
+
+    @staticmethod
+    def _why(row: dict, safety: dict, why_from: dict) -> list[str]:
+        strategy = row.get("strategy") or "momentum"
+        try:
+            return explain_trade(
+                safety.get("facts") or {},
+                strategy=strategy,
+                pnl_pct=float(row["pnl_pct"] or 0.0),
+                exit_reason=str(row["exit_reason"] or ""),
+                peak_pct=float(row["peak_ratio"] or 1.0) - 1.0,
+                analysis=why_from.get(strategy),
+            )
+        except Exception as exc:  # en forklaring må aldrig vælte siden
+            logger.info("Forklaring fejlede for %s: %s", row.get("id"), exc)
+            return []
 
     def _candidate_view(self, row: dict) -> dict:
         return {

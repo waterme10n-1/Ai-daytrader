@@ -31,9 +31,10 @@ def _closed(engine, strategy: str, pnls: list[float]) -> None:
         engine.store.update_position(position_id, status="closed", closed_at=now_iso(), pnl_usd=pnl, pnl_pct=pnl / 1.5, exit_reason="stop_loss", remaining_raw=0, learned=True)
 
 
-def test_guard_is_off_by_default():
+def test_guard_is_on_by_default_and_can_be_switched_off():
     engine, *_ = make_engine()
-    assert engine.guard_on is False
+    assert engine.guard_on is True
+    engine.set_strategy({"guard": False})
     _closed(engine, "sniper", [-0.5] * 10)
     engine._check_guard()
     assert engine._holds() == {}

@@ -203,6 +203,17 @@
   input:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
   input[type="range"] { width: 100%; height: 30px; accent-color: var(--accent); margin: 2px 0; }
   .field { padding: 13px 0; border-bottom: 1px solid var(--border); }
+  .why-list { margin: 0 0 10px; padding: 10px 12px; border-radius: 10px; background: color-mix(in srgb, var(--raised) 70%, transparent); font-size: 13px; }
+  .why-list b { display: block; margin-bottom: 4px; font-size: 12px; letter-spacing: 0.02em; text-transform: uppercase; color: var(--muted); }
+  .why-list ul { margin: 0; padding-left: 18px; }
+  .why-list li + li { margin-top: 3px; }
+  .why-peek { color: var(--muted); font-size: 12px; -webkit-line-clamp: 1; }
+  .chg-row { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; padding: 12px 0; border-bottom: 1px solid var(--border); align-items: start; }
+  .chg-row:last-child { border-bottom: 0; }
+  .chg-row .what { font-weight: 600; font-size: 14px; }
+  .chg-row .what .num { white-space: nowrap; }
+  .chg-row .meta { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .chg-row .reason { grid-column: 1 / -1; color: var(--muted); font-size: 12.5px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .field:last-child { border-bottom: 0; }
   .field-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; font-size: 14px; font-weight: 600; }
   .field .row { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; font-size: 12.5px; }
@@ -940,6 +951,17 @@
   .skin small { display: block; margin-top: 1px; font-size: 12.5px; color: var(--muted); }
   .skin .ck { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 50%; color: var(--on-accent); background: var(--accent); opacity: 0; }
   .skin[aria-pressed="true"] .ck { opacity: 1; }
+
+  /* Fire faner under Strategi: hold dem på én linje på telefonen. */
+  .segmented { overflow-x: auto; scrollbar-width: none; }
+  .segmented::-webkit-scrollbar { display: none; }
+  .segmented button { white-space: nowrap; flex-shrink: 0; flex-grow: 1; }
+  @media (max-width: 560px) {
+    .segmented:has(button:nth-child(4)) button { padding: 0 8px; gap: 5px; }
+    .segmented:has(button:nth-child(4)) button svg { display: none; }
+  }
+  #panel-almindelig .field .row input[type="number"] { width: 150px; }
+  @media (max-width: 560px) { .savebar .dirty:not([hidden]) { flex: 1 1 100%; } }
 </style>
 </head>
 <body>
@@ -1018,6 +1040,7 @@
         <div class="card" id="strat-card">
           <div class="card-head"><h2 id="strat-title"></h2><span class="muted small-txt">resultat pr. strategi</span></div>
           <div id="strats"></div>
+          <div class="field" style="border-bottom:0;padding-bottom:0"><div class="field-top"><span>Strategi-vagt</span><button class="switch" id="guard-switch" type="button" role="switch" aria-checked="false" aria-label="Strategi-vagt"></button></div><span class="muted small-txt">Taber en strategi på sine seneste 8–12 handler, holder den selv pause i 24 timer (næste gang længere) og lærer videre som skyggehandler.</span></div>
         </div>
       </div>
       <div class="col">
@@ -1069,6 +1092,28 @@
       <div class="card-head"><h2 id="journal-title"></h2><div class="chips" id="journal-sum"></div></div>
       <div class="filters" id="journal-filters"></div>
       <div id="journal"></div>
+    </div>
+  </section>
+
+  <section class="panel" id="panel-almindelig" role="tabpanel" hidden>
+    <div class="card">
+      <div class="card-head"><h2 id="mom-title"></h2><span class="chip warn">læring = kan strammes</span></div>
+      <p class="muted small-txt" style="margin:-6px 0 4px">Den almindelige strategi køber tokens, der allerede handler, når de består alle filtre nedenfor. Retter du et tal, rører læringen det ikke i <span id="mom-lock-days">7</span> dage.</p>
+    </div>
+    <div class="sn-grid">
+      <div class="card">
+        <div class="card-head"><h2 id="mom-filter-title"></h2></div>
+        <div id="mom-filters"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2 id="mom-exit-title"></h2><span class="muted small-txt">Gælder også åbne handler</span></div>
+        <div id="mom-exits"></div>
+      </div>
+    </div>
+    <div class="card savebar" id="mom-savebar">
+      <span class="dirty" id="mom-dirty" hidden></span>
+      <button class="btn" type="button" id="mom-reset">Nulstil</button>
+      <button class="btn primary" type="button" id="mom-save">Gem indstillinger</button>
     </div>
   </section>
 
@@ -1230,6 +1275,11 @@
         <a class="btn small" href="/api/meme/export" download id="export-link">Hent data (JSON)</a>
       </div>
     </div>
+    <div class="card" id="changes-card">
+      <div class="card-head"><h2 id="changes-title"></h2><span class="muted small-txt">det botten selv har ændret</span></div>
+      <p class="muted" style="margin:0 0 6px;font-size:13.5px">Mål, stop og filtre, som læringen har flyttet. Fortryder du en ændring, sættes den tilbage, og læringen rører den ikke i en uge.</p>
+      <div id="changes"></div>
+    </div>
     <div class="card">
       <div class="card-head"><h2 id="params-title"></h2><span class="muted small-txt">Læringen må kun flytte dem inden for grænserne</span></div>
       <div class="table-wrap" id="params"></div>
@@ -1364,6 +1414,7 @@ const ICONS = {
   phone: '<rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M11 18h2"/>',
   keyboard: '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M6 9h.01M10 9h.01M14 9h.01M18 9h.01M6 13h.01M18 13h.01M8 17h8"/>',
   sliders: '<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M2 14h4M10 8h4M18 16h4"/>',
+  undo: '<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>',
   search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
   target: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
   plug: '<path d="M12 22v-5"/><path d="M9 8V2"/><path d="M15 8V2"/><path d="M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8Z"/>',
@@ -1382,12 +1433,12 @@ function icon(name, cls) { return `<svg class="i${cls ? " " + cls : ""}" viewBox
 const NAV = [
   ["hjem", "Hjem", "home", ["oversigt"]],
   ["handler", "Handler", "trades", ["positioner", "journal"]],
-  ["snipe", "Strategi", "target", ["sniper", "top", "radar"]],
+  ["snipe", "Strategi", "target", ["almindelig", "sniper", "top", "radar"]],
   ["wallet", "Wallet", "wallet", ["wallets"]],
   ["mere", "Mere", "more", ["laering", "krav"]],
 ];
-const VIEWS = { oversigt: ["Oversigt", "grid"], positioner: ["Åbne", "coins"], journal: ["Historik", "book"], sniper: ["Sniper", "target"], top: ["Top 10", "trophy"], radar: ["Radar", "radar"], wallets: ["Wallet", "wallet"], laering: ["Læring", "brain"], krav: ["Indstillinger", "shield"] };
-const VIEW_ORDER = ["oversigt", "positioner", "sniper", "radar", "journal", "laering", "wallets", "krav", "top"];
+const VIEWS = { oversigt: ["Oversigt", "grid"], positioner: ["Åbne", "coins"], journal: ["Historik", "book"], almindelig: ["Almindelig", "activity"], sniper: ["Sniper", "target"], top: ["Top 10", "trophy"], radar: ["Radar", "radar"], wallets: ["Wallet", "wallet"], laering: ["Læring", "brain"], krav: ["Indstillinger", "shield"] };
+const VIEW_ORDER = ["oversigt", "positioner", "almindelig", "sniper", "radar", "journal", "laering", "wallets", "krav"];
 const TITLES = { handler: "Handler", snipe: "Strategier", wallet: "Wallet", mere: "Mere" };
 const lastView = {};
 const STAGES = { "købt": "Købt", sniper: "Sniper-filter", marked: "Markedsfilter", rug: "Rug-tjek", score: "Score", rute: "Exit-rute", claude: "Claude", risiko: "Risiko", "køb": "Køb fejlede" };
@@ -1914,9 +1965,9 @@ function renderJournal(data) {
     const open = expanded.has(t.id);
     const sigs = (t.signatures || []).filter((s) => /^[1-9A-HJ-NP-Za-km-z]{40,100}$/.test(s));
     return `<div class="lrow tap" data-row="${esc(t.id)}" aria-expanded="${open}" role="button" tabindex="0">${avatar(t.symbol, t.mint)}
-      <div class="lmain"><div class="ltitle">${esc(t.symbol)}${t.strategy === "sniper" ? '<span class="stage-tag claude">sniper</span>' : t.strategy === "toptrader" ? '<span class="stage-tag ok">top 10</span>' : ""}</div><div class="lsub">${esc(t.exit_reason)} · ${esc(minutes(t.hold_minutes))} · ${esc(stamp(t.closed_at))}</div></div>
+      <div class="lmain"><div class="ltitle">${esc(t.symbol)}${t.strategy === "sniper" ? '<span class="stage-tag claude">sniper</span>' : t.strategy === "toptrader" ? '<span class="stage-tag ok">top 10</span>' : ""}</div><div class="lsub">${esc(t.exit_reason)} · ${esc(minutes(t.hold_minutes))} · ${esc(stamp(t.closed_at))}</div>${!open && t.pnl_usd <= 0 && (t.why || [])[1] ? `<div class="lsub why-peek">${esc(t.why[1])}</div>` : ""}</div>
       <div class="lright"><b class="${tone(t.pnl_usd)}">${esc(signed(t.pnl_usd))}</b><span class="${tone(t.pnl_pct)}">${esc(spct(t.pnl_pct))}</span></div>
-      ${open ? `<div class="ldetail"><div class="stats3 num"><div><span>Indsat</span><b>${esc(money(t.cost_usd))}</b></div><div><span>Top</span><b>${esc(spct(t.peak_pct))}</b></div><div><span>Kilde</span><b style="font-size:12.5px">${esc(t.source)}</b></div></div><p class="why" style="margin-top:0">${esc(t.reasoning || "")}</p>${t.ai_summary ? `<p class="why"><b>Claude:</b> ${esc(t.ai_summary)}</p>` : ""}<div class="links">${tokenLinks(t.mint, t.pair_url)}${sigs.map((s) => `<a href="https://solscan.io/tx/${s}" target="_blank" rel="noopener noreferrer">${icon("ext", "sm")}tx ${esc(short(s))}</a>`).join("")}</div></div>` : ""}
+      ${open ? `<div class="ldetail"><div class="stats3 num"><div><span>Indsat</span><b>${esc(money(t.cost_usd))}</b></div><div><span>Top</span><b>${esc(spct(t.peak_pct))}</b></div><div><span>Kilde</span><b style="font-size:12.5px">${esc(t.source)}</b></div></div>${(t.why || []).length ? `<div class="why-list"><b>${t.pnl_usd > 0 ? "Hvorfor den vandt" : "Hvorfor den tabte"}</b><ul>${t.why.map((w) => `<li>${esc(w)}</li>`).join("")}</ul></div>` : ""}<p class="why" style="margin-top:0"><b>Ved køb:</b> ${esc(t.reasoning || "")}</p>${t.ai_summary ? `<p class="why"><b>Claude:</b> ${esc(t.ai_summary)}</p>` : ""}<div class="links">${tokenLinks(t.mint, t.pair_url)}${sigs.map((s) => `<a href="https://solscan.io/tx/${s}" target="_blank" rel="noopener noreferrer">${icon("ext", "sm")}tx ${esc(short(s))}</a>`).join("")}</div></div>` : ""}
     </div>`;
   }).join("") : empty(trades.length ? "Ingen handler matcher filteret." : "Ingen lukkede handler endnu.", "book"));
 }
@@ -2270,7 +2321,7 @@ function renderSniper(data) {
       <div class="ltitle">${esc(c.symbol || short(c.mint))}<span class="stage-tag ${STAGE_CLASS[c.stage] || ""}">${esc(STAGES[c.stage] || c.stage)}</span></div>
       <div class="lsub">${esc(c.reason)}</div>
       <div class="lmeta"><span>${esc(ago(c.ts))}</span>${tokenLinks(c.mint, c.pair_url)}</div>
-    </div></div>`).join("") : empty(sn.enabled ? "Ingen nye tokens endnu. Botten kigger hvert 10. sekund og venter mindst et minut efter lancering." : "Tænd for sniperen for at se nye tokens her.", "target"));
+    </div></div>`).join("") : empty(sn.enabled ? "Ingen nye tokens endnu. Botten kigger hvert 10. sekund og venter mindst 5 minutter efter lancering." : "Tænd for sniperen for at se nye tokens her.", "target"));
 }
 function setDraft(name, value) {
   if (!state || !sniperDraft) return;
@@ -2307,6 +2358,92 @@ function renderShadows(data) {
       <td><span class="chip ${v[1]}">${esc(r.status === "done" ? v[0] : "Følges")}</span></td></tr>`;
   }).join("")}</tbody></table>` : empty("Ingen endnu.", "ghost"));
 }
+/* ---------- Almindelig strategi: filtre og salgsregler fra siden ---------- */
+let momDraft = null, momDirty = false, momKey = "";
+const MOM_UNIT = { pct: "%", usd: "$", min: "min.", hours: "timer", pctnum: "%", int: "", score: "" };
+const MOM_STEP = { pct: 1, usd: 1000, min: 5, hours: 1, pctnum: 1, int: 1, score: 0.01 };
+const MOM_FILTERS = ["min_liquidity_usd", "min_volume_h1_usd", "min_txns_h1", "min_mcap_usd", "max_mcap_usd", "min_age_minutes", "max_age_hours", "max_change_h1_pct", "min_buy_ratio_h1", "min_organic_score", "max_top10_pct", "max_insiders", "max_dev_mints", "max_rug_score", "max_roundtrip_loss_pct", "min_score"];
+const MOM_EXITS = ["stop_loss_pct", "take_profit_pct", "partial_fraction", "trail_activation_pct", "trailing_stop_pct", "max_hold_minutes", "stale_minutes"];
+function momToUi(f, v) { return f.kind === "pct" ? Math.round(v * 1000) / 10 : f.kind === "score" ? Math.round(v * 100) / 100 : Math.round(v * 100) / 100; }
+function momFromUi(f, v) { return f.kind === "pct" ? v / 100 : v; }
+function momFields(data) { const m = {}; for (const f of data.params || []) m[f.name] = f; return m; }
+function momField(f) {
+  const v = momToUi(f, momDraft[f.name]);
+  const lo = momToUi(f, f.bounds[0]), hi = momToUi(f, f.bounds[1]), def = momToUi(f, f.default);
+  const left = f.locked_until ? f.locked_until * 1000 - Date.now() : 0;
+  const chip = left > 0 ? `<span class="chip info" title="Læringen rører den ikke, før låsen udløber">sat af dig · ${esc(Math.max(1, Math.ceil(left / 86400000)))} d.</span>` : "";
+  return `<div class="field"><div class="field-top"><span>${esc(f.label)}</span>${chip}</div>
+    <div class="row"><input type="number" inputmode="decimal" min="${lo}" max="${hi}" step="${MOM_STEP[f.kind] || 1}" value="${esc(v)}" data-pf="${f.name}" aria-label="${esc(f.label)}"><span class="muted">${esc(MOM_UNIT[f.kind] || "")}${MOM_UNIT[f.kind] ? " · " : ""}${esc(fmtNum.format(lo))}–${esc(fmtNum.format(hi))}${v !== def ? ` · standard ${esc(fmtNum.format(def))}` : ""}</span></div></div>`;
+}
+function renderMomForm(data) {
+  const m = momFields(data);
+  put("mom-filters", MOM_FILTERS.filter((n) => m[n]).map((n) => momField(m[n])).join(""));
+  put("mom-exits", MOM_EXITS.filter((n) => m[n]).map((n) => momField(m[n])).join(""));
+}
+function markMomDirty() {
+  momDirty = true;
+  const d = document.getElementById("mom-dirty");
+  d.hidden = false;
+  d.innerHTML = icon("alert", "sm") + "Ændringerne er ikke gemt";
+  document.getElementById("mom-savebar").classList.add("floating");
+}
+function renderMomentum(data) {
+  document.getElementById("mom-title").innerHTML = icon("activity") + "Almindelig strategi";
+  document.getElementById("mom-filter-title").innerHTML = icon("shield") + "Køb kun når";
+  document.getElementById("mom-exit-title").innerHTML = icon("target") + "Salg";
+  document.getElementById("mom-lock-days").textContent = data.param_lock_days || 7;
+  const key = JSON.stringify((data.params || []).map((f) => [f.name, f.value, f.locked_until]));
+  if (!momDirty && key !== momKey) {
+    momKey = key;
+    momDraft = {};
+    for (const f of data.params || []) momDraft[f.name] = f.value;
+    renderMomForm(data);
+  }
+  if (!momDirty) {
+    document.getElementById("mom-dirty").hidden = true;
+    document.getElementById("mom-savebar").classList.remove("floating");
+  }
+}
+document.getElementById("panel-almindelig").addEventListener("input", (ev) => {
+  const name = ev.target.dataset && ev.target.dataset.pf;
+  if (!name || !state || !momDraft) return;
+  const f = momFields(state)[name];
+  const v = Number(ev.target.value);
+  if (!f || ev.target.value === "" || Number.isNaN(v)) return;
+  momDraft[name] = momFromUi(f, v);
+  markMomDirty();
+});
+document.getElementById("mom-save").addEventListener("click", () => {
+  if (!momDraft) return;
+  act(async () => { const b = await post("/api/meme/params", { changes: momDraft }); momDirty = false; momKey = ""; return b; }, "Den almindelige strategi er gemt");
+});
+document.getElementById("mom-reset").addEventListener("click", async () => {
+  if (!(await ask("Nulstil den almindelige strategi?", "Alle filtre og salgsregler sættes tilbage til standard, også dem læringen har flyttet.", { confirm: "Nulstil", danger: true }))) return;
+  act(async () => { const b = await post("/api/meme/params", { reset: true }); momDirty = false; momKey = ""; return b; }, "Standardindstillingerne er tilbage");
+});
+
+/* ---------- Automatiske ændringer, som kan fortrydes ---------- */
+const CHANGE_SOURCE = { strammer: "Strammer", "mål": "Bedste mål", "læring": "Læring", skygger: "Skyggehandler", opgradering: "Opgradering" };
+function renderChanges(data) {
+  document.getElementById("changes-title").innerHTML = icon("sliders") + "Automatiske ændringer";
+  const list = data.auto_changes || [];
+  put("changes", list.length ? list.map((c) => {
+    const what = c.changes.map((x) => `${esc(x.label)}: <span class="num">${esc(x.old_text)} → ${esc(x.new_text)}</span>`).join("<br>");
+    const right = c.undone_at ? '<span class="chip">fortrudt</span>'
+      : c.can_undo ? `<button class="btn small" type="button" data-undo="${esc(c.id)}">${icon("undo", "sm")}Fortryd</button>`
+      : c.changed_since ? '<span class="chip" title="Tallet er ændret igen siden">ændret siden</span>' : "";
+    return `<div class="chg-row"><div><div class="what">${what}</div><div class="meta">${esc(ago(c.at))} · ${esc(c.strategy_label)} · ${esc(CHANGE_SOURCE[c.source] || c.source)}</div></div><div>${right}</div>${c.why ? `<div class="reason">${esc(c.why)}</div>` : ""}</div>`;
+  }).join("") : empty("Ingen endnu. Når læringen flytter et mål, et stop eller et filter, står det her, og du kan fortryde det.", "sliders"));
+}
+document.getElementById("changes").addEventListener("click", async (ev) => {
+  const b = ev.target.closest("[data-undo]");
+  if (!b) return;
+  const c = ((state && state.auto_changes) || []).find((x) => String(x.id) === b.dataset.undo);
+  const what = c ? c.changes.map((x) => `${x.label}: ${x.new_text} → ${x.old_text}`).join(", ") : "";
+  if (!(await ask("Fortryd ændringen?", `${what}. Læringen rører det ikke i en uge.`, { confirm: "Fortryd" }))) return;
+  act(() => post("/api/meme/changes/undo", { id: Number(b.dataset.undo) }), "Ændringen er fortrudt");
+});
+
 let analysisStrategy = "momentum";
 try { analysisStrategy = localStorage.getItem("meme-analysis") || "momentum"; } catch (e) {}
 function renderAnalysis(data) {
@@ -2474,6 +2611,8 @@ function render(data) {
   renderKrav(data);
   renderShadows(data);
   renderAnalysis(data);
+  renderChanges(data);
+  renderMomentum(data);
   renderOptimizer(data);
   renderDiagnostics(data);
   renderSecurity(data);
@@ -2966,6 +3105,7 @@ function renderStrategies(data) {
   const list = data.strategies || [];
   document.getElementById("strat-title").innerHTML = icon("bars") + "Hvad tjener penge?";
   document.getElementById("auto-targets").setAttribute("aria-checked", data.auto_targets ? "true" : "false");
+  document.getElementById("guard-switch").setAttribute("aria-checked", data.strategy_guard ? "true" : "false");
   put("strats", list.map((st) => {
     let tag = "", action = "";
     if (st.hold) {
@@ -2998,6 +3138,10 @@ document.getElementById("strat-card").addEventListener("click", (ev) => {
     const id = resume.dataset.sresume;
     act(() => post("/api/meme/strategies", { resume: id }), `${label(id)} kører igen`);
   }
+});
+document.getElementById("guard-switch").addEventListener("click", () => {
+  const on = !(state && state.strategy_guard);
+  act(() => post("/api/meme/strategies", { guard: on }), on ? "Strategi-vagten er slået til" : "Strategi-vagten er slået fra");
 });
 document.getElementById("auto-targets").addEventListener("click", () => {
   const on = !(state && state.auto_targets);
