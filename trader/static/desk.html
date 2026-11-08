@@ -66,6 +66,9 @@
   .appnav-in { display: inline-flex; gap: 2px; padding: 2px; border-radius: 10px; background: var(--fill); }
   .appnav a { padding: 6px 16px; border-radius: 8px; font: 500 13px/1.2 var(--font); color: var(--text-2); white-space: nowrap; }
   .appnav a[aria-current="page"] { background: var(--card); color: var(--text); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2); }
+  .appnav .ldot { display: inline-block; width: 6px; height: 6px; margin: 0 0 1px 6px; border-radius: 50%; vertical-align: middle; background: var(--up); box-shadow: 0 0 0 3px color-mix(in srgb, var(--up) 22%, transparent); }
+  .appnav .ldot.pre { background: var(--warn); box-shadow: 0 0 0 3px color-mix(in srgb, var(--warn) 22%, transparent); }
+  .appnav .ldot[hidden] { display: none; }
 
   /* ---------- top ---------- */
   header.top { position: sticky; top: 0; z-index: 20; background: var(--bar); -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px); border-bottom: 0.5px solid var(--sep); }
@@ -355,13 +358,18 @@
     main { padding-bottom: calc(var(--nav-h) + 40px + var(--safe-b)); }
     body.chatting main { padding-bottom: calc(var(--nav-h) + 150px + var(--safe-b)); }
     .card { padding: 16px 16px 18px; }
+    /* Telefon: én kolonne i den rækkefølge, man har brug for: konto, børsen, åbne handler, så resten. */
+    #tab-home .grid { display: flex; flex-direction: column; align-items: stretch; gap: 16px; }
+    #tab-home .grid > .col { display: contents; }
+    #approvals { order: 1; } #tab-home .hero { order: 2; } #mk-card { order: 3; } #trades-card { order: 4; }
+    #pre-card { order: 5; } #now-card { order: 6; } #wl-card { order: 7; }
   }
   @media (max-width: 400px) { .status .lbl-s { display: none; } .stock { grid-template-columns: minmax(0, 1fr) 70px 90px; } .stock svg { width: 70px; } }
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 </style>
 </head>
 <body>
-<nav class="appnav" aria-label="Skift side"><div class="appnav-in"><a href="/meme">Memebot</a><a href="/desk?m=us" data-m="us" aria-label="Handelsbordet i USA" aria-current="page">USA</a><a href="/desk?m=dk" data-m="dk" id="nav-dk" aria-label="Handelsbordet i Danmark">Danmark</a></div></nav>
+<nav class="appnav" aria-label="Skift side"><div class="appnav-in"><a href="/meme">Memebot</a><a href="/desk?m=us" data-m="us" aria-label="Handelsbordet i USA" aria-current="page">USA<i class="ldot" hidden></i></a><a href="/desk?m=dk" data-m="dk" id="nav-dk" aria-label="Handelsbordet i Danmark">Danmark<i class="ldot" hidden></i></a></div></nav>
 
 <header class="top">
   <div class="wrap bar">
@@ -400,7 +408,7 @@
         </article>
       </div>
       <div class="col">
-        <article class="card">
+        <article class="card" id="mk-card">
           <div class="card-h"><h2 id="mk-title">New York-børsen</h2><span class="pill right" id="mk-pill">–</span></div>
           <div class="market">
             <div class="ring" id="ring"><svg viewBox="0 0 120 120" aria-hidden="true"><circle class="trk" cx="60" cy="60" r="52"/><circle class="bar-r" id="ring-bar" cx="60" cy="60" r="52" stroke-dasharray="326.7" stroke-dashoffset="326.7"/></svg><div class="mid"><div><div class="t" id="clock"><span class="sk" style="width:76px;height:22px"></span></div><div class="s" id="clock-s"></div></div></div></div>
@@ -416,7 +424,7 @@
           <div class="card-h"><h2>Åbne handler</h2></div>
           <div id="trades"></div>
         </article>
-        <article class="card">
+        <article class="card" id="wl-card">
           <div class="card-h"><h2>Watchlist</h2><div class="seg right" id="wl-seg"><button type="button" data-view="list" aria-selected="true">Liste</button><button type="button" data-view="radar" aria-selected="false">Radar</button></div></div>
           <div id="wl-list"><div class="sk-row"><span><span class="sk" style="width:58px;height:16px"></span><br><span class="sk" style="width:120px;height:11px;margin-top:6px"></span></span><span class="sk" style="width:84px;height:24px"></span><span style="text-align:right"><span class="sk" style="width:62px;height:15px"></span><br><span class="sk" style="width:76px;height:20px;margin-top:5px"></span></span></div><div class="sk-row"><span><span class="sk" style="width:58px;height:16px"></span><br><span class="sk" style="width:120px;height:11px;margin-top:6px"></span></span><span class="sk" style="width:84px;height:24px"></span><span style="text-align:right"><span class="sk" style="width:62px;height:15px"></span><br><span class="sk" style="width:76px;height:20px;margin-top:5px"></span></span></div><div class="sk-row"><span><span class="sk" style="width:58px;height:16px"></span><br><span class="sk" style="width:120px;height:11px;margin-top:6px"></span></span><span class="sk" style="width:84px;height:24px"></span><span style="text-align:right"><span class="sk" style="width:62px;height:15px"></span><br><span class="sk" style="width:76px;height:20px;margin-top:5px"></span></span></div><div class="sk-row"><span><span class="sk" style="width:58px;height:16px"></span><br><span class="sk" style="width:120px;height:11px;margin-top:6px"></span></span><span class="sk" style="width:84px;height:24px"></span><span style="text-align:right"><span class="sk" style="width:62px;height:15px"></span><br><span class="sk" style="width:76px;height:20px;margin-top:5px"></span></span></div><div class="sk-row"><span><span class="sk" style="width:58px;height:16px"></span><br><span class="sk" style="width:120px;height:11px;margin-top:6px"></span></span><span class="sk" style="width:84px;height:24px"></span><span style="text-align:right"><span class="sk" style="width:62px;height:15px"></span><br><span class="sk" style="width:76px;height:20px;margin-top:5px"></span></span></div></div>
           <div id="wl-radar" hidden>
@@ -566,12 +574,31 @@ const api = (url) => (DK ? url + (url.includes("?") ? "&" : "?") + "market=dk" :
     document.getElementById("wl-lbl").textContent = "Watchlist (fx NOVO-B, DSV, GMAB)";
   }
   // Vis kun Danmark, når serveren kører en dansk motor. Er den slået fra, går siden tilbage til USA.
-  fetch("/api/desk/markets", { credentials: "same-origin", cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => {
+  // Prikken ved hver børs: grøn, når den handler; gul før åbning. Opdateres hvert minut.
+  let first = true;
+  const markets = () => fetch("/api/desk/markets", { credentials: "same-origin", cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => {
     if (!d) return;
-    const keys = (d.markets || []).map((m) => m.key);
-    if (!keys.includes("dk")) { document.getElementById("nav-dk").hidden = true; if (DK) location.replace("/desk?m=us"); }
-    else if (!keys.includes("us") && !DK) location.replace("/desk?m=dk");
+    const list = d.markets || [], keys = list.map((m) => m.key);
+    if (first) {
+      first = false;
+      if (!keys.includes("dk")) { document.getElementById("nav-dk").hidden = true; if (DK) location.replace("/desk?m=us"); }
+      else if (!keys.includes("us") && !DK) location.replace("/desk?m=dk");
+    }
+    list.forEach((m) => {
+      const a = document.querySelector(`.appnav a[data-m="${m.key}"]`), dot = a && a.querySelector(".ldot");
+      if (!dot) return;
+      const live = m.is_open && !m.paused, early = m.phase === "pre";
+      dot.hidden = !(live || early);
+      dot.classList.toggle("pre", !live && early);
+      const sign = m.currency === "DKK" ? "kr." : "$";
+      const bits = [m.label || ""];
+      if (m.open_trades) bits.push(`${m.open_trades} åben${m.open_trades === 1 ? "" : "e"} handel${m.open_trades === 1 ? "" : "er"}`);
+      if (m.pnl_today) bits.push(`${m.pnl_today > 0 ? "+" : ""}${nf2.format(m.pnl_today)} ${sign} i dag`);
+      a.title = `${m.name}: ${bits.filter(Boolean).join(" · ")}`;
+    });
   }).catch(() => {});
+  markets();
+  setInterval(() => { if (!document.hidden) markets(); }, 60000);
 })();
 let state = null, lastId = 0, busy = false, tab = "home", lastOk = 0, failed = false, wlView = "list";
 const messages = [];
@@ -951,9 +978,13 @@ function renderWatch(d) {
   const bench = (d.market_info || {}).benchmark || "SPY";
   const items = (q.items || []).filter((x) => x.symbol !== bench);
   const pre = (d.market || {}).phase === "pre";
-  $("wl-src").textContent = items.length ? (snap ? (pre ? `Før åbning · seneste handel mod i går (IEX, tyndt før åbning) · ${ago(q.ts)}` : `Børsen er lukket · kurser fra sidste handelsdag · ${ago(q.ts)}`) : `Live · opdateret ${ago(q.ts)}`) : "";
+  $("wl-src").textContent = items.length && q.error ? `Seneste kurser ${ago(q.ts)} · ${q.error}` : items.length ? (snap ? (pre ? `Før åbning · seneste handel mod i går (IEX, tyndt før åbning) · ${ago(q.ts)}` : `Børsen er lukket · kurser fra sidste handelsdag · ${ago(q.ts)}`) : `Live · opdateret ${ago(q.ts)}`) : "";
   if (!items.length) {
-    $("wl-list").innerHTML = `<div class="empty">${d.keys_present ? "Henter kurser …" : 'Kurserne vises, når bordet er forbundet til Alpaca.<br><button class="btn plain" type="button" data-goto="bots">Forbind nu</button>'}</div>`;
+    $("wl-list").innerHTML = `<div class="empty">${!d.keys_present
+      ? 'Kurserne vises, når bordet er forbundet til Alpaca.<br><button class="btn plain" type="button" data-goto="bots">Forbind nu</button>'
+      : q.error
+        ? `Kurserne kunne ikke hentes. ${esc(q.error)}<br><span class="cap">Bordet prøver igen hvert minut.</span>`
+        : "Henter kurser …"}</div>`;
     $("blips").innerHTML = ""; wlKey = ""; return;
   }
   const key = `${q.ts}|${p.move_pct}|${p.volume_x}`;
@@ -1017,7 +1048,7 @@ function systems(d) {
       ? ["Kursdata", err ? "bad" : "ok", err ? err : "Yahoo Finance · bordets egen papirkonto i kroner"]
       : ["Alpaca", !d.keys_present || err ? "bad" : "ok", !d.keys_present ? "Mangler nøgler" : err ? err : "Forbundet til papirkontoen"],
     ["Børsen", m.is_open ? "ok" : "", m.label || "–"],
-    ["Kurser", q.ts ? "ok" : "warn", q.ts ? `${q.mode === "live" ? "Live" : m.phase === "pre" ? "Før åbning" : "Sidste handelsdag"}, ${ago(q.ts)}` : "Ingen endnu"],
+    ["Kurser", q.error ? (q.ts ? "warn" : "bad") : q.ts ? "ok" : "warn", q.error ? q.error : q.ts ? `${q.mode === "live" ? "Live" : m.phase === "pre" ? "Før åbning" : "Sidste handelsdag"}, ${ago(q.ts)}` : "Ingen endnu"],
     ["SCOUT", d.paused ? "warn" : sys.last_scan ? "ok" : "", d.paused ? "På pause" : sys.last_scan ? `Kiggede ${ago(sys.last_scan)}` : m.is_open ? "Venter på første scan" : d.params.premarket ? "Kigger fra kl. 10 dansk tid (før åbning)" : "Kigger, når børsen åbner"],
     ["Claude", !ai.configured ? "warn" : ai.last_error ? "bad" : "ok", !ai.configured ? "ANTHROPIC_API_KEY mangler i Railway" : ai.last_error ? ai.last_error : ai.limited ? `${money(ai.spent_today_usd)} af ${money(ai.budget_usd)} $ brugt i dag` : `Klar · ${money(ai.spent_today_usd)} $ brugt i dag`],
     ["Autopilot", d.params.auto_approve ? "ok" : "warn", d.params.auto_approve ? "Køber selv på papir" : "Du godkender hver ordre"],
@@ -1094,7 +1125,8 @@ function renderStatus(d) {
   const el = $("status");
   el.className = `status ${d.paused ? "warn" : bad ? "bad" : "ok"} ${!d.paused && !bad && m.is_open ? "live" : ""}`;
   $("status-t").textContent = d.paused ? "På pause" : bad ? `${bad[0]} mangler` : m.is_open ? "Handler nu" : "Alt kører";
-  const issue = bad ? { level: "error", title: bad[0] === "Alpaca" ? "Alpaca er ikke forbundet" : `${bad[0]}: ${bad[2]}`, text: bad[0] === "Alpaca" ? "Uden forbindelse kan bordet ikke se saldo, kurser eller handle. Det tager et minut at ordne." : bad[2] } : null;
+  const TITLES = { Alpaca: "Alpaca er ikke forbundet", Kurser: "Kurserne kan ikke hentes", Kursdata: "Kursdata svarer ikke", Claude: "Claude svarer ikke" };
+  const issue = bad ? { level: "error", title: TITLES[bad[0]] || `${bad[0]} virker ikke`, text: bad[0] === "Alpaca" ? "Uden forbindelse kan bordet ikke se saldo, kurser eller handle. Det tager et minut at ordne." : bad[2] } : null;
   $("issue").dataset.kind = issue ? "status" : "";
   $("issue").innerHTML = issue ? `<div class="issue ${issue.level}"><span class="ic">!</span><div class="tx"><b>${esc(issue.title)}</b>${esc(issue.text)}</div><button class="btn primary" type="button" data-goto="bots">Løs</button></div>` : "";
 }
@@ -1209,7 +1241,7 @@ function notifyApprovals(list) {
 }
 document.addEventListener("click", () => { if ("Notification" in window && Notification.permission === "default") Notification.requestPermission().catch(() => {}); }, { once: true });
 // Nye hændelser glider ned fra toppen som en besked på telefonen.
-const BANNER_KINDS = { premarket: "Før åbning", flag: "Ny markering", approval: "Venter på dig", fill: "Købt", close: "Lukket", lesson: "Lært i dag", log: "Dagslog" };
+const BANNER_KINDS = { open: "Børsen er åben", premarket: "Før åbning", flag: "Ny markering", approval: "Venter på dig", fill: "Købt", close: "Lukket", lesson: "Lært i dag", log: "Dagslog" };
 let bannerTimer = null;
 function showBanner(m) {
   const who = BOT[m.author] || BOT.system, el = $("banner");

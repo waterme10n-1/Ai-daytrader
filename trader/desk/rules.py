@@ -10,6 +10,7 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
 
 from trader.desk.alpaca import Bar, _bracket, _parse_ts, _round_price, resolve_intrabar, vwap
+from trader.desk.fmt import money, num, pct, short
 
 MIN_BARS = 15
 SWING_BARS = 15
@@ -142,14 +143,14 @@ def gap_flag(
 
 
 def scout_text(flag: Flag) -> str:
-    move = f"{flag.move_pct:+.1f}%"
+    move = pct(flag.move_pct)
     span = "den sidste time" if flag.window_minutes >= 60 else f"de sidste {flag.window_minutes} min"
     if flag.by_gap:
         return (
-            f"GAP: {flag.symbol} {flag.gap_pct:+.1f}% siden i går og over VWAP ({move} {span}), handler "
-            f"{flag.volume_x:.1f}x normal volumen. Kurs {flag.price:.2f}."
+            f"GAP: {flag.symbol} {pct(flag.gap_pct)} siden i går og over VWAP ({move} {span}), handler "
+            f"{num(flag.volume_x, 1)}x normal volumen. Kurs {num(flag.price)}."
         )
-    return f"FLAG: {flag.symbol} {move} {span}, handler {flag.volume_x:.1f}x normal volumen. Kurs {flag.price:.2f}."
+    return f"FLAG: {flag.symbol} {move} {span}, handler {num(flag.volume_x, 1)}x normal volumen. Kurs {num(flag.price)}."
 
 
 def premarket_gaps(symbols: list[str], snapshots: dict, daily: dict, now: datetime, *, gap_pct: float) -> list[dict]:
@@ -184,8 +185,8 @@ def premarket_gaps(symbols: list[str], snapshots: dict, daily: dict, now: dateti
 
 def premarket_text(item: dict) -> str:
     return (
-        f"Før åbning: {item['symbol']} {item['gap_pct']:+.1f}% mod i går (kurs {item['price']:.2f}, lukkede "
-        f"{item['prev_close']:.2f}). Jeg holder øje med den, når børsen åbner."
+        f"Før åbning: {item['symbol']} {pct(item['gap_pct'])} mod i går (kurs {num(item['price'])}, lukkede "
+        f"{num(item['prev_close'])}). Jeg holder øje med den, når børsen åbner."
     )
 
 
@@ -225,10 +226,10 @@ def chart(
     if rising < 0:
         return ChartPlan(False, reason="Kursen falder, og bordet køber kun (ingen short).")
     if price <= level:
-        return ChartPlan(False, reason=f"Kursen {price:.2f} er under VWAP {level:.2f}. Køberne har ikke kontrollen.")
+        return ChartPlan(False, reason=f"Kursen {num(price)} er under VWAP {num(level)}. Køberne har ikke kontrollen.")
     extension = (price - level) / level * 100.0
     if extension > 2 * stop_max_pct:
-        return ChartPlan(False, reason=f"Kursen er {extension:.1f}% over VWAP. Det er at jagte en løbet bevægelse.")
+        return ChartPlan(False, reason=f"Kursen er {pct(extension, sign=False)} over VWAP. Det er at jagte en løbet bevægelse.")
     if len(bars) > 5 and price < bars[-6].close:
         return ChartPlan(False, reason="Momentum er vendt de sidste fem minutter.")
     swing = min(bar.low for bar in bars[-SWING_BARS:]) - 0.01
@@ -260,7 +261,11 @@ def chart(
         target=target,
         stop_pct=round(stop_pct, 2),
         reward_risk=round((target - entry) / risk, 2),
-        reason=f"Over VWAP {level:.2f}, stop under laveste kurs de sidste {SWING_BARS} min." if stop_r > floor + 0.005 else f"Over VWAP {level:.2f}, stop ved loftet på {stop_max_pct:g}%.",
+        reason=(
+            f"Over VWAP {num(level)}, stop under laveste kurs de sidste {SWING_BARS} min."
+            if stop_r > floor + 0.005
+            else f"Over VWAP {num(level)}, stop ved loftet på {short(stop_max_pct)} %."
+        ),
     )
 
 
@@ -268,8 +273,8 @@ def chart_text(symbol: str, plan: ChartPlan) -> str:
     if not plan.setup:
         return f"{symbol}: Ingen setup. {plan.reason}"
     return (
-        f"{symbol}: indgang {plan.entry:.2f}, mål {plan.target:.2f}, stop {plan.stop:.2f}. "
-        f"Stoppet er {plan.stop_pct:.1f}% væk, og målet er {plan.reward_risk:.1f}x så langt."
+        f"{symbol}: indgang {num(plan.entry)}, mål {num(plan.target)}, stop {num(plan.stop)}. "
+        f"Stoppet er {pct(plan.stop_pct, sign=False)} væk, og målet er {num(plan.reward_risk, 1)}x så langt."
     )
 
 
@@ -313,7 +318,7 @@ def size(
     budget = min(equity * position_pct / 100.0, max(0.0, buying_power) * 0.9)
     qty = int(math.floor(budget / entry))
     if qty < 1:
-        zero.reason = f"{position_pct:g}% af kontoen rækker ikke til én aktie. Svaret er nul."
+        zero.reason = f"{short(position_pct)} % af kontoen rækker ikke til én aktie. Svaret er nul."
         return zero
     notional = qty * entry
     return Size(
@@ -331,8 +336,8 @@ def size_text(symbol: str, sized: Size, currency: str = "USD") -> str:
     if sized.qty < 1:
         return f"{symbol}: 0. {sized.reason}"
     return (
-        f"{symbol}: {sized.qty} aktier for {sized.notional:,.0f} {currency} ({sized.pct:.1f}% af kontoen). "
-        f"Største tab ved stop: {sized.max_loss:,.0f} {currency}. Åbne handler efter denne: {sized.open_after} af {sized.max_open}."
+        f"{symbol}: {sized.qty} aktier for {money(sized.notional, currency, decimals=0)} ({pct(sized.pct, sign=False)} af kontoen). "
+        f"Største tab ved stop: {money(sized.max_loss, currency, decimals=0)}. Åbne handler efter denne: {sized.open_after} af {sized.max_open}."
     )
 
 
@@ -346,13 +351,13 @@ def rules_skeptic(
     vs_vwap = float(flag.get("vs_vwap_pct") or 0)
     if flag.get("by_gap"):
         gap = float(flag.get("gap_pct") or 0)
-        reasons.append(f"Aktien er allerede steget {gap:+.1f}% siden i går. Gaps lukker tit igen i løbet af dagen.")
+        reasons.append(f"Aktien er allerede steget {pct(gap)} siden i går. Gaps lukker tit igen i løbet af dagen.")
     elif flag.get("by_move"):
-        reasons.append(f"Aktien har allerede flyttet sig {move:+.1f}%. En stor del af bevægelsen skete, før vi så den.")
+        reasons.append(f"Aktien har allerede flyttet sig {pct(move)}. En stor del af bevægelsen skete, før vi så den.")
     else:
         reasons.append("Flaget kommer kun fra volumen. Kursen har ikke bekræftet noget endnu.")
     if vs_vwap > stop_max_pct / 2:
-        reasons.append(f"Kursen ligger {vs_vwap:.1f}% over VWAP. Et helt normalt tilbagefald rammer stoppet.")
+        reasons.append(f"Kursen ligger {pct(vs_vwap, sign=False)} over VWAP. Et helt normalt tilbagefald rammer stoppet.")
     else:
         reasons.append("Et udbrud midt på dagen fader ofte, når de første købere tager gevinst.")
     if (now.hour, now.minute) >= late_from:
@@ -388,11 +393,11 @@ def shadow_outcome(entry: float, stop: float, target: float, bars: list[Bar], si
                 "reason": reason,
             }
     last = later[-1].close
-    pct = (last - entry) / entry * 100.0
+    change = (last - entry) / entry * 100.0
     return {
-        "result": "loss" if pct < 0 else "win",
+        "result": "loss" if change < 0 else "win",
         "exit": round(last, 2),
-        "pct": round(pct, 2),
+        "pct": round(change, 2),
         "reason": "close",
     }
 

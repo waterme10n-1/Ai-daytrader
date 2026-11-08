@@ -19,6 +19,7 @@ from trader.config import Settings
 from trader.desk.alpaca import ET_NAME, AlpacaPaper, BrokerError
 from trader.desk import calendar, learning, markets, rules
 from trader.desk.agents import BOTS, DeskBrain, bot_rules
+from trader.desk.fmt import money, num, pct, short, tidy
 from trader.desk.config import (
     HARD_MAX_FLAGS,
     HARD_MAX_OPEN,
@@ -57,6 +58,10 @@ STATUS_DA = {
     "failed": "Fejlede",
 }
 EXIT_DA = {"stop": "stop", "target": "mål", "flatten": "lukketid", "outside": "lukket udefra", "manual": "lukket af dig"}
+
+
+def _notify(settings: Settings, text: str) -> None:
+    notify(settings, tidy(text))
 
 
 def _parse_ts(value: str | None) -> datetime | None:
@@ -103,6 +108,7 @@ class DeskEngine:
         self.last_tick: str | None = None
         self.scanning = False
         self._quotes: dict = {"ts": None, "mode": None, "items": []}
+        self.quotes_error = ""  # hvorfor kurserne mangler, vist på siden i stedet for "Henter kurser …" for evigt
         self.last_scan: str | None = None
         existing = self.store.get_state("welcome") is not None
         self._retire_old_defaults(announce=existing)
@@ -141,11 +147,11 @@ class DeskEngine:
             self.store.post(
                 "system",
                 "info",
-                f"SCOUT er opdateret: grænsen er {cfg.move_pct:g} % på en time, højst {cfg.max_flags_per_day} markeringer "
+                f"SCOUT er opdateret: grænsen er {short(cfg.move_pct)} % på en time, højst {cfg.max_flags_per_day} markeringer "
                 f"om dagen, og watchlisten har {len(cfg.watchlist)} aktier ({', '.join(cfg.watchlist)}). Markeringer kun på "
                 "volumen bruger ikke længere pladserne. "
                 + (
-                    f"Før åbning (fra kl. 10 dansk tid) kigger SCOUT efter aktier, der er steget {cfg.gap_pct:g} % eller mere "
+                    f"Før åbning (fra kl. 10 dansk tid) kigger SCOUT efter aktier, der er steget {short(cfg.gap_pct)} % eller mere "
                     "siden i går, og NEWS finder grunden. Ved åbningen kan sådan et gap blive købt, hvis det holder."
                     if cfg.premarket
                     else ""
@@ -211,9 +217,9 @@ class DeskEngine:
             except (TypeError, ValueError) as exc:
                 raise ValueError(f"{name} skal være et tal.") from exc
             if not (low <= value <= high):
-                raise ValueError(f"{name} skal ligge mellem {low:g} og {high:g}.")
+                raise ValueError(f"{name} skal ligge mellem {short(low)} og {short(high)}.")
             params[name] = value
-            changes.append(f"{name}={value:g}")
+            changes.append(f"{name}={short(value)}")
         if body.get("reset"):
             params = {}
             changes = ["tilbage til standard"]
@@ -282,7 +288,7 @@ class DeskEngine:
             "ok": True,
             "saved": save,
             **info,
-            "text": f"Alpaca godtager nøglerne. Papirkontoen har {account.equity:,.2f} USD." + (" Nøglerne er gemt og bruges nu." if save else ""),
+            "text": f"Alpaca godtager nøglerne. Papirkontoen har {money(account.equity, 'USD')}." + (" Nøglerne er gemt og bruges nu." if save else ""),
         }
 
     def forget_keys(self) -> None:
@@ -425,7 +431,9 @@ class DeskEngine:
             daily = self._daily(broker, everything, now)
         except Exception as exc:
             logger.info("Kurser kunne ikke hentes: %s", exc)
+            self.quotes_error = str(exc)
             return
+        self.quotes_error = ""
         flagged = self.store.flagged_today(now.date().isoformat())
         self._quotes = {
             "ts": now.isoformat(timespec="seconds"),
@@ -448,9 +456,42 @@ class DeskEngine:
             self.store.post(
                 "system",
                 "info",
-                f"Bordet er i gang med {account.equity:,.0f} {self.market.currency} på papirkontoen. Det lærer af hver handel: "
+                f"Bordet er i gang med {money(account.equity, self.market.currency, decimals=0)} på papirkontoen. Det lærer af hver handel: "
                 "taber den samme slags køb flere gange, får den slags WAIT fremover.",
             )
+            return
+        # Hver morgen: én linje, der viser, at bordet er vågent, og hvad dagen byder på.
+        cfg = self.cfg
+        text = (
+            f"{self.market.name} er åben. SCOUT kigger {self._window_text(now)} på {len(cfg.watchlist)} aktier. "
+            f"Papirkontoen: {money(account.equity, self.market.currency)}."
+        )
+        if self.paused:
+            text += " Bordet står på pause. Skriv \"Start igen\" for at handle i dag."
+        self.store.post("system", "open", text)
+
+    def _window_text(self, now: datetime) -> str:
+        """SCOUT's vindue i dansk tid: '9:15–16:30' for København, '15:45–21:30 dansk tid' for New York."""
+        day = now.date()
+        dk = markets.DK.tz
+        start = self.market.at(day, self.market.scan_start).astimezone(dk)
+        end = self.market.at(day, self.market.scan_end(day)).astimezone(dk)
+        span = f"{start.hour}:{start.minute:02d}–{end.hour}:{end.minute:02d}"
+        return span if self.market.key == "dk" else f"{span} dansk tid"
+
+    def summary(self) -> dict:
+        """Det korte overblik til skifteren øverst: åben eller lukket, åbne handler og dagens resultat. Ingen netværk."""
+        market = self._market()
+        day = self._now().astimezone(self.tz).date().isoformat()
+        today = [row for row in self.store.proposals_on(day) if row.get("pnl") is not None]
+        return {
+            "phase": market["phase"],
+            "is_open": market["is_open"],
+            "label": market["label"],
+            "open_trades": len(self.store.proposals_with_status("placed")),
+            "pnl_today": round(sum(float(row["pnl"]) for row in today), 2),
+            "paused": self.paused,
+        }
 
     def _last_price(self, broker, symbol: str, now: datetime) -> float | None:
         bars = broker.get_intraday([symbol], now).get(symbol) or []
@@ -478,8 +519,13 @@ class DeskEngine:
             broker = self.broker()
             # Ét kald for hele watchlisten (+ indekset): giver radaren kurser og SCOUT sine barer.
             everything = list(dict.fromkeys([*cfg.watchlist, self.market.benchmark]))
-            intraday = broker.get_intraday(everything, now)
-            daily = self._daily(broker, everything, now)
+            try:
+                intraday = broker.get_intraday(everything, now)
+                daily = self._daily(broker, everything, now)
+            except Exception as exc:
+                self.quotes_error = str(exc)
+                raise
+            self.quotes_error = ""
             minutes = self.market.session_minutes
             self._quotes = {
                 "ts": now.isoformat(timespec="seconds"),
@@ -562,8 +608,13 @@ class DeskEngine:
             if not hasattr(broker, "get_snapshots"):
                 return 0
             everything = list(dict.fromkeys([*cfg.watchlist, self.market.benchmark]))
-            snaps = broker.get_snapshots(everything)
-            daily = self._daily(broker, everything, now)
+            try:
+                snaps = broker.get_snapshots(everything)
+                daily = self._daily(broker, everything, now)
+            except Exception as exc:
+                self.quotes_error = str(exc)
+                raise
+            self.quotes_error = ""
             self._quotes = {
                 "ts": now.isoformat(timespec="seconds"),
                 "mode": "snapshot",
@@ -753,11 +804,11 @@ class DeskEngine:
                 logger.info("Autopilot købte ikke %s: %s", symbol, exc)
             return
         text = (
-            f"Godkendelse nødvendig: KØB {sized.qty} {symbol} til ca. {plan.entry:.2f}, stop {plan.stop:.2f}, "
-            f"mål {plan.target:.2f}. Udløber kl. {self.market.local_hint((expires.hour, expires.minute), expires.date())}."
+            f"Godkendelse nødvendig: KØB {sized.qty} {symbol} til ca. {num(plan.entry)}, stop {num(plan.stop)}, "
+            f"mål {num(plan.target)}. Udløber kl. {self.market.local_hint((expires.hour, expires.minute), expires.date())}."
         )
         self.store.post("executor", "approval", text, symbol=symbol, proposal_id=pid, data={"expires_at": expires.isoformat()})
-        notify(self.main_settings, f"{self.title}: {text} Åbn /desk for at godkende.")
+        _notify(self.main_settings, f"{self.title}: {text} Åbn /desk for at godkende.")
 
     def _open_count(self) -> int:
         return len(self.store.proposals_with_status("placed", "awaiting"))
@@ -813,11 +864,11 @@ class DeskEngine:
             if price is None:
                 problem = "Ingen aktuel kurs."
             elif price <= stop:
-                problem = f"Kursen {price:.2f} er allerede under stoppet {stop:.2f}."
+                problem = f"Kursen {num(price)} er allerede under stoppet {num(stop)}."
             elif price >= target:
-                problem = f"Kursen {price:.2f} har allerede nået målet {target:.2f}."
+                problem = f"Kursen {num(price)} har allerede nået målet {num(target)}."
             elif price > entry * (1 + cfg.max_chase_pct / 100.0):
-                problem = f"Kursen {price:.2f} er løbet mere end {cfg.max_chase_pct:g}% over indgangen {entry:.2f}. Jeg jagter ikke."
+                problem = f"Kursen {num(price)} er løbet mere end {short(cfg.max_chase_pct)} % over indgangen {num(entry)}. Jeg jagter ikke."
             if problem:
                 self.store.update_proposal(proposal_id, status="expired", decided_at=now.isoformat(timespec="seconds"))
                 self.store.post("executor", "info", f"{symbol}: ordren er ikke lagt. {problem}", symbol=symbol, proposal_id=proposal_id)
@@ -845,21 +896,21 @@ class DeskEngine:
                 fill_price=fill,
                 decided_at=now.isoformat(timespec="seconds"),
             )
-            at = f"til {fill:.2f}" if fill else f"(markedsordre, kurs ca. {price:.2f})"
+            at = f"til {num(fill)}" if fill else f"(markedsordre, kurs ca. {num(price)})"
             self.store.post(
                 "executor",
                 "fill",
                 f"Købt {qty} {symbol} {at} på papirkontoen"
                 + (
-                    f" (inkl. {self.base.fee_pct:g} % kurtage). Bordet holder selv øje med stop {stop:.2f} og mål {target:.2f}."
+                    f" (inkl. {short(self.base.fee_pct)} % kurtage). Bordet holder selv øje med stop {num(stop)} og mål {num(target)}."
                     if self.own_ledger
-                    else f". Stop {stop:.2f} og mål {target:.2f} ligger hos Alpaca."
+                    else f". Stop {num(stop)} og mål {num(target)} ligger hos Alpaca."
                 ),
                 symbol=symbol,
                 proposal_id=proposal_id,
                 data={"order_id": order.id, "qty": qty},
             )
-            notify(self.main_settings, f"{self.title}: købt {qty} {symbol} (papir). Stop {stop:.2f}, mål {target:.2f}.")
+            _notify(self.main_settings, f"{self.title}: købt {qty} {symbol} (papir). Stop {num(stop)}, mål {num(target)}.")
             return self.store.proposal(proposal_id) or {}
 
     def reject(self, proposal_id: int) -> None:
@@ -933,12 +984,12 @@ class DeskEngine:
         self.store.post(
             "executor",
             "close",
-            f"Lukket {qty} {row['symbol']} ved {why} til {exit_price:.2f}. Resultat {self.market.money(pnl)}.",
+            f"Lukket {qty} {row['symbol']} ved {why} til {num(exit_price)}. Resultat {self.market.money(pnl)}.",
             symbol=row["symbol"],
             proposal_id=row["id"],
             data={"pnl": pnl, "reason": reason},
         )
-        notify(self.main_settings, f"{self.title}: lukket {row['symbol']} ({why}) {self.market.money(pnl)} (papir).")
+        _notify(self.main_settings, f"{self.title}: lukket {row['symbol']} ({why}) {self.market.money(pnl)} (papir).")
 
     def _flatten(self, broker, now: datetime, message: str, *, reason: str = "flatten") -> int:
         with self._order_lock:
@@ -1069,30 +1120,30 @@ class DeskEngine:
         if key == "chart":
             plan = (latest or {}).get("chart")
             if plan and plan.get("setup"):
-                return prefix + f"Seneste plan, {latest['symbol']}: indgang {plan['entry']:.2f}, stop {plan['stop']:.2f}, mål {plan['target']:.2f}."
+                return prefix + f"Seneste plan, {latest['symbol']}: indgang {num(plan['entry'])}, stop {num(plan['stop'])}, mål {num(plan['target'])}."
             if plan:
                 return prefix + f"Seneste, {latest['symbol']}: ingen setup. {plan.get('reason') or ''}".rstrip()
-            return prefix + f"Ingen planer endnu. Jeg sætter stop højst {cfg.stop_max_pct:g} % under indgangen og målet mindst {cfg.reward_risk:g} gange så langt væk."
+            return prefix + f"Ingen planer endnu. Jeg sætter stop højst {short(cfg.stop_max_pct)} % under indgangen og målet mindst {short(cfg.reward_risk)} gange så langt væk."
         if key == "skeptic":
             record = context["skeptic"]
             return prefix + f"Jeg har afgjort {record['rulings']} handler: {record['buy']} BUY og {record['refused']} nej. {record['verdict']}"
         if key == "sizer":
-            return prefix + f"Højst {cfg.position_pct:g} % pr. handel og {cfg.max_open} åbne ad gangen. Lige nu: {context['open']} åbne eller ventende."
+            return prefix + f"Højst {short(cfg.position_pct)} % pr. handel og {cfg.max_open} åbne ad gangen. Lige nu: {context['open']} åbne eller ventende."
         if key == "scout":
             extra = f" (+{context['volume_flags_today']} kun på volumen)" if context["volume_flags_today"] else ""
             early = context["premarket"]
             gaps = (
-                " Før åbning: " + ", ".join(f"{row['symbol']} {float(row['gap_pct']):+.1f} %" for row in early[:5]) + "."
+                " Før åbning: " + ", ".join(f"{row['symbol']} {pct(float(row['gap_pct']))}" for row in early[:5]) + "."
                 if early
                 else (
-                    f" Før åbning kigger jeg efter gaps på {cfg.gap_pct:g} % fra kl. 10 dansk tid."
+                    f" Før åbning kigger jeg efter gaps på {short(cfg.gap_pct)} % fra kl. 10 dansk tid."
                     if cfg.premarket and self.market.premarket_trading
-                    else (f" Gaps på {cfg.gap_pct:g} % ved åbningen tæller også." if cfg.premarket else "")
+                    else (f" Gaps på {short(cfg.gap_pct)} % ved åbningen tæller også." if cfg.premarket else "")
                 )
             )
             return prefix + (
                 f"I dag: {context['flags_today']} af {cfg.max_flags_per_day} markeringer på kursbevægelse{extra}. "
-                f"Grænse: {cfg.move_pct:g} % på en time.{gaps} Watchlist: {', '.join(cfg.watchlist)}."
+                f"Grænse: {short(cfg.move_pct)} % på en time.{gaps} Watchlist: {', '.join(cfg.watchlist)}."
             )
         if key == "executor":
             return prefix + f"Åbne handler: {context['open']}. Lukket i alt: {context['closed']} med {self.market.money(context['pnl'])}."
@@ -1195,8 +1246,8 @@ class DeskEngine:
                 if row["status"] == "closed":
                     why = EXIT_DA.get(row.get("exit_reason") or "", row.get("exit_reason") or "")
                     lines.append(
-                        f"{row['symbol']}: {row['qty']} købt til {float(row['fill_price']):.2f}, solgt til "
-                        f"{float(row['exit_price']):.2f} ({why}), {self.market.money(float(row['pnl']))}."
+                        f"{row['symbol']}: {row['qty']} købt til {num(float(row['fill_price']))}, solgt til "
+                        f"{num(float(row['exit_price']))} ({why}), {self.market.money(float(row['pnl']))}."
                     )
                 else:
                     lines.append(f"{row['symbol']}: {row['qty']} stadig åben.")
@@ -1213,13 +1264,13 @@ class DeskEngine:
             lines.append(f"Skyggeregnskab: {len(right)} af {len(checked)} afviste handler ville have tabt.")
         try:
             equity = self.broker().get_account().equity
-            lines.append(f"Saldo på papirkontoen: {equity:,.2f} {self.market.currency}.")
+            lines.append(f"Saldo på papirkontoen: {money(equity, self.market.currency)}.")
         except Exception as exc:
             lines.append(f"Saldoen kunne ikke hentes: {exc}")
         text = " ".join(lines)
         self.store.set_state(f"log:{day}", text)
         self.store.post("executor", "log", text)
-        notify(self.main_settings, f"{self.title}: " + text)
+        _notify(self.main_settings, f"{self.title}: " + text)
         return text
 
     def diagnose(self) -> dict:
@@ -1256,7 +1307,7 @@ class DeskEngine:
         bench = self.market.benchmark
         probe = self.cfg.watchlist[0] if self.cfg.watchlist else bench
         tests = [
-            ("Handelskontoen", lambda: f"Saldo {broker.get_account().equity:,.2f} {self.market.currency}"),
+            ("Handelskontoen", lambda: f"Saldo {money(broker.get_account().equity, self.market.currency)}"),
             ("Markedets ur", lambda: "Åbent" if broker.get_clock().is_open else "Lukket lige nu (det er i orden)"),
             ("Kursdata", lambda: f"{len(broker.get_daily([bench], 5, now).get(bench) or [])} dagsbarer for {self.market.benchmark_name}"),
             ("Nyheder", lambda: f"{len(broker.get_news([probe], now))} overskrifter for {probe}"),
@@ -1314,11 +1365,11 @@ class DeskEngine:
         index = self.market.benchmark_name
         result["benchmark_name"] = index
         if spy_pct is None:
-            result["text"] = f"Bordet: {desk_pct:+.2f}% siden {start['date']}. {index} kunne ikke hentes."
+            result["text"] = f"Bordet: {pct(desk_pct, 2)} siden {start['date']}. {index} kunne ikke hentes."
         elif desk_pct > spy_pct:
-            result["text"] = f"Bordet: {desk_pct:+.2f}%, {index}: {spy_pct:+.2f}% siden {start['date']}. Bordet slår indtil videre at holde {index}."
+            result["text"] = f"Bordet: {pct(desk_pct, 2)}, {index}: {pct(spy_pct, 2)} siden {start['date']}. Bordet slår indtil videre at holde {index}."
         else:
-            result["text"] = f"Bordet: {desk_pct:+.2f}%, {index}: {spy_pct:+.2f}% siden {start['date']}. Bordet slår ikke at holde {index} endnu."
+            result["text"] = f"Bordet: {pct(desk_pct, 2)}, {index}: {pct(spy_pct, 2)} siden {start['date']}. Bordet slår ikke at holde {index} endnu."
         return result
 
     # ------------------------------------------------------------------ dashboard
@@ -1475,7 +1526,7 @@ class DeskEngine:
                 "open": self._open_count(),
                 "max_open": cfg.max_open,
             },
-            "quotes": self._quotes,
+            "quotes": {**self._quotes, "error": self.quotes_error},
             "premarket": self._premarket_list(day),
             "systems": {
                 "last_scan": self.last_scan,

@@ -437,7 +437,7 @@ def test_premarket_scout_and_news_find_gaps_before_the_open(tmp_path):
     clock["now"] = at(8, 5)
     desk.tick()
     assert sum(1 for m in desk.store.messages(limit=80) if m["kind"] == "premarket") == 1
-    assert "Før åbning: MSTR +4.2 %" in desk._rules_answer("scout")
+    assert "Før åbning: MSTR +4,2 %" in desk._rules_answer("scout")
 
 
 def test_premarket_ignores_old_prices_and_can_be_switched_off(tmp_path):

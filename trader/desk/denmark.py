@@ -32,12 +32,15 @@ from trader.desk.alpaca import (
     resolve_intrabar,
     vwap,
 )
+from trader.desk.fmt import money, num
 from trader.desk.markets import DK, Market
 
 logger = logging.getLogger("trader.desk.dk")
 
-CHART_URL = "https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
-SEARCH_URL = "https://query1.finance.yahoo.com/v1/finance/search"
+# Yahoo har to ens adresser. Svarer den ene ikke (eller beder os vente), prøves den anden.
+HOSTS = ("https://query1.finance.yahoo.com", "https://query2.finance.yahoo.com")
+CHART_PATH = "/v8/finance/chart/{symbol}"
+SEARCH_PATH = "/v1/finance/search"
 # Yahoo afviser kald uden en almindelig browser-User-Agent. Ingen personlige oplysninger sendes med.
 USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
 LEDGER = "paper_ledger"
@@ -62,26 +65,37 @@ class YahooData:
     def close(self) -> None:
         self._client.close()
 
-    def _get(self, url: str, params: dict[str, Any], what: str) -> dict:
-        try:
-            response = self._client.get(url, params=params)
-        except httpx.HTTPError as exc:
-            raise BrokerError(f"Yahoo Finance svarede ikke ({what}): {exc.__class__.__name__}.") from exc
-        if response.status_code == 429:
-            raise BrokerError("Yahoo Finance beder bordet vente lidt (429). Kurserne kommer igen om et øjeblik.")
-        if response.status_code == 404:
-            raise BrokerError(f"Yahoo Finance kender ikke {what}. Tjek tickeren (fx NOVO-B).")
-        if response.status_code >= 400:
-            raise BrokerError(f"Yahoo Finance svarede {response.status_code} for {what}.")
-        try:
-            data = response.json()
-        except ValueError as exc:
-            raise BrokerError(f"Yahoo Finance sendte et svar, bordet ikke kan læse ({what}).") from exc
-        return data if isinstance(data, dict) else {}
+    def _get(self, path: str, params: dict[str, Any], what: str) -> dict:
+        """Ét kald til Yahoo. Netværksfejl, 429 og 5xx prøves én gang til på den anden adresse."""
+        problem: BrokerError | None = None
+        for host in HOSTS:
+            try:
+                response = self._client.get(host + path, params=params)
+            except httpx.HTTPError as exc:
+                problem = BrokerError(f"Yahoo Finance svarede ikke ({what}): {exc.__class__.__name__}.")
+                continue
+            if response.status_code == 429:
+                problem = BrokerError("Yahoo Finance beder bordet vente lidt (429). Kurserne kommer igen om et øjeblik.")
+                continue
+            if response.status_code >= 500:
+                problem = BrokerError(f"Yahoo Finance har en fejl lige nu ({response.status_code}) for {what}.")
+                continue
+            if response.status_code == 404:
+                raise BrokerError(f"Yahoo Finance kender ikke {what}. Tjek tickeren (fx NOVO-B).")
+            if response.status_code in (401, 403):
+                raise BrokerError(f"Yahoo Finance afviser kaldet ({response.status_code}) for {what}. Prøv igen senere.")
+            if response.status_code >= 400:
+                raise BrokerError(f"Yahoo Finance svarede {response.status_code} for {what}.")
+            try:
+                data = response.json()
+            except ValueError as exc:
+                raise BrokerError(f"Yahoo Finance sendte et svar, bordet ikke kan læse ({what}).") from exc
+            return data if isinstance(data, dict) else {}
+        raise problem or BrokerError(f"Yahoo Finance svarede ikke ({what}).")
 
     def chart(self, symbol: str, interval: str, range_: str) -> tuple[list[Bar], dict]:
         data = self._get(
-            CHART_URL.format(symbol=quote(yahoo_symbol(symbol))),
+            CHART_PATH.format(symbol=quote(yahoo_symbol(symbol))),
             {"interval": interval, "range": range_, "includePrePost": "false"},
             symbol,
         )
@@ -118,7 +132,7 @@ class YahooData:
         return bars, meta
 
     def news(self, symbol: str) -> list[NewsItem]:
-        data = self._get(SEARCH_URL, {"q": yahoo_symbol(symbol), "quotesCount": 0, "newsCount": 8}, f"nyheder for {symbol}")
+        data = self._get(SEARCH_PATH, {"q": yahoo_symbol(symbol), "quotesCount": 0, "newsCount": 8}, f"nyheder for {symbol}")
         items: list[NewsItem] = []
         for row in data.get("news") or []:
             title = str(row.get("title") or "").strip()
@@ -344,13 +358,13 @@ class DanishPaper:
             raise BrokerError(f"Ingen kurs for {symbol} i dag.")
         raw = bars[-1].close
         if not (stop_price < raw < target_price):
-            raise BrokerError(f"Kursen {raw:.2f} ligger ikke mellem stop {stop_price:.2f} og mål {target_price:.2f}.")
+            raise BrokerError(f"Kursen {num(raw)} ligger ikke mellem stop {num(stop_price)} og mål {num(target_price)}.")
         fill = round(raw * (1 + self.fee), 4)  # købskurs inklusive kurtage
         with self._lock:
             ledger = self._ledger()
             cost = fill * qty
             if cost > float(ledger["cash"]) + 1e-6:
-                raise BrokerError(f"Ikke nok kontanter: købet koster {cost:,.2f} kr., og der er {float(ledger['cash']):,.2f} kr.")
+                raise BrokerError(f"Ikke nok kontanter: købet koster {money(cost, 'DKK')}, og der er {money(float(ledger['cash']), 'DKK')}.")
             order_id = f"dk-{int(ledger['next'])}"
             ledger["next"] = int(ledger["next"]) + 1
             ledger["cash"] = round(float(ledger["cash"]) - cost, 2)

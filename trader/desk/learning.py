@@ -11,6 +11,8 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Callable
 
+from trader.desk.fmt import pct
+
 LEARN_MIN_TRADES = 3
 LEARN_MAX_WIN_RATE = 1 / 3
 MAX_LESSONS = 30
@@ -51,8 +53,8 @@ def outcome(row: dict) -> dict | None:
     if row.get("status") == "closed" and row.get("pnl") is not None and row.get("fill_price"):
         fill = float(row["fill_price"])
         exit_price = float(row.get("exit_price") or fill)
-        pct = (exit_price - fill) / fill * 100.0 if fill else 0.0
-        return {"win": float(row["pnl"]) > 0, "pct": pct, "real": True}
+        change = (exit_price - fill) / fill * 100.0 if fill else 0.0
+        return {"win": float(row["pnl"]) > 0, "pct": change, "real": True}
     shadow = row.get("shadow")
     if shadow and shadow.get("result") in ("win", "loss"):
         return {"win": shadow["result"] == "win", "pct": float(shadow.get("pct") or 0), "real": False}
@@ -110,7 +112,7 @@ def blocking(learned: list[dict], flag: dict, news: dict, chart: dict) -> list[d
 
 
 def rule_text(rule: dict) -> str:
-    return f"{rule['label']} har tabt {rule['n'] - rule['wins']} af {rule['n']} gange (snit {rule['avg_pct']:+.1f}%)."
+    return f"{rule['label']} har tabt {rule['n'] - rule['wins']} af {rule['n']} gange (snit {pct(rule['avg_pct'])})."
 
 
 def day_lessons(rows_today: list[dict], before: list[dict], after: list[dict]) -> list[str]:
@@ -129,8 +131,8 @@ def day_lessons(rows_today: list[dict], before: list[dict], after: list[dict]) -
             continue
         flag = row.get("flag") or {}
         lessons.append(
-            f"{row['symbol']} tabte {done['pct']:+.1f}% ({row.get('exit_reason') or 'lukket'}). Den var steget "
-            f"{float(flag.get('move_pct') or 0):+.1f}% på en time og lå {float(flag.get('vs_vwap_pct') or 0):.1f}% over VWAP, da vi købte."
+            f"{row['symbol']} tabte {pct(done['pct'])} ({row.get('exit_reason') or 'lukket'}). Den var steget "
+            f"{pct(float(flag.get('move_pct') or 0))} på en time og lå {pct(float(flag.get('vs_vwap_pct') or 0), sign=False)} over VWAP, da vi købte."
         )
     missed = [row for row in rows_today if (outcome(row) or {}).get("win") and not (outcome(row) or {}).get("real")]
     if missed:

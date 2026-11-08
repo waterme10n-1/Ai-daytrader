@@ -9,6 +9,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from trader.desk.fmt import tidy
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS messages (
     id INTEGER PRIMARY KEY,
@@ -150,6 +152,7 @@ class DeskStore:
         proposal_id: int | None = None,
         data: dict | None = None,
     ) -> int:
+        text = tidy(text)
         return self._write(
             "INSERT INTO messages (ts, author, kind, text, symbol, proposal_id, data) VALUES (?, ?, ?, ?, ?, ?, ?)",
             (

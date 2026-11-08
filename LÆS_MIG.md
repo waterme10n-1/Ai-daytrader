@@ -320,11 +320,16 @@ Fanen **Læring** viser reglerne med tal, lektionerne og bordets resultat mod at
 
 ## Siden
 
-Forsiden **Overblik** viser papirkontoen, en nedtælling til New York-børsen åbner eller lukker, nøgletal, en radar over watchlisten, systemstatus, seneste forslag trin for trin, åbne positioner og watchlisten med kurver.
+Forsiden **Overblik** viser papirkontoen, en nedtælling til børsen (New York eller København) åbner eller lukker, nøgletal, en radar over watchlisten, systemstatus, seneste forslag trin for trin, åbne positioner og watchlisten med kurver.
 
 - **Nedtællingen virker altid.** Bordet har sin egen kalender over børsens åbningstider med helligdage og halve dage (regnet ud fra NYSE's regler). Svarer Alpaca, bruges Alpacas ur i stedet, fordi det også kender ekstraordinære lukninger.
 - **Kurser hele døgnet.** Når børsen er lukket, henter bordet sidste handelsdags kurser hos Alpaca hvert 10. minut, så radar, kursbånd og watchlist altid har noget at vise.
 - Tryk på en prik i radaren eller en række i watchlisten for at se aktien og spørge SKEPTIC eller NEWS. ⌘K/Ctrl+K åbner kommandolinjen, og tasterne 1–5 skifter fane.
+- **Hvem handler lige nu.** I skifteren øverst får **USA** og **Danmark** en grøn prik, når den børs handler, og en gul før åbning. Hold musen over for at se åbne handler og dagens resultat.
+- **Godmorgen i Gruppen.** Når en børs åbner, skriver bordet én linje: hvornår SCOUT kigger, hvor mange aktier og saldoen. Står bordet på pause, siger beskeden det.
+- **Mangler kurserne, står grunden der.** Kan kurserne ikke hentes (fx hvis Yahoo eller Alpaca ikke svarer), viser watchlisten og statuslinjen hvorfor, og bordet prøver igen hvert minut. Yahoo prøves på to adresser, før bordet giver op.
+- På telefonen står kontoen øverst, så børsen med nedtællingen og åbne handler, og derefter resten.
+- Bottenes beskeder skriver tal på dansk: `+3,5 %`, `103,44`, `4.965 kr.`.
 
 ## Opsætning
 
