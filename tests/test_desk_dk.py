@@ -302,7 +302,7 @@ def test_bot_messages_use_danish_numbers():
     assert "+3,5 %" in text and "10,0x" in text and text.endswith("Kurs 103,44.")
 
 
-def test_yahoo_parser_reads_the_real_format_and_falls_back_to_the_second_host():
+def test_yahoo_parser_reads_the_real_format_and_uses_the_second_host_when_the_first_is_down():
     import httpx
 
     from trader.desk.denmark import YahooData
@@ -329,7 +329,7 @@ def test_yahoo_parser_reads_the_real_format_and_falls_back_to_the_second_host():
         if "UKENDT" in request.url.path:
             return httpx.Response(404, json={"chart": {"result": None, "error": {"description": "No data found"}}})
         if request.url.host == "query1.finance.yahoo.com":
-            return httpx.Response(429, text="Too Many Requests")
+            return httpx.Response(503, text="Service Unavailable")
         return httpx.Response(200, json=body)
 
     data = YahooData(httpx.Client(transport=httpx.MockTransport(handler)))
@@ -384,3 +384,98 @@ def test_copenhagen_moves_at_1_5_percent_and_an_old_saved_2_percent_gives_way(tm
     us_store.set_json("params", {"move_pct": 2.5})
     us, _ = make_desk(tmp_path, FakeBroker({}), db_path=str(tmp_path / "desk_us.db"))
     assert us.cfg.move_pct == 2.5
+
+
+def test_yahoo_429_pauses_politely_instead_of_asking_again_and_again():
+    import httpx
+
+    from trader.desk.denmark import YahooData
+
+    now = {"t": 1000.0}
+    calls: list[str] = []
+    answer = {"status": 429, "retry": None}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request.url.host)
+        if answer["status"] == 429:
+            headers = {"Retry-After": answer["retry"]} if answer["retry"] else {}
+            return httpx.Response(429, text="Too Many Requests", headers=headers)
+        return httpx.Response(200, json={"chart": {"result": [{"meta": {}, "timestamp": [], "indicators": {"quote": [{}]}}]}})
+
+    data = YahooData(httpx.Client(transport=httpx.MockTransport(handler)), clock=lambda: now["t"])
+    with pytest.raises(BrokerError, match="pause med kurserne i 2 min"):
+        data.chart("NOVO-B", "1m", "1d")
+    assert calls == ["query1.finance.yahoo.com"]  # ingen omvej via den anden adresse
+    # Under pausen spørger bordet slet ikke.
+    now["t"] += 60
+    with pytest.raises(BrokerError, match="prøver igen om 1 min"):
+        data.chart("DSV", "1m", "1d")
+    assert len(calls) == 1 and data.blocked_for() == 60
+    # Næste 429 giver dobbelt så lang pause, og Retry-After vinder, hvis Yahoo beder om mere.
+    now["t"] += 61
+    answer["retry"] = "600"
+    with pytest.raises(BrokerError, match="10 min"):
+        data.chart("DSV", "1m", "1d")
+    # Når Yahoo svarer igen, starter pausen forfra.
+    now["t"] += 601
+    answer["status"] = 200
+    data.chart("DSV", "1m", "1d")
+    answer["status"], answer["retry"] = 429, None
+    with pytest.raises(BrokerError, match="2 min"):
+        data.chart("DSV", "1m", "1d")
+
+
+def test_copenhagen_asks_yahoo_far_less_often(tmp_path):
+    assert DeskSettings.from_env_dk().scan_minutes == 5
+    # Ingen nyheder: SCOUT markerer, men intet købes, så der er ingen ordrer at tjekke.
+    data = FakeYahoo({"NOVO-B": ramp(), "DSV": ramp(end=100.2, ramp_volume=1000), "^OMXC25": ramp(end=100.4, ramp_volume=1000)})
+    desk, _paper, clock = make_dk(tmp_path, data, scan_minutes=5)
+    clock["now"] = at(11, 0)
+    desk.tick()
+    first = len(data.calls)
+    assert first > 0
+    for minute in range(1, 5):  # 11:01-11:04: mellem scanningerne spørges Yahoo slet ikke
+        clock["now"] = at(11, minute)
+        desk.tick()
+    assert len(data.calls) == first
+    clock["now"] = at(11, 5)
+    desk.tick()
+    assert len(data.calls) > first  # næste scanning
+    # Lukket børs: højst hvert 30. minut.
+    calls = len(data.calls)
+    clock["now"] = at(17, 30)
+    desk.tick()
+    after_close = len(data.calls)
+    clock["now"] = at(17, 50)
+    desk.tick()
+    assert len(data.calls) == after_close and after_close >= calls
+
+
+def test_open_orders_are_checked_every_other_minute_but_never_miss_a_stop(tmp_path):
+    data = FakeYahoo({"DSV": ramp()})
+    store = DeskStore(str(tmp_path / "dk.db"))
+    clock = {"now": at(11, 0)}
+    paper = DanishPaper(store, start_cash=100_000, fee_pct=0.0, data=data, now_fn=lambda: clock["now"])
+    order = paper.submit_bracket("DSV", "long", 5, 102.0, 106.0)
+    clock["now"] = at(11, 30)
+    paper.get_order(order.id)
+    calls = len(data.calls)
+    clock["now"] = at(11, 31)
+    paper.get_order(order.id)
+    assert len(data.calls) == calls  # under 2 minutter siden sidst: intet kald
+    # Stoppet rammes 11:31; lukkes positionen 11:32, tjekkes de seneste minutter først, så salget sker til stoppet.
+    data.intraday["DSV"] = ramp()[:151] + ramp(start=103.5, end=101.0, ramp_from=(11, 31), ramp_to=(11, 32))[151:]
+    paper._bars.clear()
+    clock["now"] = at(11, 33)
+    paper.close_position("DSV")
+    assert paper.get_order(order.id).exit_reason == "stop"
+
+
+def test_old_saved_one_minute_scan_gives_way_in_copenhagen(tmp_path):
+    store = DeskStore(str(tmp_path / "desk_dk.db"))
+    store.set_state("welcome", "1")
+    store.set_json("retired_defaults", ["move_pct", "max_flags_per_day", "watchlist", "dk_move_pct_2"])
+    store.set_json("params", {"scan_minutes": 1})
+    cfg = replace(DeskSettings(), market="dk", scan_minutes=5, db_path=str(tmp_path / "desk_dk.db"))
+    desk = DeskEngine(cfg, _settings(tmp_path), store=store, broker=DanishPaper(store, data=FakeYahoo({})), background_replies=False)
+    assert desk.cfg.scan_minutes == 5

@@ -37,14 +37,19 @@ from trader.desk.markets import DK, Market
 
 logger = logging.getLogger("trader.desk.dk")
 
-# Yahoo har to ens adresser. Svarer den ene ikke (eller beder os vente), prøves den anden.
+# Yahoo har to ens adresser. Er den ene nede (netværksfejl eller 5xx), prøves den anden. Ved 429 respekteres
+# Yahoos "vent": bordet prøver ikke den anden adresse, men holder pause.
 HOSTS = ("https://query1.finance.yahoo.com", "https://query2.finance.yahoo.com")
+# Pause efter 429: 2, 4, 8, 16 og højst 30 minutter, eller så længe Yahoo selv beder om (Retry-After).
+BACKOFF_FIRST = 120.0
+BACKOFF_MAX = 1800.0
 CHART_PATH = "/v8/finance/chart/{symbol}"
 SEARCH_PATH = "/v1/finance/search"
 # Yahoo afviser kald uden en almindelig browser-User-Agent. Ingen personlige oplysninger sendes med.
 USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
 LEDGER = "paper_ledger"
 BAR_CACHE_SECONDS = 20.0
+ORDER_CHECK_SECONDS = 110.0  # et åbent køb tjekkes mod nye minutter ca. hvert 2. minut
 MINUTE = timedelta(minutes=1)
 
 
@@ -58,15 +63,43 @@ def yahoo_symbol(symbol: str) -> str:
 class YahooData:
     """Minutbarer, dagsbarer, seneste kurs og overskrifter fra Yahoo Finance. Gratis og uden nøgle."""
 
-    def __init__(self, client: httpx.Client | None = None, *, market: Market = DK) -> None:
+    def __init__(
+        self, client: httpx.Client | None = None, *, market: Market = DK, clock: Callable[[], float] = clock_time.monotonic
+    ) -> None:
         self._client = client or httpx.Client(timeout=12.0, headers={"User-Agent": USER_AGENT, "Accept": "application/json"})
         self.tz = market.tz
+        self._clock = clock
+        self._lock = threading.Lock()
+        self._blocked_until = float("-inf")
+        self._backoff = 0.0
+
+    def blocked_for(self) -> float:
+        """Sekunder, til bordet må spørge Yahoo igen efter en 429. 0, når det må."""
+        return max(0.0, self._blocked_until - self._clock())
+
+    def _pause(self, retry_after: str | None) -> float:
+        """Næste pause: dobbelt så lang som sidst, eller så lang som Yahoo beder om, hvis det er længere."""
+        with self._lock:
+            self._backoff = min(BACKOFF_MAX, self._backoff * 2 if self._backoff else BACKOFF_FIRST)
+            try:
+                asked = float(retry_after) if retry_after else 0.0
+            except ValueError:
+                asked = 0.0
+            wait = max(self._backoff, min(asked, BACKOFF_MAX))
+            self._blocked_until = self._clock() + wait
+            return wait
 
     def close(self) -> None:
         self._client.close()
 
     def _get(self, path: str, params: dict[str, Any], what: str) -> dict:
-        """Ét kald til Yahoo. Netværksfejl, 429 og 5xx prøves én gang til på den anden adresse."""
+        """Ét kald til Yahoo. Netværksfejl og 5xx prøves på den anden adresse. 429 giver en pause."""
+        wait = self.blocked_for()
+        if wait > 0:
+            raise BrokerError(
+                f"Yahoo Finance bad bordet vente (429). Bordet holder pause med kurserne og prøver igen om "
+                f"{max(1, round(wait / 60))} min."
+            )
         problem: BrokerError | None = None
         for host in HOSTS:
             try:
@@ -75,8 +108,11 @@ class YahooData:
                 problem = BrokerError(f"Yahoo Finance svarede ikke ({what}): {exc.__class__.__name__}.")
                 continue
             if response.status_code == 429:
-                problem = BrokerError("Yahoo Finance beder bordet vente lidt (429). Kurserne kommer igen om et øjeblik.")
-                continue
+                paused = self._pause(response.headers.get("Retry-After"))
+                raise BrokerError(
+                    f"Yahoo Finance beder bordet vente (429). Bordet holder pause med kurserne i "
+                    f"{max(1, round(paused / 60))} min og prøver så igen."
+                )
             if response.status_code >= 500:
                 problem = BrokerError(f"Yahoo Finance har en fejl lige nu ({response.status_code}) for {what}.")
                 continue
@@ -90,6 +126,8 @@ class YahooData:
                 data = response.json()
             except ValueError as exc:
                 raise BrokerError(f"Yahoo Finance sendte et svar, bordet ikke kan læse ({what}).") from exc
+            with self._lock:
+                self._backoff = 0.0  # Yahoo svarer igen: næste pause starter forfra
             return data if isinstance(data, dict) else {}
         raise problem or BrokerError(f"Yahoo Finance svarede ikke ({what}).")
 
@@ -173,7 +211,8 @@ class DanishPaper:
         self._lock = threading.RLock()
         self._bars: dict[str, tuple[float, str, list[Bar]]] = {}
         self._last: dict[str, float] = {}
-        self._pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="desk-dk-data")
+        self._pool = ThreadPoolExecutor(max_workers=2, thread_name_prefix="desk-dk-data")  # få samtidige kald til Yahoo
+        self._checked: dict[str, float] = {}  # ordre-id → hvornår stop og mål sidst blev tjekket
         with self._lock:
             if self.store.get_json(LEDGER) is None:
                 self.store.set_json(LEDGER, {"cash": float(start_cash), "start": float(start_cash), "orders": {}, "next": 1})
@@ -387,14 +426,20 @@ class DanishPaper:
         self._last[symbol] = raw
         return self._order(row)
 
-    def get_order(self, order_id: str) -> Order:
+    def get_order(self, order_id: str, *, force: bool = False) -> Order:
         with self._lock:
             row = self._ledger()["orders"].get(order_id)
         if row is None:
             raise BrokerError(f"Ukendt ordre {order_id}.")
         if row["status"] != "open":
             return self._order(row)
+        # Stop og mål tjekkes mod alle minutter siden sidst, så et tjek hvert 2. minut giver samme resultat som hvert
+        # minut, med halvt så mange kald til Yahoo.
         now = self._now().astimezone(self.tz)
+        stamp = now.timestamp()
+        if not force and stamp - self._checked.get(order_id, float("-inf")) < ORDER_CHECK_SECONDS:
+            return self._order(row)
+        self._checked[order_id] = stamp
         try:
             bars = self._session_bars(self._fetch_today(row["symbol"]), now.date(), now)
         except BrokerError as exc:
@@ -421,6 +466,11 @@ class DanishPaper:
             return self._order(row)
 
     def close_position(self, symbol: str, reason: str = "manual") -> None:
+        # Først de seneste minutter: ramte et stop eller mål lige før, er det den rigtige salgskurs.
+        with self._lock:
+            pending = [row["id"] for row in self._ledger()["orders"].values() if row["symbol"] == symbol and row["status"] == "open"]
+        for order_id in pending:
+            self.get_order(order_id, force=True)
         price = self._price(symbol)
         now = self._now().astimezone(self.tz)
         with self._lock:

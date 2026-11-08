@@ -38,7 +38,10 @@ RETIRED_DEFAULTS: dict[str, object] = {
 }
 # Gamle standarder for én børs: nøgle → (indstilling, gammel værdi). Nøglen skal være ny for hver ændring.
 RETIRED_BY_MARKET: dict[str, dict[str, tuple[str, object]]] = {
-    "dk": {"dk_move_pct_2": ("move_pct", 2.0)},  # København: 2 % blev til 1,5 %
+    "dk": {
+        "dk_move_pct_2": ("move_pct", 2.0),  # København: 2 % blev til 1,5 %
+        "dk_scan_minutes_1": ("scan_minutes", 1),  # København: hvert minut blev til hvert 5. (skånsomt for Yahoo)
+    },
 }
 TICKER = re.compile(r"^[A-Z]{1,5}(\.[A-Z])?$")
 # Københavns børs: NOVO-B, MAERSK-B, NDA-DK, GN, ROCK-B (som hos Yahoo, uden .CO).
@@ -205,6 +208,8 @@ class DeskSettings:
             watchlist=tuple(watch),
             # Store danske aktier flytter sig mindre end de livlige amerikanske, så grænsen er lavere.
             move_pct=min(20.0, max(0.5, _float(os.getenv("DESK_DK_MOVE_PCT"), 1.5))),
+            # Yahoo er gratis, men siger 429, hvis bordet spørger for tit. Hvert 5. minut er nok til bevægelser på en time.
+            scan_minutes=max(1, min(30, _int(os.getenv("DESK_DK_SCAN_MINUTES"), 5))),
             start_cash=min(10_000_000.0, max(10_000.0, _float(os.getenv("DESK_DK_START_CASH"), 100_000.0))),
             fee_pct=min(1.0, max(0.0, _float(os.getenv("DESK_DK_FEE_PCT"), 0.1))),
             alpaca_api_key="",

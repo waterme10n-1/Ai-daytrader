@@ -331,7 +331,7 @@ Forsiden **Overblik** viser papirkontoen, en nedtælling til børsen (New York e
 - Tryk på en prik i radaren eller en række i watchlisten for at se aktien og spørge SKEPTIC eller NEWS. ⌘K/Ctrl+K åbner kommandolinjen, og tasterne 1–5 skifter fane.
 - **Hvem handler lige nu.** I skifteren øverst får **USA** og **Danmark** en grøn prik, når den børs handler, og en gul før åbning. Hold musen over for at se åbne handler og dagens resultat.
 - **Godmorgen i Gruppen.** Når en børs åbner, skriver bordet én linje: hvornår SCOUT kigger, hvor mange aktier og saldoen. Står bordet på pause, siger beskeden det.
-- **Mangler kurserne, står grunden der.** Kan kurserne ikke hentes (fx hvis Yahoo eller Alpaca ikke svarer), viser watchlisten og statuslinjen hvorfor, og bordet prøver igen hvert minut. Yahoo prøves på to adresser, før bordet giver op.
+- **Mangler kurserne, står grunden der.** Kan kurserne ikke hentes (fx hvis Yahoo eller Alpaca ikke svarer), viser watchlisten og statuslinjen hvorfor, og bordet prøver igen hvert minut. Er Yahoo nede, prøves Yahoos anden adresse. Beder Yahoo bordet vente (fejl 429), holder bordet pause med de danske kurser i 2, 4, 8 … op til 30 minutter (eller så længe Yahoo selv beder om) i stedet for at spørge igen hvert minut.
 - På telefonen står kontoen øverst, så børsen med nedtællingen og åbne handler, og derefter resten.
 - Bottenes beskeder skriver tal på dansk: `+3,5 %`, `103,44`, `4.965 kr.`.
 
@@ -369,7 +369,7 @@ Tiderne følger børsen:
 | | New York | København |
 |---|---|---|
 | Åben | 9:30–16:00 ET (15:30–22:00 dansk tid) | 9:00–17:00 |
-| SCOUT kigger | 9:45–15:30 ET | 9:15–16:30 |
+| SCOUT kigger | hvert minut, 9:45–15:30 ET | hvert 5. minut, 9:15–16:30 |
 | Gaps ved åbningen | til 11:00 ET | til 10:30 |
 | Alt lukkes | 15:50 ET | 16:50 |
 | Dagslog | 16:15 ET | 17:15 |
@@ -380,6 +380,6 @@ København er lukket på danske helligdage: nytår, skærtorsdag, langfredag, 2.
 
 Der er ingen handel før åbning i København, så kortet **Før åbning** findes kun for New York. Gaps ved åbningen gælder begge steder.
 
-SCOUT markerer i København fra 1,5 % på en time (`DESK_DK_MOVE_PCT`), fordi store danske aktier flytter sig mindre end de livlige amerikanske. Watchlisten er 16 likvide C25-aktier: NOVO-B, DSV, DANSKE, ORSTED, VWS, GMAB, PNDORA, CARL-B, COLO-B, NSIS-B, DEMANT, GN, NKT, BAVA, ZEAL og AMBU-B. Skriv tickers, som Yahoo skriver dem, uden `.CO` (fx `NOVO-B`). Bordet måles mod C25-indekset.
+Yahoo er gratis, men svarer 429 ("for mange forespørgsler"), hvis bordet spørger for tit. Derfor kigger SCOUT i København hvert 5. minut (`DESK_DK_SCAN_MINUTES`). Det er nok til bevægelser på en time. Mellem scanningerne spørger bordet ikke Yahoo, åbne handler tjekkes hvert 2. minut mod alle minutter siden sidst (så intet stop overses), og når børsen er lukket, hentes kurserne hvert 30. minut. SCOUT markerer i København fra 1,5 % på en time (`DESK_DK_MOVE_PCT`), fordi store danske aktier flytter sig mindre end de livlige amerikanske. Watchlisten er 16 likvide C25-aktier: NOVO-B, DSV, DANSKE, ORSTED, VWS, GMAB, PNDORA, CARL-B, COLO-B, NSIS-B, DEMANT, GN, NKT, BAVA, ZEAL og AMBU-B. Skriv tickers, som Yahoo skriver dem, uden `.CO` (fx `NOVO-B`). Bordet måles mod C25-indekset.
 
 `DESK_DK_ENABLED=false` slår København fra.

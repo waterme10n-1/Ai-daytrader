@@ -412,7 +412,7 @@ class DeskEngine:
             in_window = self.market.scan_start <= (now.hour, now.minute) < self.market.scan_end(now.date())
             if in_window and (now.minute % self.cfg.scan_minutes == 0):
                 self.scan(now)
-            self._refresh_quotes(broker, now, max_age=120)
+            self._refresh_quotes(broker, now, max_age=self._quote_age(open_market=True))
             return
         self._sync(broker, now)
         if self._premarket_now(now, clock):
@@ -420,10 +420,20 @@ class DeskEngine:
                 self.premarket_scan(now)
             self._refresh_quotes(broker, now, max_age=120)
             return
-        self._refresh_quotes(broker, now, max_age=600)
+        self._refresh_quotes(broker, now, max_age=self._quote_age(open_market=False))
         if (now.hour, now.minute) >= self.market.log_at(now.date()) and self.store.get_state(f"seen_open:{day}") == "1":
             if self.store.get_state(f"log:{day}") is None:
                 self.day_log(day, now)
+
+    def _quote_age(self, *, open_market: bool) -> int:
+        """Hvor gamle kurserne må blive, før bordet henter nye uden for en scanning.
+
+        Alpaca kan tåle at blive spurgt ofte. Yahoo (København) siger 429, så der hentes kun mellem scanningerne,
+        hvis kurserne er ældre end en hel scanning, og hvert 30. minut, når børsen er lukket.
+        """
+        if not self.own_ledger:
+            return 120 if open_market else 600
+        return max(300, self.cfg.scan_minutes * 60 + 60) if open_market else 1800
 
     def _refresh_quotes(self, broker, now: datetime, *, max_age: int) -> None:
         """Kurser til radar og kursbånd, også når SCOUT ikke kigger (lukket marked, pause, før 9:45)."""
