@@ -12,3 +12,10 @@ __pycache__/
 *.db-shm
 *.sqlite
 .DS_Store
+
+# Day Trader-skills (.claude/skills/trader-*) skriver deres data i en mappe, der hedder trader/, der hvor de køres fra.
+# Kør dem fra skill-data/. Køres de alligevel fra roden, må deres filer aldrig blandes med appens kode i trader/.
+skill-data/
+trader/*.json
+trader/*.txt
+trader/state/

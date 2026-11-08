@@ -46,6 +46,10 @@ Efter ændringer i `trader/static/*.html`: brug skill'en `/ui-check` (`node .cla
 - Hook ved stop: er Python-koden ændret i forhold til main, køres `pytest`, og fejl skal rettes, før du stopper.
 - Skill `/ny-indstilling`: tjekliste til nye eller ændrede indstillinger.
 - `.env` må ikke læses. Brug `.env.example`.
+- Day Trader-skills (`/trader-scanner`, `/trader-news`, `/trader-entry`, `/trader-exit`, `/trader-timemachine`, `/trader-risk`, `/trader-budget`, `/trader-broker`, `/trader-alerts`, `/trader-analyst`, `/trader-pelosi`): kopieret uændret fra github.com/Jakeschincariol/day-trader-skill (commit `3d0f4ef`, MIT, se `.claude/skills/day-trader-skill.LICENSE`). De er værktøjer til chatten og har intet med appen at gøre.
+  - **Kør deres scripts fra `skill-data/`** (`mkdir -p skill-data && cd skill-data`). De skriver i en mappe, der hedder `trader/`, der hvor de køres fra, og i roden er `trader/` appens kode. `.gitignore` og `.dockerignore` holder deres filer ude, hvis det alligevel sker.
+  - `/trader-broker` lægger kun ordrer gennem en Alpaca-MCP-server, papir som standard og kun efter brugerens "ja" plus Claudes egen godkendelse. Sæt aldrig en ordre-tool til "allow".
+  - De bruger Yahoos gratis data og respekterer et 429 ved at vente. Prøv aldrig at komme uden om Yahoos spærre.
 
 ## Claude i appen
 

@@ -9,3 +9,9 @@ __pycache__/
 *.db-journal
 agent-tools/
 terminals/
+# Day Trader-skills: deres data og arbejdsmappe skal aldrig med i billedet til Railway.
+.claude/
+skill-data/
+trader/*.json
+trader/*.txt
+trader/state/
