@@ -437,6 +437,36 @@ def create_app(
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         return meme().status()
 
+    @app.post("/api/meme/params")
+    async def meme_params(request: Request) -> dict:
+        """Den almindelige strategis filtre og salgsregler. {"reset": true} sætter dem tilbage til standard."""
+        try:
+            body = await request.json()
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Ugyldig JSON.") from exc
+        body = body if isinstance(body, dict) else {}
+        try:
+            if body.get("reset"):
+                meme().reset_params()
+            else:
+                meme().update_params(body.get("changes") if isinstance(body.get("changes"), dict) else {})
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return meme().status()
+
+    @app.post("/api/meme/changes/undo")
+    async def meme_undo_change(request: Request) -> dict:
+        try:
+            body = await request.json()
+            change_id = int((body or {}).get("id"))
+        except (ValueError, TypeError, AttributeError) as exc:
+            raise HTTPException(status_code=400, detail="Ugyldig ændring.") from exc
+        try:
+            message = meme().undo_change(change_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return {"ok": True, "message": message, "status": meme().status()}
+
     @app.post("/api/meme/limits")
     async def meme_limits(request: Request) -> dict:
         try:

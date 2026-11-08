@@ -528,11 +528,13 @@ def _edge(value: float) -> str:
     return _fmt(value)
 
 
-def _bucket_stats(label: str, values: list[float]) -> dict:
+def _bucket_stats(label: str, values: list[float], lo: float | None = None, hi: float | None = None) -> dict:
     n = len(values)
     enough = n >= BUCKET_MIN_ROWS
     return {
         "label": label,
+        "lo": lo,
+        "hi": hi,
         "n": n,
         "avg": sum(values) / n if enough else None,
         "win_rate": sum(1 for value in values if value > 0) / n if enough else None,
@@ -549,8 +551,8 @@ def fact_report(rows: list[dict]) -> list[dict]:
             continue
         if key in BINARY_FACTS:
             buckets = [
-                _bucket_stats("Nej", [pnl for value, pnl in pairs if value < 0.5]),
-                _bucket_stats("Ja", [pnl for value, pnl in pairs if value >= 0.5]),
+                _bucket_stats("Nej", [pnl for value, pnl in pairs if value < 0.5], None, 0.5),
+                _bucket_stats("Ja", [pnl for value, pnl in pairs if value >= 0.5], 0.5, None),
             ]
         else:
             ordered = sorted(value for value, _pnl in pairs)
@@ -559,9 +561,9 @@ def fact_report(rows: list[dict]) -> list[dict]:
             if high <= low:
                 continue
             buckets = [
-                _bucket_stats(f"under {_edge(low)}", [pnl for value, pnl in pairs if value < low]),
-                _bucket_stats(f"{_edge(low)}–{_edge(high)}", [pnl for value, pnl in pairs if low <= value < high]),
-                _bucket_stats(f"{_edge(high)}+", [pnl for value, pnl in pairs if value >= high]),
+                _bucket_stats(f"under {_edge(low)}", [pnl for value, pnl in pairs if value < low], None, low),
+                _bucket_stats(f"{_edge(low)}–{_edge(high)}", [pnl for value, pnl in pairs if low <= value < high], low, high),
+                _bucket_stats(f"{_edge(high)}+", [pnl for value, pnl in pairs if value >= high], high, None),
             ]
         avgs = [bucket["avg"] for bucket in buckets if bucket["avg"] is not None]
         if len(avgs) < 2:
@@ -605,15 +607,16 @@ def _passes(row: dict, rule: dict, threshold: float) -> bool:
     return value >= threshold if rule["kind"] == "min" else value <= threshold
 
 
-def tighten_suggestion(rows: list[dict], current: dict[str, float], rules: list[dict]) -> dict | None:
+def tighten_suggestion(rows: list[dict], current: dict[str, float], rules: list[dict], frozen: set[str] | frozenset = frozenset()) -> dict | None:
     """Det ene filter, hvor en strammere grænse ville have fjernet flest tabende handler.
 
     Kun strammere end nu, kun med mindst TIGHTEN_MIN_REMOVED fjernede tokens, der i snit tabte
-    mindst 5 %, og kun hvis de resterende klarede sig tydeligt bedre. Ellers None."""
+    mindst 5 %, og kun hvis de resterende klarede sig tydeligt bedre. Ellers None.
+    `frozen` er grænser, du selv har sat: de flyttes ikke, men tæller stadig som filtre."""
     best: dict | None = None
     for rule in rules:
         name = rule["param"]
-        if name not in current:
+        if name not in current or name in frozen:
             continue
         now = float(current[name])
         others = [other for other in rules if other is not rule and other["param"] in current]
@@ -650,3 +653,111 @@ def tighten_suggestion(rows: list[dict], current: dict[str, float], rules: list[
                     "saved": saved,
                 }
     return best
+
+
+# --------------------------------------------------------------------------- hvorfor vandt eller tabte handlen?
+
+EXIT_WHY = {
+    "rug_liquidity": "Likviditeten blev trukket: et rug pull.",
+    "rug_no_route": "Tokenet kunne ikke længere sælges: sandsynligvis et rug pull.",
+    "rug_dev": "Udvikleren eller de største holdere solgte ud.",
+    "stale": "Intet skete: kursen stod stille, så botten solgte.",
+    "time": "Tidsgrænsen udløb.",
+    "copy_exit": "Traderen solgte, så botten solgte også.",
+    "target": "Gevinstmålet blev ramt.",
+    "take_profit": "Delvis gevinst blev taget, og resten fulgte toppen.",
+    "trailing": "Kursen faldt fra toppen, og trailing stop sikrede resten.",
+    "manual": "Solgt manuelt.",
+    "kill": "Solgt ved nødstop.",
+    "no_price": "Ingen kurs i lang tid, så botten solgte.",
+}
+
+
+def _fact_text(key: str, value: float) -> str:
+    if key in BINARY_FACTS:
+        return f"{FACT_LABELS.get(key, key)}: {'ja' if value >= 0.5 else 'nej'}"
+    shown = _edge(value) if abs(value) >= 1 or value == 0 else _fmt(value)
+    return f"{FACT_LABELS.get(key, key)} {shown}"
+
+
+def _in_bucket(bucket: dict, value: float) -> bool:
+    lo, hi = bucket.get("lo"), bucket.get("hi")
+    return (lo is None or value >= lo) and (hi is None or value < hi)
+
+
+def _rule_flags(facts: dict, strategy: str) -> list[str]:
+    """Kendte faresignaler fra researchen. Bruges, til der er data nok til faktaanalysen."""
+    flags = []
+    organic = facts.get("organic")
+    if organic is not None and organic < 40:
+        flags.append(f"Lav organisk score ({_edge(round(organic))}): meget af handlen var bots.")
+    insiders = facts.get("insiders")
+    if insiders is not None and insiders >= 20:
+        flags.append(f"RugCheck fandt {_edge(insiders)} insider-wallets.")
+    change = facts.get("chg_h1")
+    if change is not None and change >= 150:
+        flags.append(f"Kursen var allerede steget {_edge(round(change))} % den time, den blev købt: købt sent i en pump.")
+    if "tg" in facts and "x" in facts and not facts["tg"] and not facts["x"]:
+        flags.append("Hverken Telegram eller X.")
+    top10 = facts.get("top10")
+    if top10 is not None and top10 >= 30:
+        flags.append(f"Top-10 ejede {_edge(round(top10))} %.")
+    mints = facts.get("dev_mints")
+    if mints is not None and mints >= 10:
+        flags.append(f"Udvikleren havde lavet {_edge(mints)} tokens.")
+    chase = facts.get("chase")
+    if strategy == "toptrader" and chase is not None and chase >= 0.1:
+        flags.append(f"Købt {chase * 100:.0f} % over traderens egen pris.")
+    if facts.get("boosted"):
+        flags.append("Tokenet var betalt promoveret (boost).")
+    return flags
+
+
+def explain_trade(
+    facts: dict,
+    *,
+    strategy: str,
+    pnl_pct: float,
+    exit_reason: str,
+    peak_pct: float,
+    analysis: list[dict] | None = None,
+) -> list[str]:
+    """Et par korte linjer om, hvorfor en lukket handel vandt eller tabte.
+
+    Først hvordan den sluttede, så hvad dataene siger om tokenets egenskaber: med faktaanalysen,
+    når der er nok skyggehandler ("tokens under 37 gav i snit -20 %"), ellers kendte faresignaler."""
+    won = pnl_pct > 0
+    lines: list[str] = []
+    if exit_reason == "stop_loss":
+        if peak_pct < 0.05:
+            lines.append("Kom aldrig over +5 % og ramte stop-loss: købt på vej ned eller for sent i stigningen.")
+        else:
+            lines.append(f"Nåede +{peak_pct * 100:.0f} %, men faldt til stop-loss, før målet blev ramt.")
+    elif exit_reason in EXIT_WHY:
+        lines.append(EXIT_WHY[exit_reason])
+    found: list[str] = []
+    for item in analysis or []:
+        value = facts.get(item["fact"])
+        if value is None:
+            continue
+        buckets = [bucket for bucket in item["buckets"] if bucket.get("avg") is not None]
+        if len(buckets) < 2:
+            continue
+        mine = next((bucket for bucket in buckets if _in_bucket(bucket, float(value))), None)
+        if mine is None:
+            continue
+        worst = min(buckets, key=lambda bucket: bucket["avg"])
+        best = max(buckets, key=lambda bucket: bucket["avg"])
+        if best["avg"] - worst["avg"] < 0.05:
+            continue
+        if not won and mine is worst and mine["avg"] < 0:
+            found.append(f"{_fact_text(item['fact'], float(value))}: tokens i gruppen {mine['label']} gav i snit {mine['avg'] * 100:+.0f} %.")
+        elif won and mine is best and mine["avg"] > 0:
+            found.append(f"{_fact_text(item['fact'], float(value))}: tokens i gruppen {mine['label']} gav i snit {mine['avg'] * 100:+.0f} %.")
+        if len(found) >= 2:
+            break
+    if not found and not won:
+        found = _rule_flags(facts, strategy)[:2]
+    if not facts and not won and exit_reason not in {"manual", "kill"}:
+        found.append("Købt før botten gemte tokenets tal, så der er ingen detaljer.")
+    return lines + found

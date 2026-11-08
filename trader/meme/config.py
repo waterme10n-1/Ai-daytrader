@@ -173,8 +173,8 @@ class MemeSettings:
             # Ingen daglig tabsgrænse som standard. Den samlede tabsgrænse er slået til.
             daily_loss_limit=_flag(os.getenv("MEME_DAILY_LOSS_LIMIT"), False),
             drawdown_limit=_flag(os.getenv("MEME_DRAWDOWN_LIMIT"), True),
-            # Strategi-vagt (sæt en tabende strategi på hold af sig selv) er fra. Sniperen lærer sit bedste mål.
-            strategy_guard=_flag(os.getenv("MEME_STRATEGY_GUARD"), False),
+                    # Strategi-vagt: en strategi, der bliver ved med at tabe, sættes selv på hold. Slået til som standard.
+            strategy_guard=_flag(os.getenv("MEME_STRATEGY_GUARD"), True),
             auto_targets=_flag(os.getenv("MEME_AUTO_TARGETS"), True),
             sol_reserve=max(0.005, _float(os.getenv("MEME_SOL_RESERVE"), 0.02)),
             slippage_bps=max(50, min(1500, _int(os.getenv("MEME_SLIPPAGE_BPS"), 300))),
@@ -322,6 +322,18 @@ PARAM_LABELS: dict[str, str] = {
 }
 
 INT_PARAMS = {"min_txns_h1", "max_insiders", "max_dev_mints"}
+
+# Hvordan siden viser hver parameter: "pct" er en brøk vist i procent (0,25 → 25 %).
+PARAM_KINDS: dict[str, str] = {
+    "min_liquidity_usd": "usd", "min_volume_h1_usd": "usd", "min_mcap_usd": "usd", "max_mcap_usd": "usd",
+    "min_txns_h1": "int", "max_insiders": "int", "max_dev_mints": "int", "min_organic_score": "int",
+    "min_age_minutes": "min", "max_hold_minutes": "min", "stale_minutes": "min", "max_age_hours": "hours",
+    "max_change_h1_pct": "pctnum", "max_top10_pct": "pctnum", "max_roundtrip_loss_pct": "pctnum",
+    "min_buy_ratio_h1": "pct", "stop_loss_pct": "pct", "take_profit_pct": "pct", "partial_fraction": "pct",
+    "trail_activation_pct": "pct", "trailing_stop_pct": "pct", "min_score": "score", "max_rug_score": "score",
+}
+# Salgsregler. Resten er købsfiltre.
+PARAM_EXITS = ("stop_loss_pct", "take_profit_pct", "partial_fraction", "trail_activation_pct", "trailing_stop_pct", "max_hold_minutes", "stale_minutes")
 
 
 def clamp_param(name: str, value: float) -> float:
