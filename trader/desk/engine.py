@@ -40,6 +40,8 @@ logger = logging.getLogger("trader.desk")
 ET = ZoneInfo(ET_NAME)
 
 PRE_SCAN_MINUTES = 5  # før åbning kigger SCOUT hvert 5. minut
+RETRY_MINUTES = 30  # en aktie, CHART sagde "ingen opstilling" til, kan markeres igen efter en halv time
+MAX_TRIES = 2  # højst to markeringer på kursbevægelse pr. aktie pr. dag
 CACHE_SECONDS = 30.0
 REFUSALS = ("wait", "skip", "rejected", "expired", "sized_zero")
 STOP_WORDS = {"stop nu", "stop", "stop now", "pause", "stop alt"}
@@ -531,7 +533,8 @@ class DeskEngine:
             flags = self.flags_on(day)
             # Kun markeringer på kursbevægelse tæller i dagens kvote. Dem kun på volumen (typisk i første time,
             # hvor alt handler tungt) har deres egen, så de ikke bruger pladserne op på aktier, der står stille.
-            left_move = cfg.max_flags_per_day - len(flags["move"])
+            # En markering, CHART sagde "ingen opstilling" til, tæller ikke: den kom aldrig tæt på et køb.
+            left_move = cfg.max_flags_per_day - len(flags["counted"])
             left_volume = cfg.max_flags_per_day - len(flags["volume"])
             broker = self.broker()
             # Ét kald for hele watchlisten (+ indekset): giver radaren kurser og SCOUT sine barer.
@@ -557,8 +560,16 @@ class DeskEngine:
             moves: list[rules.Flag] = []
             volume_only: list[rules.Flag] = []
             for symbol in cfg.watchlist:
+                second = False
                 if symbol in moved:
-                    continue
+                    # Anden chance: CHART sagde nej sidst (faldende, under VWAP, løbet eller vendt). Efter en halv
+                    # time kan aktien have sat sig, så den må markeres én gang til, hvis kursen stadig flytter sig.
+                    if symbol not in flags["retry"]:
+                        continue
+                    last = flags["retry"][symbol]
+                    if last is not None and now - last < timedelta(minutes=RETRY_MINUTES):
+                        continue
+                    second = True
                 bars, days = intraday.get(symbol, []), daily.get(symbol, [])
                 # Først: et gap ved åbningen, der holder (den første halvanden time). Så: en almindelig bevægelse på en time.
                 flag = (
@@ -573,6 +584,9 @@ class DeskEngine:
                     flag = rules.scout(symbol, bars, days, now, move_pct=cfg.move_pct, volume_x=cfg.volume_x, session_minutes=minutes)
                 if flag is None:
                     continue
+                if second and not (flag.by_move and ((flag.gap_pct if flag.by_gap else flag.move_pct) or 0) > 0):
+                    continue  # anden chance kun på vej op: bordet køber kun, så et nyt fald ville spilde den
+                flag.second = second
                 flag.to_close_min = int((self.market.at(now.date(), self.market.close_on(now.date())) - now).total_seconds() // 60)
                 if flag.by_move:
                     moves.append(flag)
@@ -713,12 +727,31 @@ class DeskEngine:
             if symbol in (item.symbols or [symbol])
         ]
 
-    def flags_on(self, day: str) -> dict[str, list[str]]:
-        """Dagens markeringer delt op: på kursbevægelse (tæller i kvoten) og kun på volumen."""
+    def flags_on(self, day: str) -> dict:
+        """Dagens markeringer delt op.
+
+        move: aktier markeret på kursbevægelse. counted: dem, der tæller i kvoten, dvs. alle undtagen dem, CHART
+        sagde "ingen opstilling" til (en faldende aktie eller en løbet bevægelse skal ikke bruge en af dagens pladser).
+        retry: aktier, der kan få en anden chance (kun "ingen opstilling" indtil nu), med tidspunktet for sidste forsøg.
+        """
         rows = self.store.proposals_on(day)
-        move = [row["symbol"] for row in rows if (row.get("flag") or {}).get("by_move", True)]
-        volume = [row["symbol"] for row in rows if not (row.get("flag") or {}).get("by_move", True)]
-        return {"all": [row["symbol"] for row in rows], "move": move, "volume": volume}
+        tries: dict[str, list[dict]] = {}
+        for row in rows:
+            if (row.get("flag") or {}).get("by_move", True):
+                tries.setdefault(row["symbol"], []).append(row)
+        never = {symbol for symbol, items in tries.items() if all(item.get("status") == "no_setup" for item in items)}
+        return {
+            "all": [row["symbol"] for row in rows],
+            "move": list(tries),
+            "counted": [symbol for symbol in tries if symbol not in never],
+            "no_setup": [symbol for symbol in tries if symbol in never],
+            "volume": [row["symbol"] for row in rows if not (row.get("flag") or {}).get("by_move", True)],
+            "retry": {
+                symbol: _parse_ts((tries[symbol][-1].get("flag") or {}).get("ts"))
+                for symbol in never
+                if len(tries[symbol]) < MAX_TRIES
+            },
+        }
 
     def _daily(self, broker, symbols: list[str], now: datetime) -> dict:
         """Dagsbarer ændrer sig ikke i løbet af dagen. De hentes én gang pr. dag, så SCOUT kan kigge hvert minut."""
@@ -793,11 +826,13 @@ class DeskEngine:
         )
         # Prøvekøb: WAIT med en klar grund fra NEWS og en ren opstilling fra CHART købes alligevel, til halv størrelse.
         # SKIP (ingen grund), markeringer kun på volumen og WAIT fra en lært regel købes aldrig.
+        # Prøvekøb dækker også SKIP, når den eneste grund er, at NEWS ikke fandt en nyhed. Et SKIP fra Claude med en
+        # nyhed i hånden respekteres. Taber køb uden grund, lærer bordet det ("no_reason") og stopper dem selv.
+        no_reason = not news.get("has_reason")
         trial = (
-            verdict["ruling"] == "WAIT"
-            and cfg.trial_buys
+            cfg.trial_buys
             and flag.by_move  # kun rigtige kursbevægelser, ikke markeringer kun på volumen
-            and bool(news.get("has_reason"))
+            and (verdict["ruling"] == "WAIT" or (verdict["ruling"] == "SKIP" and no_reason))
             and not verdict.get("learned")
             and not learning.blocking(learned, flag.to_dict(), news, plan.to_dict())
         )
@@ -806,12 +841,14 @@ class DeskEngine:
             return
         if trial:
             verdict["trial"] = True
+            verdict["trial_reason"] = "no_news" if no_reason else "wait"
             self.store.update_proposal(pid, skeptic=verdict)
+            why = "NEWS fandt ingen grund" if no_reason else "SKEPTIC sagde WAIT"
             self.store.post(
                 "executor",
                 "info",
-                f"Prøvekøb: SKEPTIC sagde WAIT, men grunden og opstillingen er der. Jeg køber {symbol} til halv størrelse "
-                "på papir, så bordet lærer af det rigtige resultat.",
+                f"Prøvekøb: {why}, men kursen bevæger sig, og CHART har en ren opstilling. Jeg køber {symbol} til halv "
+                "størrelse på papir, så bordet lærer af det rigtige resultat.",
                 symbol=symbol,
                 proposal_id=pid,
             )
@@ -1204,7 +1241,7 @@ class DeskEngine:
             "time_et": now.isoformat(timespec="minutes"),
             "market": f"{self.market.name} ({self.market.currency})",
             "paused": self.paused,
-            "flags_today": len(flags["move"]),
+            "flags_today": len(flags["counted"]),
             "volume_flags_today": len(flags["volume"]),
             "premarket": self._premarket_list(now.date().isoformat()),
             "open": self._open_count(),
@@ -1481,7 +1518,12 @@ class DeskEngine:
         elif self.brain.limited and self.brain.budget_left() < 0.15:
             alerts.append({"level": "info", "text": "Dagens AI-budget er brugt. Reglerne tager over til i morgen."})
         elif self.brain.last_error:
-            alerts.append({"level": "error", "text": f"Claude: {self.brain.last_error}"})
+            alerts.append(
+                {
+                    "level": "warning",
+                    "text": f"Claude: {self.brain.last_error} NEWS og SKEPTIC bruger faste regler imens, så bordet handler videre.",
+                }
+            )
         if record["too_soft"]:
             alerts.append({"level": "warning", "text": "SKEPTIC godkender mere end halvdelen. Den skal sige nej langt oftere end ja."})
         if cfg.auto_approve:
@@ -1525,6 +1567,8 @@ class DeskEngine:
                 "limited": self.brain.limited,
                 "reason": self.brain.why_unavailable(),
                 "last_error": self.brain.last_error,
+                "resting": self.brain.resting,
+                "retry_minutes": self.brain.rest_minutes(),
                 "last_ok": self.brain.last_ok,
                 "spent_today_usd": round(self.store.spend_on(day), 4),
             },
@@ -1564,8 +1608,9 @@ class DeskEngine:
             "open": [_proposal(row) for row in self.store.proposals_with_status("placed")],
             "proposals": [_proposal(row) for row in proposals],
             "today": {
-                "flags": len(flags["move"]),
+                "flags": len(flags["counted"]),
                 "volume_flags": len(flags["volume"]),
+                "no_setup": len(flags["no_setup"]),
                 "max_flags": cfg.max_flags_per_day,
                 "open": self._open_count(),
                 "max_open": cfg.max_open,

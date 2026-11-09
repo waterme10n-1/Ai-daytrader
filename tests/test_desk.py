@@ -238,7 +238,7 @@ def test_full_chain_waits_for_approval_then_places_bracket_and_closes(tmp_path):
 
 def test_no_news_reason_means_skip_even_if_claude_says_buy(tmp_path):
     broker = FakeBroker({"NVDA": ramp_bars()})
-    desk, clock = make_desk(tmp_path, broker)
+    desk, clock = make_desk(tmp_path, broker, trial_buys=False)
     desk.brain.skeptic = lambda *args, **kwargs: {"reasons": ["a", "b", "c"], "ruling": "BUY", "summary": "BUY", "source": "claude"}
     desk.tick()
     row = desk.store.proposals_on(DAY.isoformat())[0]
@@ -290,7 +290,7 @@ def test_flatten_at_1550_and_day_log_with_shadow(tmp_path):
         {"NVDA": ramp_bars(), "AAPL": ramp_bars(), "SPY": ramp_bars(end=100.3)},
         news={"NVDA": fresh_news("NVDA")},
     )
-    desk, clock = make_desk(tmp_path, broker)
+    desk, clock = make_desk(tmp_path, broker, trial_buys=False)
     desk.tick()
     rows = {row["symbol"]: row for row in desk.store.proposals_on(DAY.isoformat())}
     assert rows["AAPL"]["status"] == "skip"  # ingen nyhed
@@ -333,14 +333,17 @@ def test_trial_buys_turn_a_wait_with_a_reason_into_a_half_size_buy(tmp_path):
     assert desk.status()["approvals"][0]["trial"]
 
 
-def test_trial_buys_never_buy_without_a_reason_on_volume_alone_or_when_switched_off(tmp_path):
-    # Ingen nyhed: SKIP, også med prøvekøb.
+def test_trial_buys_also_take_a_move_without_news_but_never_volume_alone_or_when_switched_off(tmp_path):
+    # Ingen nyhed: med prøvekøb købes en ren kursbevægelse alligevel, til halv størrelse.
     broker = FakeBroker({"NVDA": late_ramp()})
     desk, clock = make_desk(tmp_path / "a", broker, watchlist=("NVDA",))
     clock["now"] = at(15, 5)
     desk.scan()
-    assert desk.store.proposals_on(DAY.isoformat())[0]["status"] == "skip"
-    # Slået fra: WAIT forbliver WAIT.
+    row = desk.store.proposals_on(DAY.isoformat())[0]
+    assert row["ruling"] == "SKIP" and row["status"] == "awaiting"
+    assert row["skeptic"]["trial"] and row["skeptic"]["trial_reason"] == "no_news" and row["size"]["pct"] <= 2.6
+    assert any(m["text"].startswith("Prøvekøb: NEWS fandt ingen grund") for m in desk.store.messages(limit=50))
+    # Slået fra: WAIT forbliver WAIT, og uden nyhed er det SKIP som før.
     broker = FakeBroker({"NVDA": late_ramp()}, news={"NVDA": fresh_news("NVDA")})
     desk, clock = make_desk(tmp_path / "b", broker, watchlist=("NVDA",))
     desk.update_params({"trial_buys": False})
@@ -349,13 +352,23 @@ def test_trial_buys_never_buy_without_a_reason_on_volume_alone_or_when_switched_
     desk.scan()
     row = desk.store.proposals_on(DAY.isoformat())[0]
     assert row["status"] == "wait" and not (row["skeptic"] or {}).get("trial")
-    # Kun volumen: kursen har ikke bekræftet noget, så ingen prøvekøb.
+    # Kun volumen: kursen har ikke bekræftet noget, så ingen prøvekøb, heller ikke uden nyhed.
     loud = ramp_bars(end=100.5, volume=3000.0, ramp_volume=3000.0)
-    broker = FakeBroker({"NVDA": loud}, news={"NVDA": fresh_news("NVDA")})
-    desk, clock = make_desk(tmp_path / "c", broker, watchlist=("NVDA",))
-    desk.scan()
-    rows = desk.store.proposals_on(DAY.isoformat())
-    assert rows and all(row["status"] != "awaiting" for row in rows)
+    for news in ({"NVDA": fresh_news("NVDA")}, {}):
+        broker = FakeBroker({"NVDA": loud}, news=news)
+        desk, clock = make_desk(tmp_path / f"c{len(news)}", broker, watchlist=("NVDA",))
+        desk.scan()
+        rows = desk.store.proposals_on(DAY.isoformat())
+        assert rows and all(row["status"] != "awaiting" for row in rows)
+
+
+def test_buys_without_news_stop_once_the_desk_has_seen_them_lose():
+    rows = [
+        {"status": "skip", "flag": {"by_move": True}, "news": {"has_reason": False}, "shadow": {"result": "loss", "pct": -1.0}}
+        for _ in range(3)
+    ]
+    rule = next(item for item in learning.evaluate(rows) if item["key"] == "no_reason")
+    assert rule["active"] and learning.blocking(learning.evaluate(rows), {"by_move": True}, {"has_reason": False}, {})
 
 
 def test_a_learned_rule_stops_trial_buys_too(tmp_path):
@@ -429,10 +442,68 @@ def test_move_quota_still_caps_real_moves(tmp_path):
     assert len(desk.flags_on(DAY.isoformat())["move"]) == 2
 
 
+def dip_then_rise() -> list[Bar]:
+    """Falder 3 % fra 10:30 til 11:00 (ingen opstilling: bordet køber kun), står stille, og stiger så 4 % fra 12:00 til 12:45."""
+    bars: list[Bar] = []
+    moment = at(9, 30)
+    while moment < at(16, 0):
+        if moment < at(10, 30):
+            close, volume = 100.0, 1000.0
+        elif moment < at(11, 0):
+            close, volume = 100.0 - 3.0 * (moment - at(10, 30)).total_seconds() / 1800, 10_000.0
+        elif moment < at(12, 0):
+            close, volume = 97.0, 1000.0
+        elif moment < at(12, 45):
+            close, volume = 97.0 + 4.0 * (moment - at(12, 0)).total_seconds() / 2700, 10_000.0
+        else:
+            close, volume = 101.0, 1000.0
+        bars.append(Bar(ts=moment, open=close - 0.02, high=close + 0.03, low=close - 0.05, close=close, volume=volume))
+        moment += timedelta(minutes=1)
+    return bars
+
+
+def test_a_stock_chart_said_no_to_gets_one_second_chance_and_does_not_use_the_quota(tmp_path):
+    broker = FakeBroker({"NVDA": dip_then_rise()}, news={"NVDA": fresh_news("NVDA")})
+    desk, clock = make_desk(tmp_path, broker, watchlist=("NVDA",), max_flags_per_day=1)
+    clock["now"] = at(11, 0)
+    assert desk.scan() == 1
+    row = desk.store.proposals_on(DAY.isoformat())[0]
+    assert row["status"] == "no_setup" and "falder" in row["chart"]["reason"]
+    today = desk.status()["today"]
+    assert today["flags"] == 0 and today["no_setup"] == 1  # en faldende aktie bruger ikke dagens eneste plads
+    clock["now"] = at(11, 20)
+    assert desk.scan() == 0  # under en halv time siden: ingen ny markering
+    clock["now"] = at(11, 45)
+    assert desk.scan() == 0  # stadig ikke på vej op: anden chance gemmes
+    clock["now"] = at(12, 46)
+    assert desk.scan() == 1
+    rows = desk.store.proposals_on(DAY.isoformat())
+    assert len(rows) == 2 and rows[1]["flag"]["second"] and rows[1]["status"] == "awaiting"
+    assert any("Anden chance" in m["text"] for m in desk.store.messages(limit=50))
+    assert desk.status()["today"]["flags"] == 1
+    clock["now"] = at(13, 30)
+    assert desk.scan() == 0  # højst to forsøg pr. aktie, og kvoten er brugt
+
+
+def test_chart_allows_a_tiny_dip_but_not_a_real_turn():
+    bars = ramp_bars()
+    now = at(11, 31)
+    flag = rules.scout("NVDA", bars, daily_bars(), now, move_pct=1.5, volume_x=2)
+    dipped = [*bars[:-1]]
+    done = rules.completed(dipped, now)
+    last = done[-1]
+    small = Bar(ts=last.ts, open=last.open, high=last.high, low=last.low, close=round(done[-6].close * 0.999, 2), volume=last.volume)
+    big = Bar(ts=last.ts, open=last.open, high=last.high, low=last.low - 1, close=round(done[-6].close * 0.995, 2), volume=last.volume)
+    swap = lambda bar: [b if b.ts != last.ts else bar for b in bars]
+    assert rules.chart(flag, swap(small), now, stop_max_pct=2, reward_risk=2).setup
+    turned = rules.chart(flag, swap(big), now, stop_max_pct=2, reward_risk=2)
+    assert not turned.setup and "Momentum" in turned.reason
+
+
 def test_new_scout_defaults():
     from trader.desk.config import DEFAULT_WATCHLIST
 
-    assert DeskSettings().move_pct == 2.0 and DeskSettings().max_flags_per_day == 8
+    assert DeskSettings().move_pct == 1.5 and DeskSettings().max_flags_per_day == 8
     assert DeskSettings().premarket and DeskSettings().gap_pct == 3.0
     assert {"SMCI", "MSTR", "SOFI", "RIVN"} <= set(DEFAULT_WATCHLIST) and len(DEFAULT_WATCHLIST) == 16
 
@@ -445,7 +516,7 @@ def test_old_saved_defaults_give_way_to_the_new_ones(tmp_path):
     store.set_state("welcome", "1")
     store.set_json("params", {"move_pct": 3.0, "max_flags_per_day": 5, "watchlist": list(RETIRED_DEFAULTS["watchlist"]), "position_pct": 3.0})
     desk, _ = make_desk(tmp_path, broker, watchlist=DEFAULT_WATCHLIST)
-    assert desk.cfg.move_pct == 2.0 and desk.cfg.watchlist == DEFAULT_WATCHLIST and desk.cfg.position_pct == 3.0
+    assert desk.cfg.move_pct == desk.base.move_pct and desk.cfg.watchlist == DEFAULT_WATCHLIST and desk.cfg.position_pct == 3.0
     assert desk.cfg.max_flags_per_day == 8
     assert "SCOUT er opdateret" in desk.store.messages(limit=5)[-1]["text"]
     # Kun én gang: vælger man selv 3 % bagefter, bliver det ved med at gælde.
@@ -661,7 +732,7 @@ def test_autopilot_buys_on_its_own_but_only_after_skeptic_says_buy(tmp_path):
         {"NVDA": ramp_bars(), "AAPL": ramp_bars(), "SPY": ramp_bars(end=100.3, ramp_volume=1000)},
         news={"NVDA": fresh_news("NVDA")},
     )
-    desk, clock = make_desk(tmp_path, broker, auto_approve=True, scan_minutes=1)
+    desk, clock = make_desk(tmp_path, broker, auto_approve=True, scan_minutes=1, trial_buys=False)
     clock["now"] = at(11, 31)
     desk.tick()
     rows = {row["symbol"]: row for row in desk.store.proposals_on(DAY.isoformat())}
@@ -724,7 +795,7 @@ def test_401_message_names_the_service():
 # ---------------------------------------------------------------------- læring
 def _done_row(symbol, *, vs_vwap, win, real=True):
     flag = {"symbol": symbol, "move_pct": 3.5, "vs_vwap_pct": vs_vwap, "by_move": True, "ts": "2026-11-04T11:30:00-05:00"}
-    row = {"symbol": symbol, "flag": flag, "news": {"source": "claude"}, "chart": {"stop_pct": 0.8}}
+    row = {"symbol": symbol, "flag": flag, "news": {"source": "claude", "has_reason": True}, "chart": {"stop_pct": 0.8}}
     if real:
         row.update(status="closed", fill_price=100.0, exit_price=102.0 if win else 99.0, pnl=20.0 if win else -10.0, exit_reason="target" if win else "stop")
     else:
@@ -924,3 +995,77 @@ def test_status_errors_come_back_as_readable_json(tmp_path):
         assert _login(client).status_code == 303
         response = client.get("/api/desk/status")
         assert response.status_code == 500 and "database er låst" in response.json()["detail"]
+
+
+# ---------------------------------------------------------------------- Claude uden kredit
+class _ClaudeError(Exception):
+    def __init__(self, status: int, message: str) -> None:
+        super().__init__(message)
+        self.status_code = status
+        self.message = message
+
+
+class _FailingClaude:
+    def __init__(self, exc: Exception) -> None:
+        self.exc, self.calls = exc, 0
+        self.beta = self
+        self.messages = self
+
+    def parse(self, **_kwargs):
+        self.calls += 1
+        raise self.exc
+
+    create = parse
+
+
+def test_no_credit_rests_claude_for_a_while_and_the_rules_take_over(tmp_path):
+    from trader.desk.agents import DeskBrain
+
+    cfg = replace(DeskSettings(), db_path=str(tmp_path / "desk.db"))
+    brain = DeskBrain(cfg, DeskStore(cfg.db_path), "sk-ant-test")
+    claude = _FailingClaude(_ClaudeError(400, "Your credit balance is too low to access the Anthropic API."))
+    brain._client = lambda: claude
+    headlines = [{"headline": "NVDA lands a big new contract", "created_at": datetime.now(ET).isoformat(), "url": "https://example.com"}]
+    first = brain.news({"symbol": "NVDA"}, headlines)
+    assert claude.calls == 1 and first["source"] == "rules" and first["has_reason"]
+    assert brain.resting and "ingen kredit" in brain.last_error and 14 <= brain.rest_minutes() <= 15
+    # Under pausen kaldes Claude slet ikke: reglerne svarer med det samme.
+    assert brain.news({"symbol": "NVDA"}, headlines)["source"] == "rules"
+    assert brain.skeptic({"symbol": "NVDA"}, {"has_reason": True}, {}, {}) is None
+    assert claude.calls == 1
+    # Test Claude prøver altid, og et svar uden fejl slutter pausen.
+    brain._ok()
+    assert not brain.resting and brain.last_error == ""
+
+
+def test_a_passing_claude_problem_does_not_pause_it(tmp_path):
+    from trader.desk.agents import DeskBrain
+
+    cfg = replace(DeskSettings(), db_path=str(tmp_path / "desk.db"))
+    brain = DeskBrain(cfg, DeskStore(cfg.db_path), "sk-ant-test")
+    claude = _FailingClaude(_ClaudeError(429, "rate_limit_error"))
+    brain._client = lambda: claude
+    brain.news({"symbol": "NVDA"}, [])
+    brain.news({"symbol": "NVDA"}, [])
+    assert claude.calls == 2 and not brain.resting
+
+
+def test_status_says_the_desk_trades_on_without_claude(tmp_path):
+    desk, _ = make_desk(tmp_path, FakeBroker({}))
+    desk.brain.api_key = "sk-ant-test"
+    desk.brain._failed(_ClaudeError(400, "Your credit balance is too low"))
+    status = desk.status()
+    assert status["ai"]["resting"] and status["ai"]["retry_minutes"] >= 14
+    claude = [a for a in status["alerts"] if a["text"].startswith("Claude:")]
+    assert claude and claude[0]["level"] == "warning" and "bordet handler videre" in claude[0]["text"]
+
+
+def test_without_claude_a_headline_from_last_night_still_counts():
+    from trader.desk.agents import DeskBrain
+
+    now = datetime.now(ET)
+    evening = [{"headline": "NVDA wins a big contract", "created_at": (now - timedelta(hours=14)).isoformat(), "url": "https://example.com"}]
+    assert DeskBrain.rules_news(evening)["has_reason"]
+    old = [{"headline": "NVDA old story", "created_at": (now - timedelta(hours=20)).isoformat(), "url": "https://example.com"}]
+    news = DeskBrain.rules_news(old)
+    assert not news["has_reason"] and "18 timer" in news["reason"]

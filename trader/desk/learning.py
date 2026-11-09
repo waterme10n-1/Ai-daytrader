@@ -45,6 +45,7 @@ PATTERNS: tuple[tuple[str, str, Callable[[dict, dict, dict], bool]], ...] = (
     ("headline_only", "Køb, hvor grunden kun var en overskrift (ikke Claude)", lambda f, n, c: n.get("source") == "rules"),
     ("wide_stop", "Køb med stop mere end 1,5 % væk", lambda f, n, c: float(c.get("stop_pct") or 0) > 1.5),
     ("gap_open", "Gaps købt ved åbningen", lambda f, n, c: bool(f.get("by_gap"))),
+    ("no_reason", "Køb uden en grund fra NEWS", lambda f, n, c: not n.get("has_reason")),
 )
 
 

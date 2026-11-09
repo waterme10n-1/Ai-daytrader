@@ -38,6 +38,7 @@ RETIRED_DEFAULTS: dict[str, object] = {
 }
 # Gamle standarder for én børs: nøgle → (indstilling, gammel værdi). Nøglen skal være ny for hver ændring.
 RETIRED_BY_MARKET: dict[str, dict[str, tuple[str, object]]] = {
+    "us": {"us_move_pct_2": ("move_pct", 2.0)},  # New York: 2 % blev til 1,5 %, så flere bevægelser kommer med
     "dk": {
         "dk_move_pct_2": ("move_pct", 2.0),  # København: 2 % blev til 1,5 %
         "dk_scan_minutes_1": ("scan_minutes", 1),  # København: hvert minut blev til hvert 5. (skånsomt for Yahoo)
@@ -119,7 +120,7 @@ class DeskSettings:
     start_cash: float = 100_000.0  # kun den danske papirkonto (DKK)
     fee_pct: float = 0.1  # kurtage pr. handel på den danske papirkonto, i % af beløbet
     watchlist: tuple[str, ...] = DEFAULT_WATCHLIST
-    move_pct: float = 2.0
+    move_pct: float = 1.5
     volume_x: float = 2.0
     max_flags_per_day: int = 8
     premarket: bool = True  # SCOUT og NEWS kigger på gaps før åbning (4:00-9:30 ET, 10:00-15:30 dansk tid)
@@ -164,7 +165,7 @@ class DeskSettings:
         return cls(
             enabled=_flag(os.getenv("DESK_ENABLED"), True),
             watchlist=tuple(watch),
-            move_pct=min(20.0, max(0.5, _float(os.getenv("DESK_MOVE_PCT"), 2.0))),
+            move_pct=min(20.0, max(0.5, _float(os.getenv("DESK_MOVE_PCT"), 1.5))),
             volume_x=min(20.0, max(1.2, _float(os.getenv("DESK_VOLUME_X"), 2.0))),
             max_flags_per_day=max(1, min(HARD_MAX_FLAGS, _int(os.getenv("DESK_MAX_FLAGS_PER_DAY"), 8))),
             premarket=_flag(os.getenv("DESK_PREMARKET"), True),
