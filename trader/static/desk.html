@@ -914,7 +914,9 @@ function renderHero(d) {
   const cls = pnl > 0 ? "up" : pnl < 0 ? "down" : "muted", arrow = pnl > 0 ? "▲ " : pnl < 0 ? "▼ " : "";
   $("delta").innerHTML = `<span class="${cls}">${arrow}${money(Math.abs(pnl))} ${CUR} (${nf2.format(Math.abs(pctv))} %)</span><span class="cap">bordets resultat · ${d.kpis.trades} ${d.kpis.trades === 1 ? "handel" : "handler"}</span>`;
   drawChart(d);
-  $("k-flags").innerHTML = `${d.today.flags} af ${d.today.max_flags}` + (d.today.volume_flags ? `<small class="muted" title="Markeret kun på volumen. Tæller ikke med i de ${d.today.max_flags}.">+${d.today.volume_flags} volumen</small>` : "");
+  const otherFlags = (d.today.volume_flags || 0) + (d.today.no_setup || 0);
+  const otherWhy = [d.today.volume_flags ? `${d.today.volume_flags} kun på volumen` : "", d.today.no_setup ? `${d.today.no_setup} uden opstilling fra CHART` : ""].filter(Boolean).join(" og ");
+  $("k-flags").innerHTML = `${d.today.flags} af ${d.today.max_flags}` + (otherFlags ? `<small class="muted" title="${otherWhy}. Tæller ikke med i de ${d.today.max_flags}.">+${otherFlags} andre</small>` : "");
   $("k-open").textContent = `${d.today.open} af ${d.today.max_open}`;
   $("k-win").textContent = d.kpis.win_rate === null ? "–" : `${Math.round(d.kpis.win_rate * 100)} %`;
   const share = (a, b) => `${Math.round(Math.min(1, Math.max(0, b ? a / b : 0)) * 100)}%`;

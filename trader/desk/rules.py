@@ -18,6 +18,8 @@ MIN_STOP_PCT = 0.3
 LATEST_ENTRY = (15, 30)
 # Gap ved åbningen tæller kun den første halvanden time. Derefter er det en almindelig dagsbevægelse.
 GAP_UNTIL = (11, 0)
+# Et lille dyk de sidste fem minutter (højst 0,2 %) er et tilbagefald i en stigning, ikke en vending.
+MOMENTUM_SLACK_PCT = 0.2
 
 
 def completed(bars: list[Bar], now: datetime) -> list[Bar]:
@@ -41,6 +43,7 @@ class Flag:
     by_gap: bool = False
     gap_pct: float | None = None  # siden gårsdagens lukkekurs
     to_close_min: int | None = None  # minutter til børsen lukker, da SCOUT markerede
+    second: bool = False  # anden chance: CHART havde ingen opstilling sidst, aktien blev markeret i dag
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -145,12 +148,13 @@ def gap_flag(
 def scout_text(flag: Flag) -> str:
     move = pct(flag.move_pct)
     span = "den sidste time" if flag.window_minutes >= 60 else f"de sidste {flag.window_minutes} min"
+    again = " Anden chance: CHART havde ingen opstilling sidst." if flag.second else ""
     if flag.by_gap:
         return (
             f"GAP: {flag.symbol} {pct(flag.gap_pct)} siden i går og over VWAP ({move} {span}), handler "
-            f"{num(flag.volume_x, 1)}x normal volumen. Kurs {num(flag.price)}."
+            f"{num(flag.volume_x, 1)}x normal volumen. Kurs {num(flag.price)}.{again}"
         )
-    return f"FLAG: {flag.symbol} {move} {span}, handler {num(flag.volume_x, 1)}x normal volumen. Kurs {num(flag.price)}."
+    return f"FLAG: {flag.symbol} {move} {span}, handler {num(flag.volume_x, 1)}x normal volumen. Kurs {num(flag.price)}.{again}"
 
 
 def premarket_gaps(symbols: list[str], snapshots: dict, daily: dict, now: datetime, *, gap_pct: float) -> list[dict]:
@@ -230,7 +234,7 @@ def chart(
     extension = (price - level) / level * 100.0
     if extension > 2 * stop_max_pct:
         return ChartPlan(False, reason=f"Kursen er {pct(extension, sign=False)} over VWAP. Det er at jagte en løbet bevægelse.")
-    if len(bars) > 5 and price < bars[-6].close:
+    if len(bars) > 5 and price < bars[-6].close * (1 - MOMENTUM_SLACK_PCT / 100.0):
         return ChartPlan(False, reason="Momentum er vendt de sidste fem minutter.")
     swing = min(bar.low for bar in bars[-SWING_BARS:]) - 0.01
     floor = price * (1 - stop_max_pct / 100.0)

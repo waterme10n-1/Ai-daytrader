@@ -442,6 +442,64 @@ def test_move_quota_still_caps_real_moves(tmp_path):
     assert len(desk.flags_on(DAY.isoformat())["move"]) == 2
 
 
+def dip_then_rise() -> list[Bar]:
+    """Falder 3 % fra 10:30 til 11:00 (ingen opstilling: bordet køber kun), står stille, og stiger så 4 % fra 12:00 til 12:45."""
+    bars: list[Bar] = []
+    moment = at(9, 30)
+    while moment < at(16, 0):
+        if moment < at(10, 30):
+            close, volume = 100.0, 1000.0
+        elif moment < at(11, 0):
+            close, volume = 100.0 - 3.0 * (moment - at(10, 30)).total_seconds() / 1800, 10_000.0
+        elif moment < at(12, 0):
+            close, volume = 97.0, 1000.0
+        elif moment < at(12, 45):
+            close, volume = 97.0 + 4.0 * (moment - at(12, 0)).total_seconds() / 2700, 10_000.0
+        else:
+            close, volume = 101.0, 1000.0
+        bars.append(Bar(ts=moment, open=close - 0.02, high=close + 0.03, low=close - 0.05, close=close, volume=volume))
+        moment += timedelta(minutes=1)
+    return bars
+
+
+def test_a_stock_chart_said_no_to_gets_one_second_chance_and_does_not_use_the_quota(tmp_path):
+    broker = FakeBroker({"NVDA": dip_then_rise()}, news={"NVDA": fresh_news("NVDA")})
+    desk, clock = make_desk(tmp_path, broker, watchlist=("NVDA",), max_flags_per_day=1)
+    clock["now"] = at(11, 0)
+    assert desk.scan() == 1
+    row = desk.store.proposals_on(DAY.isoformat())[0]
+    assert row["status"] == "no_setup" and "falder" in row["chart"]["reason"]
+    today = desk.status()["today"]
+    assert today["flags"] == 0 and today["no_setup"] == 1  # en faldende aktie bruger ikke dagens eneste plads
+    clock["now"] = at(11, 20)
+    assert desk.scan() == 0  # under en halv time siden: ingen ny markering
+    clock["now"] = at(11, 45)
+    assert desk.scan() == 0  # stadig ikke på vej op: anden chance gemmes
+    clock["now"] = at(12, 46)
+    assert desk.scan() == 1
+    rows = desk.store.proposals_on(DAY.isoformat())
+    assert len(rows) == 2 and rows[1]["flag"]["second"] and rows[1]["status"] == "awaiting"
+    assert any("Anden chance" in m["text"] for m in desk.store.messages(limit=50))
+    assert desk.status()["today"]["flags"] == 1
+    clock["now"] = at(13, 30)
+    assert desk.scan() == 0  # højst to forsøg pr. aktie, og kvoten er brugt
+
+
+def test_chart_allows_a_tiny_dip_but_not_a_real_turn():
+    bars = ramp_bars()
+    now = at(11, 31)
+    flag = rules.scout("NVDA", bars, daily_bars(), now, move_pct=1.5, volume_x=2)
+    dipped = [*bars[:-1]]
+    done = rules.completed(dipped, now)
+    last = done[-1]
+    small = Bar(ts=last.ts, open=last.open, high=last.high, low=last.low, close=round(done[-6].close * 0.999, 2), volume=last.volume)
+    big = Bar(ts=last.ts, open=last.open, high=last.high, low=last.low - 1, close=round(done[-6].close * 0.995, 2), volume=last.volume)
+    swap = lambda bar: [b if b.ts != last.ts else bar for b in bars]
+    assert rules.chart(flag, swap(small), now, stop_max_pct=2, reward_risk=2).setup
+    turned = rules.chart(flag, swap(big), now, stop_max_pct=2, reward_risk=2)
+    assert not turned.setup and "Momentum" in turned.reason
+
+
 def test_new_scout_defaults():
     from trader.desk.config import DEFAULT_WATCHLIST
 
