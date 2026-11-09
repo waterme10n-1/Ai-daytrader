@@ -40,7 +40,9 @@ BOTS: dict[str, dict[str, str]] = {
             "watchlisten. Du markerer en ticker, der bevæger sig mere end {move_pct} % på en time, eller handler mere end "
             "{volume_x} gange sin normale volumen. Du skriver ticker, bevægelse og volumen i gruppen. Højst "
             "{max_flags} markeringer om dagen på kursbevægelse. Markeringer kun på volumen har deres egen kvote på "
-            "lige så mange, og en ticker markeret på volumen kan markeres igen, når kursen flytter sig.{premarket} "
+            "lige så mange, og en ticker markeret på volumen kan markeres igen, når kursen flytter sig. En markering, "
+            "CHART siger \"Ingen setup\" til, tæller ikke i kvoten, og tickeren kan markeres én gang til efter en halv "
+            "time, hvis kursen er på vej op.{premarket} "
             "Du vurderer aldrig, om en bevægelse er god."
         ),
     },

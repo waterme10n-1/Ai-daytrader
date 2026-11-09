@@ -458,6 +458,32 @@
   .msg[data-a="executor"] + .msg[data-a="executor"] .av { visibility: hidden; }
   .msg[data-a="executor"] + .msg[data-a="executor"] { margin-top: -6px; }
 
+  /* Læring: bordet mod indekset som to bjælker fra nul */
+  .duel { display: grid; gap: 10px; margin-top: 16px; }
+  .duel-r { display: grid; grid-template-columns: 84px minmax(0, 1fr) 66px; gap: 10px; align-items: center; }
+  .duel-r .cap { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .duel-r .num { text-align: right; font-size: 13px; font-variant-numeric: tabular-nums; color: var(--text-2); }
+  .duel-t { position: relative; height: 8px; border-radius: 4px; background: var(--fill); }
+  .duel-t b { position: absolute; left: 50%; top: -4px; bottom: -4px; width: 1px; background: var(--muted); opacity: 0.5; }
+  .duel-t i { position: absolute; top: 0; bottom: 0; border-radius: 4px; background: var(--c); box-shadow: 0 0 12px -2px color-mix(in srgb, var(--c) 70%, transparent); transition: left 0.8s ease, width 0.8s ease; }
+
+  /* Handler: forslag som en liste på telefon (tabellen er for bred), tabellen på computer */
+  .plist { display: none; }
+  .pr { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 11px; align-items: center; padding: 11px 0; }
+  .pr + .pr { border-top: 0.5px solid var(--sep); }
+  .pr .av { box-shadow: 0 5px 14px -6px color-mix(in srgb, var(--c) 85%, transparent); }
+  .pr .nm { min-width: 0; }
+  .pr .nm b { display: block; font: 600 15px var(--display); }
+  .pr .nm .cap { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pr .rt { display: grid; gap: 3px; justify-items: end; font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .pr .rt .tag { font-size: 11px; }
+  @media (max-width: 760px) {
+    #tab-trades .table-wrap { display: none; }
+    .plist { display: block; }
+  }
+  .trades-empty { display: grid; justify-items: center; gap: 6px; padding: 14px 8px 4px; text-align: center; color: var(--muted); }
+  .trades-empty svg { width: 30px; height: 30px; color: var(--executor); opacity: 0.8; }
+
   /* fanebjælken på telefon: den aktive fane får en lille pille */
   @media (max-width: 760px) {
     nav.tabs .seg button svg { position: relative; z-index: 1; }
@@ -549,11 +575,12 @@
   <section id="tab-trades" class="stack" hidden>
     <article class="card">
       <div class="card-h"><h2>Åbne positioner</h2></div>
-      <div id="open-list" class="list"></div>
+      <div id="open-list"></div>
       <div class="actions"><button class="btn" id="scan-btn" type="button">Lad SCOUT kigge nu</button><button class="btn" id="log-btn" type="button">Skriv dagslog</button><button class="btn danger" id="close-btn" type="button">Luk alle</button></div>
     </article>
     <article class="card">
       <div class="card-h"><h2>Alle forslag</h2><span class="cap right">Skygge = hvad der ville være sket</span></div>
+      <div id="prop-list" class="plist"></div>
       <div class="table-wrap"><table>
         <thead><tr><th>Dag</th><th>Aktie</th><th>Skeptic</th><th>Status</th><th class="n">Indgang</th><th class="n">Stop</th><th class="n">Mål</th><th class="n">Antal</th><th class="n">Resultat</th><th>Skygge</th></tr></thead>
         <tbody id="proposals"></tbody>
@@ -1043,10 +1070,15 @@ $("now-more").onclick = () => {
 // ---------- åbne handler ----------
 const quoteMap = () => Object.fromEntries((((state || {}).quotes || {}).items || []).map((x) => [x.symbol, x]));
 function renderTrades(d) {
-  const open = d.open || [], q = quoteMap();
+  const open = d.open || [];
   $("trades-card").hidden = !open.length;
   if (!open.length) return;
-  $("trades").innerHTML = open.map((p) => {
+  $("trades").innerHTML = tradeCards(open);
+}
+// Én åben handel: kursen nu på en bjælke fra stop til mål, og gevinst eller tab lige nu.
+function tradeCards(open) {
+  const q = quoteMap();
+  return open.map((p) => {
     const fill = p.fill_price || p.entry, now = (q[p.symbol] || {}).price || fill;
     const span = p.target - p.stop || 1, at = (v) => Math.min(100, Math.max(0, ((v - p.stop) / span) * 100));
     const pnl = (now - fill) * (p.qty || 0), e = at(fill), n = at(now);
@@ -1178,11 +1210,20 @@ const sysHtml = (d) => systems(d).map(([n, c, v]) => `<div><span class="d ${c}">
 $("status").onclick = () => { if (state) openSheet(`<h2>Status</h2><p class="cap" style="margin:4px 0 8px">Opdateret ${ago(new Date(lastOk).toISOString())}</p><div class="sysl">${sysHtml(state)}</div><div class="actions"><button class="btn" data-goto="bots" data-close>Åbn Bots</button></div>`); };
 
 // ---------- handler, læring, bots ----------
+const RULING_C = { BUY: "var(--up)", WAIT: "var(--warn)", SKIP: "var(--down)" };
 function renderTradesTab(d) {
   $("open-list").innerHTML = (d.open || []).length
-    ? d.open.map((p) => `<div class="row" style="justify-content:space-between"><b>${esc(p.symbol)}</b><span class="num cap">${p.qty} stk · købt ${price(p.fill_price || p.entry)} · stop ${price(p.stop)} · mål ${price(p.target)}</span></div>`).join("")
-    : `<div class="muted">Ingen åbne positioner. Bordet lukker alt ti minutter før børsen lukker.</div>`;
-  $("proposals").innerHTML = (d.proposals || []).map((p) => {
+    ? tradeCards(d.open)
+    : `<div class="trades-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg><b style="color:var(--text)">Ingen åbne positioner</b><span>Når bordet køber, kan du følge kursen mellem stop og mål her. Alt lukkes ti minutter før børsen lukker.</span></div>`;
+  const rows = d.proposals || [];
+  $("prop-list").innerHTML = rows.map((p) => {
+    const sh = p.shadow;
+    const shadow = sh ? `<span class="${sh.result === "loss" ? "up" : "down"}">${sh.result === "loss" ? "ville tabe" : "ville vinde"} ${pct(sh.pct)}</span>` : "";
+    const res = p.pnl !== null && p.pnl !== undefined ? `<span class="${p.pnl >= 0 ? "up" : "down"}">${money(p.pnl, true)} ${CUR}</span>` : "";
+    const sub = [p.trading_day.slice(5), p.status_label, p.qty ? `${p.qty} stk` : "", p.trial ? "prøvekøb" : ""].filter(Boolean).join(" · ");
+    return `<div class="pr"><span class="av" style="--c:${RULING_C[p.ruling] || "var(--muted)"}">${esc(p.symbol.slice(0, 2))}</span><div class="nm"><b>${esc(p.symbol)}</b><span class="cap">${esc(sub)}</span></div><div class="rt">${p.ruling ? `<span class="tag ${esc(p.ruling)}">${esc(p.ruling)}</span>` : ""}${res || shadow || (p.entry ? `<span class="muted">${price(p.entry)}</span>` : "")}</div></div>`;
+  }).join("") || `<div class="muted">Ingen forslag endnu.</div>`;
+  $("proposals").innerHTML = rows.map((p) => {
     const sh = p.shadow;
     const shadow = sh ? `<span class="${sh.result === "loss" ? "up" : "down"}">${sh.result === "loss" ? "ville tabe" : "ville vinde"} ${pct(sh.pct)}</span>` : "";
     const res = p.pnl !== null && p.pnl !== undefined ? `<span class="${p.pnl >= 0 ? "up" : "down"}">${money(p.pnl, true)}</span>` : "";
@@ -1356,7 +1397,14 @@ async function loadCompare() {
     const c = await (await fetch(api("/api/desk/compare"), { cache: "no-store", credentials: "same-origin" })).json();
     if (!c.started) { $("compare").textContent = c.text; return; }
     const cell = (k, v, cls = "") => `<div><div class="cap">${k}</div><div class="big ${cls}">${v}</div></div>`;
-    $("compare").innerHTML = `<div class="kv">${cell("Bordet", pct(c.desk_pct), c.desk_pct >= 0 ? "up" : "down")}${cell(c.benchmark_name || BENCH, c.spy_pct === null ? "–" : pct(c.spy_pct))}${cell("Handler", c.trades)}${cell("Dage", c.days + 1)}</div><p style="margin:12px 0 0;color:var(--text-2)">${esc(c.text)}</p>`;
+    // To bjælker fra nul: bordet og indekset, i samme skala, så man ser med det samme, hvem der fører.
+    const scale = Math.max(0.5, Math.abs(c.desk_pct || 0), Math.abs(c.spy_pct || 0));
+    const bar = (label, v, color) => {
+      const w = v === null || v === undefined ? 0 : Math.min(50, (Math.abs(v) / scale) * 50);
+      return `<div class="duel-r"><span class="cap">${esc(label)}</span><div class="duel-t"><i style="left:${v < 0 ? 50 - w : 50}%;width:${w.toFixed(1)}%;--c:${color}"></i><b></b></div><span class="num">${v === null || v === undefined ? "–" : pct(v)}</span></div>`;
+    };
+    const duel = `<div class="duel">${bar("Bordet", c.desk_pct, c.desk_pct >= 0 ? "var(--up)" : "var(--down)")}${bar(c.benchmark_name || BENCH, c.spy_pct, "var(--muted)")}</div>`;
+    $("compare").innerHTML = `<div class="kv">${cell("Bordet", pct(c.desk_pct), c.desk_pct >= 0 ? "up" : "down")}${cell(c.benchmark_name || BENCH, c.spy_pct === null ? "–" : pct(c.spy_pct))}${cell("Handler", c.trades)}${cell("Dage", c.days + 1)}</div>${duel}<p style="margin:12px 0 0;color:var(--text-2)">${esc(c.text)}</p>`;
   } catch (err) { $("compare").textContent = "Kunne ikke hente sammenligningen."; }
 }
 const seen = new Set();
