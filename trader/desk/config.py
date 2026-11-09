@@ -136,6 +136,9 @@ class DeskSettings:
     # Prøvekøb: siger SKEPTIC WAIT til en handel med en klar grund og en ren opstilling, køber bordet halv størrelse
     # alligevel. Så kommer der flere handler på papir, og bordet lærer af rigtige resultater i stedet for kun skygger.
     trial_buys: bool = True
+    market_filter_pct: float = 1.0  # er indekset ned så meget siden åbningen, køber bordet ingen nye aktier (0 = fra)
+    time_stop_min: int = 90  # en handel, der stadig ligger under købskursen efter så mange minutter, lukkes (0 = fra)
+    max_losses_per_day: int = 2  # efter så mange handler med tab i dag køber bordet ikke mere den dag (0 = fra)
     max_chase_pct: float = 0.5
     alpaca_api_key: str = ""
     alpaca_secret_key: str = ""
@@ -179,6 +182,9 @@ class DeskSettings:
             scan_minutes=max(1, min(30, _int(os.getenv("DESK_SCAN_MINUTES"), 1))),
             auto_approve=_flag(os.getenv("DESK_AUTO_APPROVE"), True),
             trial_buys=_flag(os.getenv("DESK_TRIAL_BUYS"), True),
+            market_filter_pct=min(5.0, max(0.0, _float(os.getenv("DESK_MARKET_FILTER_PCT"), 1.0))),
+            time_stop_min=max(0, min(390, _int(os.getenv("DESK_TIME_STOP_MIN"), 90))),
+            max_losses_per_day=max(0, min(20, _int(os.getenv("DESK_MAX_LOSSES_PER_DAY"), 2))),
             max_chase_pct=min(2.0, max(0.1, _float(os.getenv("DESK_MAX_CHASE_PCT"), 0.5))),
             # Egen papirkonto til bordet. ALPACA_API_KEY bruges, hvis du allerede har den sat.
             alpaca_api_key=clean_key(os.getenv("DESK_ALPACA_API_KEY") or os.getenv("ALPACA_API_KEY")),

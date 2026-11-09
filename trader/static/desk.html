@@ -640,6 +640,9 @@
         <label>CHART: målet mindst (gange stoppet)<input name="reward_risk" type="number" step="0.1" min="1.5" max="5"></label>
         <label>SIZER: højst (% af kontoen pr. handel)<input name="position_pct" type="number" step="0.5" min="0.5"></label>
         <label>SIZER: højst åbne handler<input name="max_open" type="number" step="1" min="1"></label>
+        <label>Markedsfilter: ingen nye køb, når indekset er ned mere end (%, 0 = fra)<input name="market_filter_pct" type="number" step="0.1" min="0" max="5"></label>
+        <label>Tidsstop: luk en handel under købskursen efter (minutter, 0 = fra)<input name="time_stop_min" type="number" step="5" min="0" max="390"></label>
+        <label>Stop efter tab: ingen nye køb, når så mange handler er lukket med tab i dag (0 = fra)<input name="max_losses_per_day" type="number" step="1" min="0" max="20"></label>
         <div class="row wide"><button class="btn primary" type="submit">Gem regler</button><button class="btn" type="button" id="reset-params">Standard</button><span class="cap" id="hard"></span></div>
       </form>
     </article>
@@ -1253,7 +1256,7 @@ function renderBots(d) {
   $("hard").textContent = `Lofter: ${p.hard.position_pct} % pr. handel, ${p.hard.max_open} åbne, stop ${p.hard.stop_max_pct} %.`;
   if (paramsFilled && form.contains(document.activeElement)) return;
   form.watchlist.value = p.watchlist.join(", ");
-  ["move_pct", "volume_x", "max_flags_per_day", "scan_minutes", "gap_pct", "stop_max_pct", "reward_risk", "position_pct", "max_open"].forEach((k) => { form[k].value = p[k]; });
+  ["move_pct", "volume_x", "max_flags_per_day", "scan_minutes", "gap_pct", "stop_max_pct", "reward_risk", "position_pct", "max_open", "market_filter_pct", "time_stop_min", "max_losses_per_day"].forEach((k) => { form[k].value = p[k]; });
   form.auto_approve.checked = !!p.auto_approve;
   form.trial_buys.checked = !!p.trial_buys;
   form.premarket.checked = !!p.premarket;
@@ -1354,7 +1357,7 @@ $("close-btn").onclick = () => { if (confirm("Luk alle bordets positioner nu?"))
 $("params").onsubmit = async (e) => {
   e.preventDefault();
   const f = e.target, body = { watchlist: f.watchlist.value, auto_approve: f.auto_approve.checked, trial_buys: f.trial_buys.checked, premarket: f.premarket.checked };
-  ["move_pct", "volume_x", "max_flags_per_day", "scan_minutes", "gap_pct", "stop_max_pct", "reward_risk", "position_pct", "max_open"].forEach((k) => { body[k] = f[k].value; });
+  ["move_pct", "volume_x", "max_flags_per_day", "scan_minutes", "gap_pct", "stop_max_pct", "reward_risk", "position_pct", "max_open", "market_filter_pct", "time_stop_min", "max_losses_per_day"].forEach((k) => { body[k] = f[k].value; });
   try { await post("/api/desk/params", body); paramsFilled = false; toast("Gemt."); refresh(); } catch (err) { toast(err.message); }
 };
 $("params").trial_buys.onchange = async (e) => { try { await post("/api/desk/params", { trial_buys: e.target.checked }); toast(e.target.checked ? "Prøvekøb er slået til: WAIT med en grund købes til halv størrelse." : "Prøvekøb er slået fra."); refresh(); } catch (err) { toast(err.message); } };

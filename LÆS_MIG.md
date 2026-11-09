@@ -306,6 +306,12 @@ SCOUT, CHART og SIZER er bevidst almindelig kode. Tal fra en sprogmodel kan vær
 
 **Prøvekøb er også slået til som standard** (`DESK_TRIAL_BUYS=true`, eller **Prøvekøb** under **Bots → Indstillinger**). Har en aktie flyttet sig, og har CHART en ren opstilling, køber bordet alligevel, men kun halv størrelse (2,5 % af kontoen i stedet for 5 %), når SKEPTIC siger WAIT, eller når NEWS ikke fandt en grund (SKIP). Et SKIP fra Claude med en nyhed i hånden respekteres. Det giver flere handler at se på papir, og bordet lærer af rigtige resultater i stedet for kun skyggeregnskab. Taber køb uden en grund fra NEWS mindst 3 gange med højst en tredjedel vindere, slår den lærte regel "Køb uden en grund fra NEWS" til, og så stopper bordet dem selv. Prøvekøb sker aldrig på en markering kun på volumen og aldrig, når en lært regel siger nej. Lofterne for åbne handler og dagens tab gælder som altid. Prøvekøb står som "prøvekøb" ved handlen og i Gruppen.
 
+**Tre stopregler, der gør bordet mere forsigtigt, når det går dårligt.** Alle tre kan slås fra med 0.
+
+- **Markedsfilter** (`DESK_MARKET_FILTER_PCT`, standard 1). Er S&P 500 eller C25 ned mere end 1 % siden åbningen, køber bordet ingen nye aktier, så længe markedet falder. Markeringerne vises stadig, og de tæller ikke som forslag, så de kan komme igen, når markedet vender.
+- **Tidsstop** (`DESK_TIME_STOP_MIN`, standard 90). En handel, der efter 90 minutter stadig ligger under købskursen, lukkes til markedskurs. Pladsen bliver fri til en ny aktie, og kapitalen sidder ikke fast i en handel, der ikke går nogen steder. Handler over købskursen får lov at køre til stop eller mål.
+- **Stop efter tab** (`DESK_MAX_LOSSES_PER_DAY`, standard 2). Når to handler er lukket med tab i dag, køber bordet ikke mere den dag. Det holder ikke en dårlig dag i gang.
+
 Slår du autopiloten fra, ender hver BUY som et kort under **Godkend** (og i chatten) med hele kæden: markering, nyhed med link, de tre modargumenter og beløbet. Du har 10 minutter. Når du trykker **Godkend køb**, tjekker EXECUTOR igen, at kursen ikke er løbet mere end 0,5 % over indgangen og stadig ligger mellem stop og mål, og at SIZER's grænser holder. Ellers lægges ordren ikke. Er Telegram sat op, får du også en besked på telefonen.
 
 ## Tal med bordet

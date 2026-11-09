@@ -500,6 +500,88 @@ def test_chart_allows_a_tiny_dip_but_not_a_real_turn():
     assert not turned.setup and "Momentum" in turned.reason
 
 
+def test_market_filter_pauses_new_buys_while_the_index_is_falling(tmp_path):
+    falling = ramp_bars(start=100.0, end=98.5)  # indekset falder 1,5 % fra åbningen
+    broker = FakeBroker({"NVDA": ramp_bars(), "SPY": falling}, news={"NVDA": fresh_news("NVDA")})
+    desk, _ = make_desk(tmp_path / "down", broker, watchlist=("NVDA",))
+    assert desk.scan() == 0
+    assert desk.store.proposals_on(DAY.isoformat()) == []  # ingen forslag, så kvoten og Claude står stille
+    assert any("er ned" in m["text"] and "S&P 500" in m["text"] for m in desk.store.messages(limit=50))
+    # Slået fra: samme fald, og NVDA købes alligevel.
+    off, _ = make_desk(tmp_path / "off", FakeBroker({"NVDA": ramp_bars(), "SPY": falling}, news={"NVDA": fresh_news("NVDA")}), watchlist=("NVDA",), market_filter_pct=0.0)
+    assert off.scan() == 1
+    # Markedet vender (fladt indeks): NVDA købes.
+    flat, _ = make_desk(tmp_path / "flat", FakeBroker({"NVDA": ramp_bars(), "SPY": ramp_bars(start=100.0, end=100.2)}, news={"NVDA": fresh_news("NVDA")}), watchlist=("NVDA",))
+    assert flat.scan() == 1
+
+
+def test_time_stop_closes_a_trade_still_under_its_buy_price_and_frees_the_slot(tmp_path):
+    broker = FakeBroker({"NVDA": ramp_bars()}, news={"NVDA": fresh_news("NVDA")})
+    desk, _ = make_desk(tmp_path, broker, watchlist=("NVDA",), time_stop_min=90)
+    pid = desk.store.create_proposal(DAY.isoformat(), "NVDA", {"symbol": "NVDA", "by_move": True})
+    desk.store.update_proposal(pid, status="placed", qty=10, entry=100.0, fill_price=100.0, stop=98.0, target=104.0, decided_at=at(9, 50).isoformat(timespec="seconds"))
+    broker.positions["NVDA"] = Position("NVDA", 10, "long", 100.0, 99.0, 0.0)
+    assert desk._time_stop(broker, at(10, 30)) == 0  # 40 minutter: endnu ikke tid
+    assert desk._time_stop(broker, at(11, 30)) == 1  # 100 minutter under købskursen
+    row = desk.store.proposal(pid)
+    assert row["status"] == "closed" and row["exit_reason"] == "time" and row["pnl"] == -10.0
+    assert "NVDA" in broker.closed
+    # En vinder over købskursen får lov at køre til stop eller mål.
+    won = desk.store.create_proposal(DAY.isoformat(), "AMD", {"symbol": "AMD", "by_move": True})
+    desk.store.update_proposal(won, status="placed", qty=10, entry=100.0, fill_price=100.0, stop=98.0, target=104.0, decided_at=at(9, 50).isoformat(timespec="seconds"))
+    broker.positions["AMD"] = Position("AMD", 10, "long", 100.0, 101.0, 0.0)
+    assert desk._time_stop(broker, at(11, 30)) == 0
+    assert desk.store.proposal(won)["status"] == "placed"
+    # Slået fra med 0.
+    off, _ = make_desk(tmp_path / "off", FakeBroker({"NVDA": ramp_bars()}), watchlist=("NVDA",), time_stop_min=0)
+    assert off._time_stop(FakeBroker({}), at(15, 0)) == 0
+
+
+def test_two_losing_trades_stop_new_buys_for_the_day(tmp_path):
+    broker = FakeBroker({"NVDA": ramp_bars()}, news={"NVDA": fresh_news("NVDA")})
+    desk, _ = make_desk(tmp_path, broker, watchlist=("NVDA",))
+    for symbol in ("X1", "X2"):
+        pid = desk.store.create_proposal(DAY.isoformat(), symbol, {"symbol": symbol, "move_pct": 3, "by_move": True, "to_close_min": 200})
+        desk.store.update_proposal(pid, status="closed", fill_price=100.0, exit_price=98.0, pnl=-20.0, ruling="BUY")
+    assert desk._losses_today(DAY.isoformat()) == 2
+    assert desk.scan() == 0
+    assert len(desk.store.proposals_on(DAY.isoformat())) == 2  # ingen nye forslag
+    assert any("handler med tab i dag" in m["text"] for m in desk.store.messages(limit=50))
+    # Med én tabende handel er der stadig plads til NVDA.
+    one, _ = make_desk(tmp_path / "one", FakeBroker({"NVDA": ramp_bars()}, news={"NVDA": fresh_news("NVDA")}), watchlist=("NVDA",))
+    pid = one.store.create_proposal(DAY.isoformat(), "X1", {"symbol": "X1", "move_pct": 3, "by_move": True, "to_close_min": 200})
+    one.store.update_proposal(pid, status="closed", fill_price=100.0, exit_price=98.0, pnl=-20.0, ruling="BUY")
+    assert one.scan() == 1
+
+
+def test_time_stop_runs_on_the_normal_tick_and_not_while_paused(tmp_path):
+    broker = FakeBroker({"NVDA": ramp_bars()}, news={"NVDA": fresh_news("NVDA")})
+    desk, clock = make_desk(tmp_path, broker, watchlist=("NVDA",))
+    pid = desk.store.create_proposal(DAY.isoformat(), "NVDA", {"symbol": "NVDA", "by_move": True})
+    desk.store.update_proposal(pid, status="placed", qty=10, entry=100.0, fill_price=100.0, stop=98.0, target=104.0, decided_at=at(9, 50).isoformat(timespec="seconds"))
+    broker.positions["NVDA"] = Position("NVDA", 10, "long", 100.0, 99.0, 0.0)
+    desk.pause(True)
+    clock["now"] = at(11, 30)
+    desk.tick(force=True)
+    assert desk.store.proposal(pid)["status"] == "placed"  # på pause: stop og mål får lov at passe på handlen
+    desk.pause(False)
+    desk.tick(force=True)
+    assert desk.store.proposal(pid)["status"] == "closed" and desk.store.proposal(pid)["exit_reason"] == "time"
+
+
+def test_new_limits_are_checked_on_the_page(tmp_path):
+    desk, _ = make_desk(tmp_path, FakeBroker({}), watchlist=("NVDA",))
+    with pytest.raises(ValueError):
+        desk.update_params({"market_filter_pct": 9})
+    with pytest.raises(ValueError):
+        desk.update_params({"time_stop_min": 1000})
+    with pytest.raises(ValueError):
+        desk.update_params({"max_losses_per_day": -1})
+    desk.update_params({"time_stop_min": 0, "max_losses_per_day": 0, "market_filter_pct": 0})
+    assert desk.cfg.time_stop_min == 0 and desk.cfg.max_losses_per_day == 0 and desk.cfg.market_filter_pct == 0
+    assert make_desk(tmp_path / "d", FakeBroker({}), watchlist=("NVDA",))[0].cfg.time_stop_min == 90
+
+
 def test_new_scout_defaults():
     from trader.desk.config import DEFAULT_WATCHLIST
 
