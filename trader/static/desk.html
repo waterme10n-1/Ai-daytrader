@@ -115,6 +115,7 @@
   .issue { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; padding: 14px 16px; border-radius: 18px; background: var(--card); box-shadow: var(--shadow); }
   .issue .ic { width: 32px; height: 32px; flex: none; display: grid; place-items: center; border-radius: 50%; background: var(--warn-bg); color: var(--warn); font-weight: 700; }
   .issue.error .ic { background: var(--down-bg); color: var(--down); }
+  .issue.warning .ic { background: var(--warn-bg); color: var(--warn); }
   .issue .tx { flex: 1; min-width: 0; font-size: 14px; }
   .issue .tx b { display: block; font-weight: 600; }
 
@@ -1051,7 +1052,7 @@ function systems(d) {
     ["Børsen", m.is_open ? "ok" : "", m.label || "–"],
     ["Kurser", q.error ? (q.ts ? "warn" : "bad") : q.ts ? "ok" : "warn", q.error ? q.error : q.ts ? `${q.mode === "live" ? "Live" : m.phase === "pre" ? "Før åbning" : "Sidste handelsdag"}, ${ago(q.ts)}` : "Ingen endnu"],
     ["SCOUT", d.paused ? "warn" : sys.last_scan ? "ok" : "", d.paused ? "På pause" : sys.last_scan ? `Kiggede ${ago(sys.last_scan)}` : m.is_open ? "Venter på første scan" : d.params.premarket ? "Kigger fra kl. 10 dansk tid (før åbning)" : "Kigger, når børsen åbner"],
-    ["Claude", !ai.configured ? "warn" : ai.last_error ? "bad" : "ok", !ai.configured ? "ANTHROPIC_API_KEY mangler i Railway" : ai.last_error ? ai.last_error : ai.limited ? `${money(ai.spent_today_usd)} af ${money(ai.budget_usd)} $ brugt i dag` : `Klar · ${money(ai.spent_today_usd)} $ brugt i dag`],
+    ["Claude", !ai.configured || ai.last_error ? "warn" : "ok", !ai.configured ? "ANTHROPIC_API_KEY mangler i Railway · faste regler kører" : ai.last_error ? `${ai.last_error} Faste regler kører${ai.resting && ai.retry_minutes ? `, Claude prøves igen om ${ai.retry_minutes} min` : ""}.` : ai.limited ? `${money(ai.spent_today_usd)} af ${money(ai.budget_usd)} $ brugt i dag` : `Klar · ${money(ai.spent_today_usd)} $ brugt i dag`],
     ["Autopilot", d.params.auto_approve ? "ok" : "warn", d.params.auto_approve ? "Køber selv på papir" : "Du godkender hver ordre"],
     ["Prøvekøb", d.params.trial_buys ? "ok" : "", d.params.trial_buys ? "Halv størrelse, når SKEPTIC siger WAIT med en grund" : "Fra"],
     ["Læring", rules ? "ok" : "", rules ? `${rules} regel${rules > 1 ? "er" : ""} aktiv` : "Samler data"],
@@ -1129,7 +1130,13 @@ function renderStatus(d) {
   el.className = `status ${d.paused ? "warn" : bad ? "bad" : "ok"} ${!d.paused && !bad && m.is_open ? "live" : ""}`;
   $("status-t").textContent = d.paused ? "På pause" : bad ? `${bad[0]} mangler` : m.is_open ? "Handler nu" : "Alt kører";
   const TITLES = { Alpaca: "Alpaca er ikke forbundet", Kurser: "Kurserne kan ikke hentes", Kursdata: "Kursdata svarer ikke", Claude: "Claude svarer ikke" };
-  const issue = bad ? { level: "error", title: TITLES[bad[0]] || `${bad[0]} virker ikke`, text: bad[0] === "Alpaca" ? "Uden forbindelse kan bordet ikke se saldo, kurser eller handle. Det tager et minut at ordne." : bad[2] } : null;
+  const ai = d.ai || {};
+  // Claude er et plus, ikke et krav: uden Claude bruger NEWS og SKEPTIC faste regler, og bordet handler videre.
+  const issue = bad
+    ? { level: "error", title: TITLES[bad[0]] || `${bad[0]} virker ikke`, text: bad[0] === "Alpaca" ? "Uden forbindelse kan bordet ikke se saldo, kurser eller handle. Det tager et minut at ordne." : bad[2] }
+    : ai.configured && ai.last_error
+      ? { level: "warning", title: "Bordet handler uden Claude lige nu", text: `${ai.last_error} Indtil da bruger NEWS og SKEPTIC faste regler.` }
+      : null;
   $("issue").dataset.kind = issue ? "status" : "";
   $("issue").innerHTML = issue ? `<div class="issue ${issue.level}"><span class="ic">!</span><div class="tx"><b>${esc(issue.title)}</b>${esc(issue.text)}</div><button class="btn primary" type="button" data-goto="bots">Løs</button></div>` : "";
 }

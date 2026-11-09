@@ -924,3 +924,66 @@ def test_status_errors_come_back_as_readable_json(tmp_path):
         assert _login(client).status_code == 303
         response = client.get("/api/desk/status")
         assert response.status_code == 500 and "database er låst" in response.json()["detail"]
+
+
+# ---------------------------------------------------------------------- Claude uden kredit
+class _ClaudeError(Exception):
+    def __init__(self, status: int, message: str) -> None:
+        super().__init__(message)
+        self.status_code = status
+        self.message = message
+
+
+class _FailingClaude:
+    def __init__(self, exc: Exception) -> None:
+        self.exc, self.calls = exc, 0
+        self.beta = self
+        self.messages = self
+
+    def parse(self, **_kwargs):
+        self.calls += 1
+        raise self.exc
+
+    create = parse
+
+
+def test_no_credit_rests_claude_for_a_while_and_the_rules_take_over(tmp_path):
+    from trader.desk.agents import DeskBrain
+
+    cfg = replace(DeskSettings(), db_path=str(tmp_path / "desk.db"))
+    brain = DeskBrain(cfg, DeskStore(cfg.db_path), "sk-ant-test")
+    claude = _FailingClaude(_ClaudeError(400, "Your credit balance is too low to access the Anthropic API."))
+    brain._client = lambda: claude
+    headlines = [{"headline": "NVDA lands a big new contract", "created_at": datetime.now(ET).isoformat(), "url": "https://example.com"}]
+    first = brain.news({"symbol": "NVDA"}, headlines)
+    assert claude.calls == 1 and first["source"] == "rules" and first["has_reason"]
+    assert brain.resting and "ingen kredit" in brain.last_error and 14 <= brain.rest_minutes() <= 15
+    # Under pausen kaldes Claude slet ikke: reglerne svarer med det samme.
+    assert brain.news({"symbol": "NVDA"}, headlines)["source"] == "rules"
+    assert brain.skeptic({"symbol": "NVDA"}, {"has_reason": True}, {}, {}) is None
+    assert claude.calls == 1
+    # Test Claude prøver altid, og et svar uden fejl slutter pausen.
+    brain._ok()
+    assert not brain.resting and brain.last_error == ""
+
+
+def test_a_passing_claude_problem_does_not_pause_it(tmp_path):
+    from trader.desk.agents import DeskBrain
+
+    cfg = replace(DeskSettings(), db_path=str(tmp_path / "desk.db"))
+    brain = DeskBrain(cfg, DeskStore(cfg.db_path), "sk-ant-test")
+    claude = _FailingClaude(_ClaudeError(429, "rate_limit_error"))
+    brain._client = lambda: claude
+    brain.news({"symbol": "NVDA"}, [])
+    brain.news({"symbol": "NVDA"}, [])
+    assert claude.calls == 2 and not brain.resting
+
+
+def test_status_says_the_desk_trades_on_without_claude(tmp_path):
+    desk, _ = make_desk(tmp_path, FakeBroker({}))
+    desk.brain.api_key = "sk-ant-test"
+    desk.brain._failed(_ClaudeError(400, "Your credit balance is too low"))
+    status = desk.status()
+    assert status["ai"]["resting"] and status["ai"]["retry_minutes"] >= 14
+    claude = [a for a in status["alerts"] if a["text"].startswith("Claude:")]
+    assert claude and claude[0]["level"] == "warning" and "bordet handler videre" in claude[0]["text"]

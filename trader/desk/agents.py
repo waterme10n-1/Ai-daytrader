@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from datetime import datetime
 from typing import Any, Literal
 from zoneinfo import ZoneInfo
@@ -181,6 +182,16 @@ def et_day() -> str:
     return datetime.now(ET).date().isoformat()
 
 
+CLAUDE_REST_SECONDS = 900  # pause efter en fejl, der ikke går over af sig selv (ingen kredit, forkert nøgle)
+
+
+def lasting_error(exc: Exception) -> bool:
+    """Ingen kredit, forkert nøgle eller model: det går ikke over, før nogen retter det. 429, 5xx og timeout gør."""
+    status = getattr(exc, "status_code", None)
+    low = str(getattr(exc, "message", None) or exc).lower()
+    return status in (401, 403, 404) or "credit balance" in low or "billing" in low
+
+
 def explain_error(exc: Exception, model: str) -> str:
     """Anthropics fejl på dansk, så man kan se, hvad der skal rettes."""
     status = getattr(exc, "status_code", None)
@@ -212,6 +223,15 @@ class DeskBrain:
         self.api_key = api_key
         self.last_error = ""
         self.last_ok: str | None = None
+        self._rest_until = 0.0
+
+    @property
+    def resting(self) -> bool:
+        """Sand, mens bordet holder pause fra Claude efter en fejl, der ikke går over af sig selv."""
+        return time.monotonic() < self._rest_until
+
+    def rest_minutes(self) -> int:
+        return max(0, int((self._rest_until - time.monotonic() + 59) // 60))
 
     @property
     def configured(self) -> bool:
@@ -227,7 +247,8 @@ class DeskBrain:
         return max(0.0, self.settings.ai_daily_budget_usd - self.store.spend_on(et_day()))
 
     def available(self, estimate: float) -> bool:
-        return self.configured and self.budget_left() >= estimate
+        # Under en pause bruges de faste regler med det samme i stedet for et kald, der fejler igen.
+        return self.configured and not self.resting and self.budget_left() >= estimate
 
     def why_unavailable(self) -> str:
         """Hvorfor Claude ikke blev brugt, på dansk. Tom streng, hvis Claude kan bruges."""
@@ -241,10 +262,13 @@ class DeskBrain:
 
     def _failed(self, exc: Exception) -> None:
         self.last_error = explain_error(exc, self.settings.ai_model)
+        if lasting_error(exc):
+            self._rest_until = time.monotonic() + CLAUDE_REST_SECONDS
         logger.warning("Claude fejlede: %s (%s)", self.last_error, exc)
 
     def _ok(self) -> None:
         self.last_error = ""
+        self._rest_until = 0.0
         self.last_ok = datetime.now(ET).isoformat(timespec="seconds")
 
     def test(self) -> dict:

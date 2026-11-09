@@ -1481,7 +1481,12 @@ class DeskEngine:
         elif self.brain.limited and self.brain.budget_left() < 0.15:
             alerts.append({"level": "info", "text": "Dagens AI-budget er brugt. Reglerne tager over til i morgen."})
         elif self.brain.last_error:
-            alerts.append({"level": "error", "text": f"Claude: {self.brain.last_error}"})
+            alerts.append(
+                {
+                    "level": "warning",
+                    "text": f"Claude: {self.brain.last_error} NEWS og SKEPTIC bruger faste regler imens, så bordet handler videre.",
+                }
+            )
         if record["too_soft"]:
             alerts.append({"level": "warning", "text": "SKEPTIC godkender mere end halvdelen. Den skal sige nej langt oftere end ja."})
         if cfg.auto_approve:
@@ -1525,6 +1530,8 @@ class DeskEngine:
                 "limited": self.brain.limited,
                 "reason": self.brain.why_unavailable(),
                 "last_error": self.brain.last_error,
+                "resting": self.brain.resting,
+                "retry_minutes": self.brain.rest_minutes(),
                 "last_ok": self.brain.last_ok,
                 "spent_today_usd": round(self.store.spend_on(day), 4),
             },
