@@ -987,3 +987,14 @@ def test_status_says_the_desk_trades_on_without_claude(tmp_path):
     assert status["ai"]["resting"] and status["ai"]["retry_minutes"] >= 14
     claude = [a for a in status["alerts"] if a["text"].startswith("Claude:")]
     assert claude and claude[0]["level"] == "warning" and "bordet handler videre" in claude[0]["text"]
+
+
+def test_without_claude_a_headline_from_last_night_still_counts():
+    from trader.desk.agents import DeskBrain
+
+    now = datetime.now(ET)
+    evening = [{"headline": "NVDA wins a big contract", "created_at": (now - timedelta(hours=14)).isoformat(), "url": "https://example.com"}]
+    assert DeskBrain.rules_news(evening)["has_reason"]
+    old = [{"headline": "NVDA old story", "created_at": (now - timedelta(hours=20)).isoformat(), "url": "https://example.com"}]
+    news = DeskBrain.rules_news(old)
+    assert not news["has_reason"] and "18 timer" in news["reason"]

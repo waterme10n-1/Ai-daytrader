@@ -182,6 +182,7 @@ def et_day() -> str:
     return datetime.now(ET).date().isoformat()
 
 
+RULES_NEWS_HOURS = 18  # uden Claude: så gammel må en overskrift være for at tælle som grund
 CLAUDE_REST_SECONDS = 900  # pause efter en fejl, der ikke går over af sig selv (ingen kredit, forkert nøgle)
 
 
@@ -398,7 +399,11 @@ class DeskBrain:
 
     @staticmethod
     def rules_news(headlines: list[dict]) -> dict:
-        """Uden Claude: kun en overskrift (Alpaca eller Yahoo) fra de sidste 6 timer tæller som grund."""
+        """Uden Claude: kun en overskrift (Alpaca eller Yahoo) fra de sidste 18 timer tæller som grund.
+
+        18 timer svarer til det vindue, bordet henter nyheder for. En nyhed fra i går aftes eller før åbning driver
+        ofte dagens bevægelse og er stadig grunden.
+        """
         now = datetime.now(ET)
         for item in headlines:
             try:
@@ -407,7 +412,7 @@ class DeskBrain:
                 continue
             if created.tzinfo is None:
                 created = created.replace(tzinfo=ET)
-            if (now - created).total_seconds() <= 6 * 3600 and item.get("headline"):
+            if (now - created).total_seconds() <= RULES_NEWS_HOURS * 3600 and item.get("headline"):
                 return {
                     "has_reason": True,
                     "reason": str(item["headline"])[:300] + f" (seneste overskrift fra {item.get('source') or 'Alpaca'}, ikke en Claude-vurdering)",
@@ -415,7 +420,13 @@ class DeskBrain:
                     "source_title": f"{item.get('source') or 'Alpaca'} News",
                     "source": "rules",
                 }
-        return {"has_reason": False, "reason": "Ingen klar grund. Ingen overskrift de sidste 6 timer.", "source_url": "", "source_title": "", "source": "rules"}
+        return {
+            "has_reason": False,
+            "reason": f"Ingen klar grund. Ingen overskrift de sidste {RULES_NEWS_HOURS} timer.",
+            "source_url": "",
+            "source_title": "",
+            "source": "rules",
+        }
 
     # ------------------------------------------------------------------ SKEPTIC
     def skeptic(self, flag: dict, news: dict, plan: dict, record: dict) -> dict | None:
