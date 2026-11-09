@@ -65,6 +65,10 @@ def test_hold_expires_doubles_next_time_and_resets_on_profit():
     engine._check_guard()
     hold = engine._holds()["momentum"]
     assert hold["hours"] == 24
+    # Under pausen viser de tokens, den ville have købt, overskud efter gebyrer.
+    for index in range(15):
+        shadow = engine.store.add_shadow({"mode": "paper", "mint": f"Proof{index}", "symbol": "P", "strategy": "momentum", "stage": "risiko", "entry_price": 1.0})
+        engine.store.update_shadow(shadow, status="done", sim_pnl_pct=0.05, verdict="missed", done_at=now_iso())
     hold["until"] = time.time() - 1  # pausen er ovre
     engine._save_holds({"momentum": hold})
     engine._check_guard()

@@ -153,6 +153,16 @@ GUARD_MAX_PF = 0.8
 GUARD_HOLD_HOURS = 24
 GUARD_MAX_HOURS = 96
 GUARD_SKIP_EXITS = {"kill", "manual"}
+# "Fordel": hvad de tokens, strategien ville købe, gav i snit efter gebyrer (skyggehandler, der bestod alle filtre).
+EDGE_STAGES = {"købt", "risiko"}
+EDGE_SAMPLES = 40
+# En pause slutter kun, når mindst 15 tokens fra pausen i snit gav mindst +1 % efter gebyrer.
+RESUME_MIN_SAMPLES = 15
+RESUME_MIN_EDGE = 0.01
+# Pause tidligere, når både de seneste handler og mindst 30 skyggehandler taber klart (-5 % i snit).
+EDGE_PAUSE_MIN_SAMPLES = 30
+EDGE_PAUSE_MAX = -0.05
+EDGE_PAUSE_MIN_TRADES = 4
 # Automatisk mål for sniperen: kun med mange kursforløb, kun hvis det klart er bedre og giver overskud.
 # Én gang efter opdateringen: en papirkonto med historik starter forfra med 50 USD (brugerens ønske).
 PAPER_RESTART_ONCE = ("papir-50-forskning-nov-2026", 50.0)
@@ -228,6 +238,18 @@ def _hold_minutes(row: dict) -> float | None:
     except (TypeError, ValueError, KeyError):
         return None
     return max(0.0, (closed - opened).total_seconds() / 60.0)
+
+
+def _iso_seconds(iso: str | None, default: float) -> float:
+    if not iso:
+        return default
+    try:
+        moment = datetime.fromisoformat(str(iso))
+    except ValueError:
+        return default
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=timezone.utc)
+    return moment.timestamp()
 
 
 def _minutes_since(iso: str | None) -> float:
@@ -2122,6 +2144,19 @@ class MemeEngine:
             "pf": gross_win / gross_loss if gross_loss > 0 else (99.0 if gross_win > 0 else 0.0),
         }
 
+    def _edge(self, strategy: str, since: str | None = None, limit: int = EDGE_SAMPLES) -> dict:
+        """Hvad tokens, strategien ville købe, gav i snit med dens egne salgsregler efter gebyrer (nyeste først)."""
+        rows = [
+            row for row in self.store.done_shadows(self.mode, strategy, 600)
+            if row["stage"] in EDGE_STAGES and row.get("sim_pnl_pct") is not None and (since is None or str(row["ts"]) >= since)
+        ][:limit]
+        values = [float(row["sim_pnl_pct"]) for row in rows]
+        return {
+            "n": len(values),
+            "avg": sum(values) / len(values) if values else None,
+            "win_rate": sum(1 for value in values if value > 0) / len(values) if values else None,
+        }
+
     def _save_holds(self, holds: dict) -> None:
         self.store.set_json(f"strategy_holds:{self.mode}", holds)
 
@@ -2133,11 +2168,33 @@ class MemeEngine:
         for strategy, hold in list(holds.items()):
             until = hold.get("until")
             if until is not None and now >= float(until):
+                label = STRATEGY_LABELS.get(strategy, strategy)
+                if hold.get("auto") and self.guard_on:
+                    # Start kun igen, når tokens fra pausen viser, at strategien tjener penge. Ellers forlæng pausen.
+                    edge = self._edge(strategy, since=str(hold.get("since") or ""))
+                    held_hours = (now - _iso_seconds(hold.get("since"), now)) / 3600
+                    still_losing = edge["n"] >= RESUME_MIN_SAMPLES and (edge["avg"] or 0.0) < RESUME_MIN_EDGE
+                    too_few = edge["n"] < RESUME_MIN_SAMPLES and held_hours < GUARD_MAX_HOURS
+                    if still_losing or too_few:
+                        if still_losing:
+                            reason = (f"Holder fortsat pause: de {edge['n']} tokens, den ville have købt under pausen, gav i snit "
+                                      f"{_dk(edge['avg'] * 100, 1)} % efter gebyrer. Den tjekker igen om {GUARD_HOLD_HOURS} timer.")
+                        else:
+                            reason = (f"Holder fortsat pause: kun {edge['n']} af {RESUME_MIN_SAMPLES} tokens at bedømme den på endnu. "
+                                      f"Den tjekker igen om {GUARD_HOLD_HOURS} timer.")
+                        hold.update(until=now + GUARD_HOLD_HOURS * 3600, reason=reason)
+                        holds[strategy] = hold
+                        changed = True
+                        self.store.add_event("info", f"{label}: {reason[0].lower()}{reason[1:]}")
+                        continue
                 holds.pop(strategy)
                 changed = True
                 # Efter pausen bedømmes strategien kun på nye handler.
                 self.store.set_state(f"guard_since:{self.mode}:{strategy}", now_iso())
-                self.store.add_event("info", f"{STRATEGY_LABELS.get(strategy, strategy)} kører igen efter strategi-vagtens pause.")
+                edge = self._edge(strategy, since=str(hold.get("since") or "")) if hold.get("auto") else {"n": 0}
+                proof = (f" Under pausen gav de {edge['n']} tokens, den ville have købt, i snit {_dk(edge['avg'] * 100, 1)} % efter gebyrer."
+                         if edge["n"] and edge.get("avg") is not None else "")
+                self.store.add_event("info", f"{label} kører igen efter strategi-vagtens pause.{proof}")
         closed = self.store.closed_positions(self.mode)
         if len(closed) != self._guard_seen:
             self._guard_seen = len(closed)
@@ -2148,17 +2205,23 @@ class MemeEngine:
                     self.store.set_state(strikes_key, "0")  # den tjener igen: næste pause bliver kort
                 if not self.guard_on or strategy in holds:
                     continue
-                if window["n"] >= GUARD_MIN_TRADES and window["pnl"] < 0 and window["pf"] < GUARD_MAX_PF:
+                losing_trades = window["n"] >= GUARD_MIN_TRADES and window["pnl"] < 0 and window["pf"] < GUARD_MAX_PF
+                edge = self._edge(strategy) if not losing_trades and window["n"] >= EDGE_PAUSE_MIN_TRADES and window["pnl"] < 0 else None
+                losing_edge = bool(edge and edge["n"] >= EDGE_PAUSE_MIN_SAMPLES and (edge["avg"] or 0.0) <= EDGE_PAUSE_MAX)
+                if losing_trades or losing_edge:
                     strikes = int(self.store.get_state(strikes_key, "0") or 0) + 1
                     hours = min(GUARD_MAX_HOURS, GUARD_HOLD_HOURS * 2 ** (strikes - 1))
                     reason = (
                         f"De seneste {window['n']} handler gav {_dk(window['pnl'])} USD "
                         f"({window['wins']} vindere, profitfaktor {_dk(window['pf'])})."
                     )
+                    if losing_edge:
+                        reason += (f" De {edge['n']} seneste tokens, den ville købe, gav i snit {_dk(edge['avg'] * 100, 1)} % "
+                                   "efter gebyrer, så tabet er ikke bare uheld.")
                     holds[strategy] = {"until": now + hours * 3600, "since": now_iso(), "reason": reason, "hours": hours, "auto": True}
                     self.store.set_state(strikes_key, str(strikes))
                     changed = True
-                    message = f"Strategi-vagt: {label} er sat på hold i {hours} timer. {reason}"
+                    message = f"Strategi-vagt: {label} holder pause. {reason} Den starter først igen, når tokens fra pausen viser overskud."
                     self.store.add_event("warning", message)
                     self.store.add_lesson("parameter", message + " Den følger stadig tokens som skyggehandler.")
                     self._notify(message)
@@ -2263,6 +2326,10 @@ class MemeEngine:
         for row in self.store.done_shadows(self.mode, strategy, ANALYSIS_ROWS):
             facts = loads(row.get("facts"), {}) or {}
             if facts and row.get("sim_pnl_pct") is not None and not facts.get("sus"):
+                features = loads(row.get("features"), {}) or {}
+                if strategy == "momentum" and features:
+                    # Scoren med de vægte, botten bruger nu: så kan min. score kalibreres efter, hvad der faktisk gav penge.
+                    facts = {**facts, "score": round(self.model.score(features), 4)}
                 rows.append({"facts": facts, "pnl": float(row["sim_pnl_pct"]), "stage": row["stage"]})
         return rows
 
@@ -2319,6 +2386,7 @@ class MemeEngine:
                 "bought": {"n": len(bought), "avg": sum(bought) / len(bought) if bought else None},
                 "skipped": {"n": len(skipped), "avg": sum(skipped) / len(skipped) if skipped else None},
                 "facts": fact_report(rows)[:8],
+                "edge": self._edge(strategy),
             })
         result["tightened"] = list(reversed(self.store.get_json("auto_tighten_log", []) or []))[:6]
         self._analysis_cache = (time.time(), result)
@@ -2364,6 +2432,7 @@ class MemeEngine:
         holds = self._holds()
         now = time.time()
         enabled = {"momentum": True, "sniper": self.sniper.enabled, "toptrader": self.top_cfg.enabled}
+        edges = {item["strategy"]: item.get("edge") for item in self._analysis()["strategies"]} if self.settings.shadows else {}
         out = []
         for strategy, label in STRATEGY_LABELS.items():
             rows = [row for row in closed if (row.get("strategy") or "momentum") == strategy]
@@ -2379,6 +2448,7 @@ class MemeEngine:
                 "pnl": sum(pnl),
                 "open": sum(1 for row in open_rows if (row.get("strategy") or "momentum") == strategy),
                 "recent": {"n": window["n"], "pnl": window["pnl"], "pf": window["pf"] if window["pf"] < 99 else None},
+                "edge": edges.get(strategy),
                 "hold": None if hold is None else {
                     "reason": hold.get("reason", ""),
                     "auto": bool(hold.get("auto")),

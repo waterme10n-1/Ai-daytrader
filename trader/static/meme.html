@@ -1040,7 +1040,7 @@
         <div class="card" id="strat-card">
           <div class="card-head"><h2 id="strat-title"></h2><span class="muted small-txt">resultat pr. strategi</span></div>
           <div id="strats"></div>
-          <div class="field" style="border-bottom:0;padding-bottom:0"><div class="field-top"><span>Strategi-vagt</span><button class="switch" id="guard-switch" type="button" role="switch" aria-checked="false" aria-label="Strategi-vagt"></button></div><span class="muted small-txt">Taber en strategi på sine seneste 8–12 handler, holder den selv pause i 24 timer (næste gang længere) og lærer videre som skyggehandler.</span></div>
+          <div class="field" style="border-bottom:0;padding-bottom:0"><div class="field-top"><span>Strategi-vagt</span><button class="switch" id="guard-switch" type="button" role="switch" aria-checked="false" aria-label="Strategi-vagt"></button></div><span class="muted small-txt">Taber en strategi på sine seneste handler, holder den selv pause og lærer videre som skyggehandler. Den starter først igen, når de tokens, den ville have købt under pausen, i snit har givet overskud efter gebyrer.</span></div>
         </div>
       </div>
       <div class="col">
@@ -3121,6 +3121,9 @@ function renderStrategies(data) {
     return `<div class="lrow"><span class="avatar sys" aria-hidden="true">${icon(STRAT_ICON[st.id] || "activity")}</span>
       <div class="lmain"><div class="ltitle">${esc(st.label)}${tag}</div>
         <div class="lsub">${esc(fmtInt.format(st.trades))} handler${st.win_rate == null ? "" : ` · ${esc(pct(st.win_rate))} vinder`}${recent}${st.open ? ` · ${esc(st.open)} åbne` : ""}</div>
+        ${st.edge ? `<div class="lsub" title="Hvad de seneste tokens, strategien ville købe, gav i snit med dens egne salgsregler efter gebyrer">${st.edge.n >= 15 && st.edge.avg != null
+          ? `Forventet pr. handel <b class="${tone(st.edge.avg)}">${esc(spct(st.edge.avg))}</b> · ${esc(st.edge.n)} tokens`
+          : `Forventet pr. handel: samler data ${esc(st.edge.n)}/15`}</div>` : ""}
         ${st.hold ? `<div class="lsub" style="-webkit-line-clamp:3">${esc(st.hold.reason)}</div>` : ""}
       </div>
       <div class="lright"><b class="${tone(st.pnl)}">${esc(signed(st.pnl))}</b><span>${action}</span></div></div>`;
