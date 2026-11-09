@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from datetime import datetime
 from typing import Any, Literal
 from zoneinfo import ZoneInfo
@@ -39,7 +40,9 @@ BOTS: dict[str, dict[str, str]] = {
             "watchlisten. Du markerer en ticker, der bevæger sig mere end {move_pct} % på en time, eller handler mere end "
             "{volume_x} gange sin normale volumen. Du skriver ticker, bevægelse og volumen i gruppen. Højst "
             "{max_flags} markeringer om dagen på kursbevægelse. Markeringer kun på volumen har deres egen kvote på "
-            "lige så mange, og en ticker markeret på volumen kan markeres igen, når kursen flytter sig.{premarket} "
+            "lige så mange, og en ticker markeret på volumen kan markeres igen, når kursen flytter sig. En markering, "
+            "CHART siger \"Ingen setup\" til, tæller ikke i kvoten, og tickeren kan markeres én gang til efter en halv "
+            "time, hvis kursen er på vej op.{premarket} "
             "Du vurderer aldrig, om en bevægelse er god."
         ),
     },
@@ -156,8 +159,8 @@ def bot_rules(key: str, settings: DeskSettings) -> str:
             else "Du lægger aldrig en ordre uden min godkendelse."
         )
         + (
-            " Prøvekøb er slået til: siger SKEPTIC WAIT til en kursbevægelse med en klar grund og en ren opstilling, "
-            "køber du halv størrelse alligevel, medmindre en lært regel siger nej."
+            " Prøvekøb er slået til: siger SKEPTIC WAIT til en kursbevægelse med en ren opstilling, eller fandt NEWS "
+            "ingen grund, køber du halv størrelse alligevel, medmindre en lært regel siger nej."
             if getattr(settings, "trial_buys", False)
             else ""
         ),
@@ -179,6 +182,17 @@ class SkepticOut(BaseModel):
 
 def et_day() -> str:
     return datetime.now(ET).date().isoformat()
+
+
+RULES_NEWS_HOURS = 18  # uden Claude: så gammel må en overskrift være for at tælle som grund
+CLAUDE_REST_SECONDS = 900  # pause efter en fejl, der ikke går over af sig selv (ingen kredit, forkert nøgle)
+
+
+def lasting_error(exc: Exception) -> bool:
+    """Ingen kredit, forkert nøgle eller model: det går ikke over, før nogen retter det. 429, 5xx og timeout gør."""
+    status = getattr(exc, "status_code", None)
+    low = str(getattr(exc, "message", None) or exc).lower()
+    return status in (401, 403, 404) or "credit balance" in low or "billing" in low
 
 
 def explain_error(exc: Exception, model: str) -> str:
@@ -212,6 +226,15 @@ class DeskBrain:
         self.api_key = api_key
         self.last_error = ""
         self.last_ok: str | None = None
+        self._rest_until = 0.0
+
+    @property
+    def resting(self) -> bool:
+        """Sand, mens bordet holder pause fra Claude efter en fejl, der ikke går over af sig selv."""
+        return time.monotonic() < self._rest_until
+
+    def rest_minutes(self) -> int:
+        return max(0, int((self._rest_until - time.monotonic() + 59) // 60))
 
     @property
     def configured(self) -> bool:
@@ -227,7 +250,8 @@ class DeskBrain:
         return max(0.0, self.settings.ai_daily_budget_usd - self.store.spend_on(et_day()))
 
     def available(self, estimate: float) -> bool:
-        return self.configured and self.budget_left() >= estimate
+        # Under en pause bruges de faste regler med det samme i stedet for et kald, der fejler igen.
+        return self.configured and not self.resting and self.budget_left() >= estimate
 
     def why_unavailable(self) -> str:
         """Hvorfor Claude ikke blev brugt, på dansk. Tom streng, hvis Claude kan bruges."""
@@ -241,10 +265,13 @@ class DeskBrain:
 
     def _failed(self, exc: Exception) -> None:
         self.last_error = explain_error(exc, self.settings.ai_model)
+        if lasting_error(exc):
+            self._rest_until = time.monotonic() + CLAUDE_REST_SECONDS
         logger.warning("Claude fejlede: %s (%s)", self.last_error, exc)
 
     def _ok(self) -> None:
         self.last_error = ""
+        self._rest_until = 0.0
         self.last_ok = datetime.now(ET).isoformat(timespec="seconds")
 
     def test(self) -> dict:
@@ -374,7 +401,11 @@ class DeskBrain:
 
     @staticmethod
     def rules_news(headlines: list[dict]) -> dict:
-        """Uden Claude: kun en overskrift (Alpaca eller Yahoo) fra de sidste 6 timer tæller som grund."""
+        """Uden Claude: kun en overskrift (Alpaca eller Yahoo) fra de sidste 18 timer tæller som grund.
+
+        18 timer svarer til det vindue, bordet henter nyheder for. En nyhed fra i går aftes eller før åbning driver
+        ofte dagens bevægelse og er stadig grunden.
+        """
         now = datetime.now(ET)
         for item in headlines:
             try:
@@ -383,7 +414,7 @@ class DeskBrain:
                 continue
             if created.tzinfo is None:
                 created = created.replace(tzinfo=ET)
-            if (now - created).total_seconds() <= 6 * 3600 and item.get("headline"):
+            if (now - created).total_seconds() <= RULES_NEWS_HOURS * 3600 and item.get("headline"):
                 return {
                     "has_reason": True,
                     "reason": str(item["headline"])[:300] + f" (seneste overskrift fra {item.get('source') or 'Alpaca'}, ikke en Claude-vurdering)",
@@ -391,7 +422,13 @@ class DeskBrain:
                     "source_title": f"{item.get('source') or 'Alpaca'} News",
                     "source": "rules",
                 }
-        return {"has_reason": False, "reason": "Ingen klar grund. Ingen overskrift de sidste 6 timer.", "source_url": "", "source_title": "", "source": "rules"}
+        return {
+            "has_reason": False,
+            "reason": f"Ingen klar grund. Ingen overskrift de sidste {RULES_NEWS_HOURS} timer.",
+            "source_url": "",
+            "source_title": "",
+            "source": "rules",
+        }
 
     # ------------------------------------------------------------------ SKEPTIC
     def skeptic(self, flag: dict, news: dict, plan: dict, record: dict) -> dict | None:
