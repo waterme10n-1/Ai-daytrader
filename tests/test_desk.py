@@ -238,7 +238,7 @@ def test_full_chain_waits_for_approval_then_places_bracket_and_closes(tmp_path):
 
 def test_no_news_reason_means_skip_even_if_claude_says_buy(tmp_path):
     broker = FakeBroker({"NVDA": ramp_bars()})
-    desk, clock = make_desk(tmp_path, broker)
+    desk, clock = make_desk(tmp_path, broker, trial_buys=False)
     desk.brain.skeptic = lambda *args, **kwargs: {"reasons": ["a", "b", "c"], "ruling": "BUY", "summary": "BUY", "source": "claude"}
     desk.tick()
     row = desk.store.proposals_on(DAY.isoformat())[0]
@@ -290,7 +290,7 @@ def test_flatten_at_1550_and_day_log_with_shadow(tmp_path):
         {"NVDA": ramp_bars(), "AAPL": ramp_bars(), "SPY": ramp_bars(end=100.3)},
         news={"NVDA": fresh_news("NVDA")},
     )
-    desk, clock = make_desk(tmp_path, broker)
+    desk, clock = make_desk(tmp_path, broker, trial_buys=False)
     desk.tick()
     rows = {row["symbol"]: row for row in desk.store.proposals_on(DAY.isoformat())}
     assert rows["AAPL"]["status"] == "skip"  # ingen nyhed
@@ -333,14 +333,17 @@ def test_trial_buys_turn_a_wait_with_a_reason_into_a_half_size_buy(tmp_path):
     assert desk.status()["approvals"][0]["trial"]
 
 
-def test_trial_buys_never_buy_without_a_reason_on_volume_alone_or_when_switched_off(tmp_path):
-    # Ingen nyhed: SKIP, også med prøvekøb.
+def test_trial_buys_also_take_a_move_without_news_but_never_volume_alone_or_when_switched_off(tmp_path):
+    # Ingen nyhed: med prøvekøb købes en ren kursbevægelse alligevel, til halv størrelse.
     broker = FakeBroker({"NVDA": late_ramp()})
     desk, clock = make_desk(tmp_path / "a", broker, watchlist=("NVDA",))
     clock["now"] = at(15, 5)
     desk.scan()
-    assert desk.store.proposals_on(DAY.isoformat())[0]["status"] == "skip"
-    # Slået fra: WAIT forbliver WAIT.
+    row = desk.store.proposals_on(DAY.isoformat())[0]
+    assert row["ruling"] == "SKIP" and row["status"] == "awaiting"
+    assert row["skeptic"]["trial"] and row["skeptic"]["trial_reason"] == "no_news" and row["size"]["pct"] <= 2.6
+    assert any(m["text"].startswith("Prøvekøb: NEWS fandt ingen grund") for m in desk.store.messages(limit=50))
+    # Slået fra: WAIT forbliver WAIT, og uden nyhed er det SKIP som før.
     broker = FakeBroker({"NVDA": late_ramp()}, news={"NVDA": fresh_news("NVDA")})
     desk, clock = make_desk(tmp_path / "b", broker, watchlist=("NVDA",))
     desk.update_params({"trial_buys": False})
@@ -349,13 +352,23 @@ def test_trial_buys_never_buy_without_a_reason_on_volume_alone_or_when_switched_
     desk.scan()
     row = desk.store.proposals_on(DAY.isoformat())[0]
     assert row["status"] == "wait" and not (row["skeptic"] or {}).get("trial")
-    # Kun volumen: kursen har ikke bekræftet noget, så ingen prøvekøb.
+    # Kun volumen: kursen har ikke bekræftet noget, så ingen prøvekøb, heller ikke uden nyhed.
     loud = ramp_bars(end=100.5, volume=3000.0, ramp_volume=3000.0)
-    broker = FakeBroker({"NVDA": loud}, news={"NVDA": fresh_news("NVDA")})
-    desk, clock = make_desk(tmp_path / "c", broker, watchlist=("NVDA",))
-    desk.scan()
-    rows = desk.store.proposals_on(DAY.isoformat())
-    assert rows and all(row["status"] != "awaiting" for row in rows)
+    for news in ({"NVDA": fresh_news("NVDA")}, {}):
+        broker = FakeBroker({"NVDA": loud}, news=news)
+        desk, clock = make_desk(tmp_path / f"c{len(news)}", broker, watchlist=("NVDA",))
+        desk.scan()
+        rows = desk.store.proposals_on(DAY.isoformat())
+        assert rows and all(row["status"] != "awaiting" for row in rows)
+
+
+def test_buys_without_news_stop_once_the_desk_has_seen_them_lose():
+    rows = [
+        {"status": "skip", "flag": {"by_move": True}, "news": {"has_reason": False}, "shadow": {"result": "loss", "pct": -1.0}}
+        for _ in range(3)
+    ]
+    rule = next(item for item in learning.evaluate(rows) if item["key"] == "no_reason")
+    assert rule["active"] and learning.blocking(learning.evaluate(rows), {"by_move": True}, {"has_reason": False}, {})
 
 
 def test_a_learned_rule_stops_trial_buys_too(tmp_path):
@@ -432,7 +445,7 @@ def test_move_quota_still_caps_real_moves(tmp_path):
 def test_new_scout_defaults():
     from trader.desk.config import DEFAULT_WATCHLIST
 
-    assert DeskSettings().move_pct == 2.0 and DeskSettings().max_flags_per_day == 8
+    assert DeskSettings().move_pct == 1.5 and DeskSettings().max_flags_per_day == 8
     assert DeskSettings().premarket and DeskSettings().gap_pct == 3.0
     assert {"SMCI", "MSTR", "SOFI", "RIVN"} <= set(DEFAULT_WATCHLIST) and len(DEFAULT_WATCHLIST) == 16
 
@@ -445,7 +458,7 @@ def test_old_saved_defaults_give_way_to_the_new_ones(tmp_path):
     store.set_state("welcome", "1")
     store.set_json("params", {"move_pct": 3.0, "max_flags_per_day": 5, "watchlist": list(RETIRED_DEFAULTS["watchlist"]), "position_pct": 3.0})
     desk, _ = make_desk(tmp_path, broker, watchlist=DEFAULT_WATCHLIST)
-    assert desk.cfg.move_pct == 2.0 and desk.cfg.watchlist == DEFAULT_WATCHLIST and desk.cfg.position_pct == 3.0
+    assert desk.cfg.move_pct == desk.base.move_pct and desk.cfg.watchlist == DEFAULT_WATCHLIST and desk.cfg.position_pct == 3.0
     assert desk.cfg.max_flags_per_day == 8
     assert "SCOUT er opdateret" in desk.store.messages(limit=5)[-1]["text"]
     # Kun én gang: vælger man selv 3 % bagefter, bliver det ved med at gælde.
@@ -661,7 +674,7 @@ def test_autopilot_buys_on_its_own_but_only_after_skeptic_says_buy(tmp_path):
         {"NVDA": ramp_bars(), "AAPL": ramp_bars(), "SPY": ramp_bars(end=100.3, ramp_volume=1000)},
         news={"NVDA": fresh_news("NVDA")},
     )
-    desk, clock = make_desk(tmp_path, broker, auto_approve=True, scan_minutes=1)
+    desk, clock = make_desk(tmp_path, broker, auto_approve=True, scan_minutes=1, trial_buys=False)
     clock["now"] = at(11, 31)
     desk.tick()
     rows = {row["symbol"]: row for row in desk.store.proposals_on(DAY.isoformat())}
@@ -724,7 +737,7 @@ def test_401_message_names_the_service():
 # ---------------------------------------------------------------------- læring
 def _done_row(symbol, *, vs_vwap, win, real=True):
     flag = {"symbol": symbol, "move_pct": 3.5, "vs_vwap_pct": vs_vwap, "by_move": True, "ts": "2026-11-04T11:30:00-05:00"}
-    row = {"symbol": symbol, "flag": flag, "news": {"source": "claude"}, "chart": {"stop_pct": 0.8}}
+    row = {"symbol": symbol, "flag": flag, "news": {"source": "claude", "has_reason": True}, "chart": {"stop_pct": 0.8}}
     if real:
         row.update(status="closed", fill_price=100.0, exit_price=102.0 if win else 99.0, pnl=20.0 if win else -10.0, exit_reason="target" if win else "stop")
     else:

@@ -496,7 +496,7 @@
       <div class="card-h"><h2>Indstillinger</h2></div>
       <form class="form" id="params">
         <label class="wide toggle"><span class="tx">Autopilot<span>Bordet køber selv på papir, når SKEPTIC siger BUY.</span></span><input name="auto_approve" type="checkbox"></label>
-        <label class="wide toggle"><span class="tx">Prøvekøb<span>Siger SKEPTIC WAIT til en kursbevægelse med en klar grund og en ren opstilling, køber bordet halv størrelse alligevel. Flere handler på papir, og bordet lærer af rigtige resultater.</span></span><input name="trial_buys" type="checkbox"></label>
+        <label class="wide toggle"><span class="tx">Prøvekøb<span>Siger SKEPTIC WAIT, eller finder NEWS ingen grund, til en kursbevægelse med en ren opstilling, køber bordet halv størrelse alligevel. Flere handler på papir. Taber køb uden grund, lærer bordet det og stopper dem selv.</span></span><input name="trial_buys" type="checkbox"></label>
         <label class="wide toggle"><span class="tx"><span id="pre-lbl" style="display:inline;font:inherit;color:inherit">Før åbning</span><span id="pre-sub">SCOUT og NEWS kigger på gaps fra kl. 10 dansk tid, og et gap, der holder, kan købes ved åbningen.</span></span><input name="premarket" type="checkbox"></label>
         <label class="wide toggle"><span class="tx">Lyd og vibration<span>Ved køb og salg (gemmes på denne enhed).</span></span><input id="sound-toggle" type="checkbox"></label>
         <label class="wide toggle"><span class="tx">Lyst tema<span>Gemmes på denne enhed.</span></span><input id="theme-toggle" type="checkbox"></label>
@@ -1054,7 +1054,7 @@ function systems(d) {
     ["SCOUT", d.paused ? "warn" : sys.last_scan ? "ok" : "", d.paused ? "På pause" : sys.last_scan ? `Kiggede ${ago(sys.last_scan)}` : m.is_open ? "Venter på første scan" : d.params.premarket ? "Kigger fra kl. 10 dansk tid (før åbning)" : "Kigger, når børsen åbner"],
     ["Claude", !ai.configured || ai.last_error ? "warn" : "ok", !ai.configured ? "ANTHROPIC_API_KEY mangler i Railway · faste regler kører" : ai.last_error ? `${ai.last_error} Faste regler kører${ai.resting && ai.retry_minutes ? `, Claude prøves igen om ${ai.retry_minutes} min` : ""}.` : ai.limited ? `${money(ai.spent_today_usd)} af ${money(ai.budget_usd)} $ brugt i dag` : `Klar · ${money(ai.spent_today_usd)} $ brugt i dag`],
     ["Autopilot", d.params.auto_approve ? "ok" : "warn", d.params.auto_approve ? "Køber selv på papir" : "Du godkender hver ordre"],
-    ["Prøvekøb", d.params.trial_buys ? "ok" : "", d.params.trial_buys ? "Halv størrelse, når SKEPTIC siger WAIT med en grund" : "Fra"],
+    ["Prøvekøb", d.params.trial_buys ? "ok" : "", d.params.trial_buys ? "Halv størrelse ved WAIT eller uden nyhed" : "Fra"],
     ["Læring", rules ? "ok" : "", rules ? `${rules} regel${rules > 1 ? "er" : ""} aktiv` : "Samler data"],
     ["Telegram", sys.telegram ? "ok" : "", sys.telegram ? "Sender beskeder" : "Ikke sat op"],
   ];

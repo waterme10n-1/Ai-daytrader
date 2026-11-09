@@ -793,11 +793,13 @@ class DeskEngine:
         )
         # Prøvekøb: WAIT med en klar grund fra NEWS og en ren opstilling fra CHART købes alligevel, til halv størrelse.
         # SKIP (ingen grund), markeringer kun på volumen og WAIT fra en lært regel købes aldrig.
+        # Prøvekøb dækker også SKIP, når den eneste grund er, at NEWS ikke fandt en nyhed. Et SKIP fra Claude med en
+        # nyhed i hånden respekteres. Taber køb uden grund, lærer bordet det ("no_reason") og stopper dem selv.
+        no_reason = not news.get("has_reason")
         trial = (
-            verdict["ruling"] == "WAIT"
-            and cfg.trial_buys
+            cfg.trial_buys
             and flag.by_move  # kun rigtige kursbevægelser, ikke markeringer kun på volumen
-            and bool(news.get("has_reason"))
+            and (verdict["ruling"] == "WAIT" or (verdict["ruling"] == "SKIP" and no_reason))
             and not verdict.get("learned")
             and not learning.blocking(learned, flag.to_dict(), news, plan.to_dict())
         )
@@ -806,12 +808,14 @@ class DeskEngine:
             return
         if trial:
             verdict["trial"] = True
+            verdict["trial_reason"] = "no_news" if no_reason else "wait"
             self.store.update_proposal(pid, skeptic=verdict)
+            why = "NEWS fandt ingen grund" if no_reason else "SKEPTIC sagde WAIT"
             self.store.post(
                 "executor",
                 "info",
-                f"Prøvekøb: SKEPTIC sagde WAIT, men grunden og opstillingen er der. Jeg køber {symbol} til halv størrelse "
-                "på papir, så bordet lærer af det rigtige resultat.",
+                f"Prøvekøb: {why}, men kursen bevæger sig, og CHART har en ren opstilling. Jeg køber {symbol} til halv "
+                "størrelse på papir, så bordet lærer af det rigtige resultat.",
                 symbol=symbol,
                 proposal_id=pid,
             )

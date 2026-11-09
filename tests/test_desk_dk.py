@@ -429,7 +429,7 @@ def test_copenhagen_asks_yahoo_far_less_often(tmp_path):
     assert DeskSettings.from_env_dk().scan_minutes == 5
     # Ingen nyheder: SCOUT markerer, men intet købes, så der er ingen ordrer at tjekke.
     data = FakeYahoo({"NOVO-B": ramp(), "DSV": ramp(end=100.2, ramp_volume=1000), "^OMXC25": ramp(end=100.4, ramp_volume=1000)})
-    desk, _paper, clock = make_dk(tmp_path, data, scan_minutes=5)
+    desk, _paper, clock = make_dk(tmp_path, data, scan_minutes=5, trial_buys=False)
     clock["now"] = at(11, 0)
     desk.tick()
     first = len(data.calls)

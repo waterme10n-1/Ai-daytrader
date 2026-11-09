@@ -157,8 +157,8 @@ def bot_rules(key: str, settings: DeskSettings) -> str:
             else "Du lægger aldrig en ordre uden min godkendelse."
         )
         + (
-            " Prøvekøb er slået til: siger SKEPTIC WAIT til en kursbevægelse med en klar grund og en ren opstilling, "
-            "køber du halv størrelse alligevel, medmindre en lært regel siger nej."
+            " Prøvekøb er slået til: siger SKEPTIC WAIT til en kursbevægelse med en ren opstilling, eller fandt NEWS "
+            "ingen grund, køber du halv størrelse alligevel, medmindre en lært regel siger nej."
             if getattr(settings, "trial_buys", False)
             else ""
         ),
