@@ -368,13 +368,116 @@
   @media (max-width: 400px) { .status .lbl-s { display: none; } .stock { grid-template-columns: minmax(0, 1fr) 70px 90px; } .stock svg { width: 70px; } }
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 </style>
+<style id="glow">
+  /* Lag 2: lys og dybde. Kun statiske gradienter og skygger: ingen sløring bag kort, ingen pulserende skygger,
+     ingen faste baggrunde, så siden stadig glider på en telefon. */
+  :root { --mood: var(--accent); --hi: rgba(255, 255, 255, 0.05); --edge: rgba(255, 255, 255, 0.075); --tone: var(--accent); }
+  :root[data-theme="light"] { --hi: rgba(255, 255, 255, 0); --edge: rgba(0, 0, 0, 0.05); }
+  html[data-mood="open"] { --mood: var(--up); }
+  html[data-mood="pre"] { --mood: var(--warn); }
+  body {
+    background:
+      radial-gradient(900px 440px at 50% -170px, color-mix(in srgb, var(--mood) 22%, transparent), transparent 72%),
+      radial-gradient(620px 360px at 105% 8%, color-mix(in srgb, var(--sizer) 9%, transparent), transparent 70%),
+      var(--bg);
+    background-repeat: no-repeat;
+  }
+  :root[data-theme="light"] body {
+    background: radial-gradient(900px 440px at 50% -170px, color-mix(in srgb, var(--mood) 14%, transparent), transparent 72%), var(--bg);
+    background-repeat: no-repeat;
+  }
+
+  /* kort med lys kant */
+  .card { background: linear-gradient(180deg, var(--hi), transparent 140px), var(--card); box-shadow: var(--shadow), inset 0 0 0 0.5px var(--edge); }
+  .stat { background: linear-gradient(180deg, var(--hi), transparent), var(--card-2); box-shadow: inset 0 0 0 0.5px var(--edge); }
+
+  /* titel med logo */
+  .title { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 11px; align-items: center; }
+  .title .logo { grid-row: 1 / 3; width: 34px; height: 34px; border-radius: 10px; box-shadow: 0 6px 18px -6px rgba(10, 132, 255, 0.7); }
+  .title .logo svg { display: block; width: 100%; height: 100%; }
+  .title .name, .title small { grid-column: 2; }
+  :root:not([data-theme="light"]) .title .name { background: linear-gradient(180deg, #fff 35%, #c3c6cf); -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+  /* kontokortet: glød i resultatets farve */
+  .hero { overflow: hidden; }
+  .hero::before { content: ""; position: absolute; right: -140px; top: -170px; width: 420px; height: 420px; border-radius: 50%; pointer-events: none;
+    background: radial-gradient(closest-side, color-mix(in srgb, var(--tone) 26%, transparent), transparent); }
+  .hero > * { position: relative; }
+  :root:not([data-theme="light"]) #equity { background: linear-gradient(180deg, #fff 30%, #b4b8c3); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .delta > span:first-child { padding: 3px 10px; border-radius: 999px; background: var(--fill); }
+  .delta > .up { background: var(--up-bg); }
+  .delta > .down { background: var(--down-bg); }
+  .chart .glow { fill: none; stroke-width: 7; stroke-linecap: round; opacity: 0.35; vector-effect: non-scaling-stroke; }
+  .chart .ln { stroke-width: 2.5; }
+  .stat .meter-s { display: block; height: 4px; margin-top: 9px; border-radius: 2px; background: var(--fill); overflow: hidden; }
+  .stat .meter-s b { display: block; height: 100%; width: 0; border-radius: 2px; background: linear-gradient(90deg, color-mix(in srgb, var(--c) 70%, transparent), var(--c)); transition: width 0.9s cubic-bezier(.3, .7, .2, 1); }
+
+  /* børsuret */
+  .ring::before { content: ""; position: absolute; inset: -16px; border-radius: 50%; pointer-events: none;
+    background: radial-gradient(closest-side, color-mix(in srgb, var(--accent) 22%, transparent) 40%, transparent); }
+  .ring.open::before { background: radial-gradient(closest-side, color-mix(in srgb, var(--up) 26%, transparent) 40%, transparent); }
+  .ring svg { position: relative; }
+  .ring .bar-r { stroke: url(#rg-closed); }
+  .ring.open .bar-r { stroke: url(#rg-open); }
+
+  /* trinene lyser */
+  .steps .st.good .ic { box-shadow: 0 0 0 4px color-mix(in srgb, var(--c) 20%, transparent), 0 6px 16px -5px color-mix(in srgb, var(--c) 75%, transparent); }
+  .steps .st.done::before { background: linear-gradient(90deg, var(--c-prev, var(--fill-2)), var(--c, var(--fill-2))); }
+
+  /* handler: fra stop (rød) til mål (grøn) */
+  .track { background: linear-gradient(90deg, color-mix(in srgb, var(--down) 38%, transparent), var(--fill) 45%, var(--fill) 55%, color-mix(in srgb, var(--up) 38%, transparent)); }
+  .track .dot { box-shadow: 0 0 0 3px var(--card), 0 0 14px 2px color-mix(in srgb, var(--text) 28%, transparent); }
+
+  /* watchlist */
+  .stock { border-radius: 12px; transition: background 0.2s; }
+  @media (hover: hover) { .stock:hover { background: var(--fill); } }
+
+  /* chatten: hver bot i sin farve, og beskeder i træk fra samme bot samles */
+  .msg:not(.me):not(.sys) .bub { background: linear-gradient(180deg, color-mix(in srgb, var(--c) 11%, var(--card)), var(--card) 70%); box-shadow: var(--shadow), inset 0 0 0 0.5px color-mix(in srgb, var(--c) 30%, transparent); }
+  .msg .av { box-shadow: 0 5px 14px -5px color-mix(in srgb, var(--c) 80%, transparent); }
+  .msg.kind-fill .bub, .msg.kind-close .bub { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 55%, transparent), 0 8px 24px -12px color-mix(in srgb, var(--c) 70%, transparent); }
+  .msg.kind-flag .bub, .msg.kind-premarket .bub { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--scout) 45%, transparent); }
+  .msg.me .bub { background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 80%, #fff), var(--accent)); }
+  .msg.sys.kind-open { color: var(--up); font-weight: 600; }
+  .msg[data-a="scout"] + .msg[data-a="scout"] .who { display: none; }
+  .msg[data-a="scout"] + .msg[data-a="scout"] .av { visibility: hidden; }
+  .msg[data-a="scout"] + .msg[data-a="scout"] { margin-top: -6px; }
+  .msg[data-a="news"] + .msg[data-a="news"] .who { display: none; }
+  .msg[data-a="news"] + .msg[data-a="news"] .av { visibility: hidden; }
+  .msg[data-a="news"] + .msg[data-a="news"] { margin-top: -6px; }
+  .msg[data-a="chart"] + .msg[data-a="chart"] .who { display: none; }
+  .msg[data-a="chart"] + .msg[data-a="chart"] .av { visibility: hidden; }
+  .msg[data-a="chart"] + .msg[data-a="chart"] { margin-top: -6px; }
+  .msg[data-a="skeptic"] + .msg[data-a="skeptic"] .who { display: none; }
+  .msg[data-a="skeptic"] + .msg[data-a="skeptic"] .av { visibility: hidden; }
+  .msg[data-a="skeptic"] + .msg[data-a="skeptic"] { margin-top: -6px; }
+  .msg[data-a="sizer"] + .msg[data-a="sizer"] .who { display: none; }
+  .msg[data-a="sizer"] + .msg[data-a="sizer"] .av { visibility: hidden; }
+  .msg[data-a="sizer"] + .msg[data-a="sizer"] { margin-top: -6px; }
+  .msg[data-a="executor"] + .msg[data-a="executor"] .who { display: none; }
+  .msg[data-a="executor"] + .msg[data-a="executor"] .av { visibility: hidden; }
+  .msg[data-a="executor"] + .msg[data-a="executor"] { margin-top: -6px; }
+
+  /* fanebjælken på telefon: den aktive fane får en lille pille */
+  @media (max-width: 760px) {
+    nav.tabs .seg button svg { position: relative; z-index: 1; }
+    nav.tabs .seg button[aria-selected="true"]::before { content: ""; position: absolute; top: 1px; left: 50%; width: 56px; height: 32px; margin-left: -28px; border-radius: 16px; background: var(--accent-bg); }
+    .title .logo { width: 30px; height: 30px; border-radius: 9px; }
+  }
+</style>
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
+  <linearGradient id="rg-open" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#30d158"/><stop offset="1" stop-color="#40c8e0"/></linearGradient>
+  <linearGradient id="rg-closed" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0a84ff"/><stop offset="1" stop-color="#bf5af2"/></linearGradient>
+  <linearGradient id="mg-up" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#30d158" stop-opacity="0.28"/><stop offset="1" stop-color="#30d158" stop-opacity="0"/></linearGradient>
+  <linearGradient id="mg-dn" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff453a" stop-opacity="0.26"/><stop offset="1" stop-color="#ff453a" stop-opacity="0"/></linearGradient>
+</defs></svg>
 <nav class="appnav" aria-label="Skift side"><div class="appnav-in"><a href="/meme">Memebot</a><a href="/desk?m=us" data-m="us" aria-label="Handelsbordet i USA" aria-current="page">USA<i class="ldot" hidden></i></a><a href="/desk?m=dk" data-m="dk" id="nav-dk" aria-label="Handelsbordet i Danmark">Danmark<i class="ldot" hidden></i></a></div></nav>
 
 <header class="top">
   <div class="wrap bar">
-    <div class="title">Handelsbordet<small id="today"></small></div>
+    <div class="title"><span class="logo" aria-hidden="true"><svg viewBox="0 0 32 32"><defs><linearGradient id="logo-g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0a84ff"/><stop offset="1" stop-color="#bf5af2"/></linearGradient></defs><rect width="32" height="32" rx="9" fill="url(#logo-g)"/><path d="M7.5 21.5l5.5-5.5 4 4 7.5-8.5" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="24.5" cy="11.5" r="2.2" fill="#fff"/></svg></span><span class="name">Handelsbordet</span><small id="today"></small></div>
     <button class="status" id="status" type="button" title="Systemstatus"><span class="dot"></span><span class="lbl-s" id="status-t">Forbinder</span></button>
     <button class="btn danger" id="pause-btn" type="button">Stop</button>
     <button class="round" id="pal-btn" type="button" title="Søg og kommandoer (⌘K)" aria-label="Søg og kommandoer"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></button>
@@ -397,9 +500,9 @@
           <div class="chart-src cap"><span id="chart-label"></span><span id="chart-hint">Træk henover grafen</span></div>
           <div class="hint" id="acct-off" hidden>Saldoen vises, når bordet er forbundet til din papirkonto hos Alpaca. <button class="btn plain" type="button" data-goto="bots">Forbind nu</button></div>
           <div class="stats">
-            <div class="stat"><div class="cap">Markeret</div><div class="v" id="k-flags"><span class="sk" style="width:54px;height:20px"></span></div></div>
-            <div class="stat"><div class="cap">Åbne</div><div class="v" id="k-open"><span class="sk" style="width:54px;height:20px"></span></div></div>
-            <div class="stat"><div class="cap">Vindere</div><div class="v" id="k-win"><span class="sk" style="width:54px;height:20px"></span></div></div>
+            <div class="stat"><div class="cap">Markeret</div><div class="v" id="k-flags"><span class="sk" style="width:54px;height:20px"></span></div><i class="meter-s"><b id="k-flags-bar" style="--c:var(--scout)"></b></i></div>
+            <div class="stat"><div class="cap">Åbne</div><div class="v" id="k-open"><span class="sk" style="width:54px;height:20px"></span></div><i class="meter-s"><b id="k-open-bar" style="--c:var(--executor)"></b></i></div>
+            <div class="stat"><div class="cap">Vindere</div><div class="v" id="k-win"><span class="sk" style="width:54px;height:20px"></span></div><i class="meter-s"><b id="k-win-bar" style="--c:var(--up)"></b></i></div>
           </div>
         </article>
         <article class="card" id="now-card">
@@ -654,7 +757,11 @@ function smooth(p) {
   }
   return d;
 }
-const mini = (values, color) => { const d = smooth(pts(values, 84, 30, 2)); return `<svg viewBox="0 0 84 30" preserveAspectRatio="none" aria-hidden="true">${d ? `<path d="${d}" fill="none" stroke="${color}" stroke-width="1.6" stroke-linecap="round" vector-effect="non-scaling-stroke"/>` : ""}</svg>`; };
+const mini = (values, color) => {
+  const p = pts(values, 84, 30, 2), d = smooth(p), g = String(color).includes("down") ? "mg-dn" : "mg-up";
+  const area = d && p.length ? `<path d="${d} L${p[p.length - 1][0].toFixed(1)},30 L${p[0][0].toFixed(1)},30 Z" fill="url(#${g})"/>` : "";
+  return `<svg viewBox="0 0 84 30" preserveAspectRatio="none" aria-hidden="true">${area}${d ? `<path d="${d}" fill="none" stroke="${color}" stroke-width="1.6" stroke-linecap="round" vector-effect="non-scaling-stroke"/>` : ""}</svg>`;
+};
 
 // tema og lyd (gemmes på enheden)
 function setTheme(light) { document.documentElement.dataset.theme = light ? "light" : "dark"; $("theme-toggle").checked = light; try { localStorage.setItem("desk-theme", light ? "light" : "dark"); } catch (e) {} }
@@ -724,9 +831,9 @@ function renderMessage(m) {
   const url = m.data && safeUrl(m.data.source_url);
   if (m.kind === "news" && url) body += `<br><a class="source" href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(m.data.source_title || "Kilde")} ›</a>`;
   if (m.kind === "approval") body += `<div data-slot="${m.proposal_id}">${approvalButtons(m.proposal_id)}</div>`;
-  if (m.author === "system") return `<div class="msg sys ${m.kind === "error" ? "error" : ""}">${body}</div>`;
+  if (m.author === "system") return `<div class="msg sys ${m.kind === "error" ? "error" : ""} kind-${esc(m.kind)}">${body}</div>`;
   if (m.author === "me") return `<div class="msg me"><div class="bub">${body}<time>${hhmm(m.ts)}</time></div></div>`;
-  return `<div class="msg kind-${esc(m.kind)}" style="--c:${who.c}"><span class="av">${who.i}</span><div style="min-width:0"><div class="who">${who.name}</div><div class="bub">${body}<time>${hhmm(m.ts)}</time></div></div></div>`;
+  return `<div class="msg kind-${esc(m.kind)}" data-a="${esc(m.author)}" style="--c:${who.c}"><span class="av">${who.i}</span><div style="min-width:0"><div class="who">${who.name}</div><div class="bub">${body}<time>${hhmm(m.ts)}</time></div></div></div>`;
 }
 function renderChat(fresh) {
   const box = $("chat");
@@ -766,8 +873,9 @@ function drawChart(d) {
   chartKey = key;
   const W = 600, H = 170, p = pts(s.values, W, H, 6), col = s.up ? "var(--up)" : "var(--down)";
   const line = smooth(p);
-  $("chart-svg").innerHTML = `<defs><linearGradient id="hg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${col}" stop-opacity="0.28"/><stop offset="1" stop-color="${col}" stop-opacity="0"/></linearGradient></defs>
+  $("chart-svg").innerHTML = `<defs><linearGradient id="hg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${col}" stop-opacity="0.32"/><stop offset="1" stop-color="${col}" stop-opacity="0"/></linearGradient><filter id="hglow" x="-5%" y="-40%" width="110%" height="180%"><feGaussianBlur stdDeviation="6"/></filter></defs>
     <path class="area" d="${line} L${p[p.length - 1][0].toFixed(1)},${H} L${p[0][0].toFixed(1)},${H} Z" fill="url(#hg)"/>
+    <path class="glow" d="${line}" stroke="${col}" filter="url(#hglow)"/>
     <path class="ln" d="${line}" stroke="${col}"/>`;
   const ln = $("chart-svg").querySelector(".ln");
   try { ln.style.setProperty("--len", ln.getTotalLength()); if (!reduced) ln.classList.add("draw"); } catch (e) {}
@@ -809,6 +917,11 @@ function renderHero(d) {
   $("k-flags").innerHTML = `${d.today.flags} af ${d.today.max_flags}` + (d.today.volume_flags ? `<small class="muted" title="Markeret kun på volumen. Tæller ikke med i de ${d.today.max_flags}.">+${d.today.volume_flags} volumen</small>` : "");
   $("k-open").textContent = `${d.today.open} af ${d.today.max_open}`;
   $("k-win").textContent = d.kpis.win_rate === null ? "–" : `${Math.round(d.kpis.win_rate * 100)} %`;
+  const share = (a, b) => `${Math.round(Math.min(1, Math.max(0, b ? a / b : 0)) * 100)}%`;
+  $("k-flags-bar").style.width = share(d.today.flags, d.today.max_flags);
+  $("k-open-bar").style.width = share(d.today.open, d.today.max_open);
+  $("k-win-bar").style.width = share(d.kpis.win_rate || 0, 1);
+  document.querySelector(".hero").style.setProperty("--tone", pnl > 0 ? "var(--up)" : pnl < 0 ? "var(--down)" : "var(--accent)");
 }
 
 // ---------- børsen: rigtig nedtælling ----------
@@ -1126,6 +1239,7 @@ function renderTab(force) {
 }
 function renderStatus(d) {
   const sys = systems(d), bad = sys.find((s) => s[1] === "bad"), m = d.market || {};
+  document.documentElement.dataset.mood = m.is_open ? "open" : m.phase === "pre" ? "pre" : "closed";
   const el = $("status");
   el.className = `status ${d.paused ? "warn" : bad ? "bad" : "ok"} ${!d.paused && !bad && m.is_open ? "live" : ""}`;
   $("status-t").textContent = d.paused ? "På pause" : bad ? `${bad[0]} mangler` : m.is_open ? "Handler nu" : "Alt kører";
