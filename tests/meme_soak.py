@@ -19,7 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import meme_fakes  # noqa: E402
 from meme_fakes import FakeDex, FakeJup, FakeRug, raw_pair, safe_report  # noqa: E402
 from trader.meme.clients import SourceError, parse_token_info  # noqa: E402
-from trader.meme.engine import MemeClients, MemeEngine  # noqa: E402
+from trader.meme.engine import TRIAL_MAX_OPEN, MemeClients, MemeEngine  # noqa: E402
 from trader.meme.store import MemeStore  # noqa: E402
 
 STEP_MINUTES = 5
@@ -209,16 +209,24 @@ def check_invariants(engine: MemeEngine, blocked: dict[str, str], tick: int) -> 
     mints = [row["mint"] for row in open_rows]
     if len(mints) != len(set(mints)):
         fail("to åbne positioner i samme token")
-    momentum = [row for row in open_rows if row["strategy"] == "momentum"]
-    snipes = [row for row in open_rows if row["strategy"] == "sniper"]
+    # Prøvekøb har deres egne grænser og tælles for sig.
+    trials = [row for row in open_rows if engine._is_trial(row)]
+    regular = [row for row in open_rows if not engine._is_trial(row)]
+    momentum = [row for row in regular if row["strategy"] == "momentum"]
+    snipes = [row for row in regular if row["strategy"] == "sniper"]
     if len(momentum) > engine.settings.max_open:
         fail(f"{len(momentum)} momentum-positioner > {engine.settings.max_open}")
     if len(snipes) > engine.settings.sniper_max_open:
         fail(f"{len(snipes)} snipes > {engine.settings.sniper_max_open}")
+    if len(trials) > TRIAL_MAX_OPEN:
+        fail(f"{len(trials)} åbne prøvekøb > {TRIAL_MAX_OPEN}")
     day = datetime.now(timezone.utc).date().isoformat()
-    if store.trades_opened_on("paper", day, "momentum") > engine.settings.max_trades_per_day:
+    open_trials, trials_today = engine._trial_counts(day)
+    if trials_today > engine._trial_per_day():
+        fail("for mange prøvekøb i dag")
+    if store.trades_opened_on("paper", day, "momentum") - engine._trial_counts(day, "momentum")[1] > engine.settings.max_trades_per_day:
         fail("for mange momentum-køb i dag")
-    if store.trades_opened_on("paper", day, "sniper") > engine.settings.sniper_max_per_day:
+    if store.trades_opened_on("paper", day, "sniper") - engine._trial_counts(day, "sniper")[1] > engine.settings.sniper_max_per_day:
         fail("for mange snipes i dag")
     for row in open_rows:
         if row["mint"] in blocked and row["opened_at"] > blocked[row["mint"]]:

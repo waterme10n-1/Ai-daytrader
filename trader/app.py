@@ -454,6 +454,20 @@ def create_app(
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         return meme().status()
 
+    @app.post("/api/meme/trade-limits")
+    async def meme_trade_limits(request: Request) -> dict:
+        """Hvor mange handler botten må lave på papir, og hvor mange prøvekøb."""
+        try:
+            body = await request.json()
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Ugyldig JSON.") from exc
+        changes = (body or {}).get("changes") if isinstance(body, dict) else None
+        try:
+            meme().update_trade_limits(changes if isinstance(changes, dict) else {})
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return meme().status()
+
     @app.post("/api/meme/changes/undo")
     async def meme_undo_change(request: Request) -> dict:
         try:

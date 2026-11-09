@@ -49,9 +49,10 @@ def test_guard_puts_a_losing_strategy_on_hold_and_keeps_shadowing():
     assert strategies["momentum"]["hold"] is None
     assert any("Sniper er på hold" in alert["text"] for alert in engine.status()["alerts"])
 
-    # En ny token, der ellers ville blive købt, skrives ned i stedet, så skyggehandlerne lærer videre.
+    # Uden prøvekøb skrives en ny token, der ellers ville blive købt, ned i stedet, så skyggehandlerne lærer videre.
     from test_meme_sniper import NEW, _arm
 
+    engine.update_trade_limits({"trial_per_day": 0})
     _arm(dex, rug, jup)
     engine.tick(force_scan=True)
     assert engine.store.open_positions("paper") == []

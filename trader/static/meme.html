@@ -1100,6 +1100,12 @@
       <div class="card-head"><h2 id="mom-title"></h2><span class="chip warn">læring = kan strammes</span></div>
       <p class="muted small-txt" style="margin:-6px 0 4px">Den almindelige strategi køber tokens, der allerede handler, når de består alle filtre nedenfor. Retter du et tal, rører læringen det ikke i <span id="mom-lock-days">7</span> dage.</p>
     </div>
+    <div class="card" id="limits-card">
+      <div class="card-head"><h2 id="tl-title"></h2><span class="muted small-txt num" id="tl-note"></span></div>
+      <p class="muted small-txt" style="margin:-6px 0 4px">Hvor mange handler botten må lave. <b>Prøvekøb</b> er små køb for en tredjedel af beløbet af tokens, hvis score var lige under grænsen, og af strategier, som strategi-vagten har sat på pause. Så får botten flere rigtige handler at lære af uden at risikere det fulde beløb. Kun på papir, og de tæller ikke med i kravene før rigtige penge.</p>
+      <div class="sn-grid" style="gap:0 24px" id="tl-fields"></div>
+      <div class="savebar" style="margin-top:8px"><button class="btn primary" type="button" id="tl-save">Gem antal handler</button></div>
+    </div>
     <div class="sn-grid">
       <div class="card">
         <div class="card-head"><h2 id="mom-filter-title"></h2></div>
@@ -1919,7 +1925,7 @@ function renderPositions(data) {
       <div class="pos-top">
         ${avatar(p.symbol, p.mint)}
         <div style="min-width:0">
-          <div class="sym">${esc(p.symbol)}${p.strategy === "sniper" ? ` <span class="chip accent">${icon("target", "sm")}Sniper</span>` : p.strategy === "toptrader" ? ` <span class="chip up">${icon("trophy", "sm")}Top 10</span>` : ""}</div>
+          <div class="sym">${esc(p.symbol)}${p.strategy === "sniper" ? ` <span class="chip accent">${icon("target", "sm")}Sniper</span>` : p.strategy === "toptrader" ? ` <span class="chip up">${icon("trophy", "sm")}Top 10</span>` : ""}${p.trial ? ' <span class="chip">prøvekøb</span>' : ""}</div>
           <div class="pos-sub">${esc(p.name || "")}${p.name ? " · " : ""}${esc(p.source)}${p.partial ? ' · <span class="up">delsalg taget</span>' : ""}</div>
         </div>
         <div><div class="pnl-big num ${tone(p.change_pct)}">${esc(spct(p.change_pct))}</div><div class="num ${tone(p.unrealized_usd)}" style="text-align:right;font-size:13px">${esc(signed(p.unrealized_usd))}</div></div>
@@ -1965,7 +1971,7 @@ function renderJournal(data) {
     const open = expanded.has(t.id);
     const sigs = (t.signatures || []).filter((s) => /^[1-9A-HJ-NP-Za-km-z]{40,100}$/.test(s));
     return `<div class="lrow tap" data-row="${esc(t.id)}" aria-expanded="${open}" role="button" tabindex="0">${avatar(t.symbol, t.mint)}
-      <div class="lmain"><div class="ltitle">${esc(t.symbol)}${t.strategy === "sniper" ? '<span class="stage-tag claude">sniper</span>' : t.strategy === "toptrader" ? '<span class="stage-tag ok">top 10</span>' : ""}</div><div class="lsub">${esc(t.exit_reason)} · ${esc(minutes(t.hold_minutes))} · ${esc(stamp(t.closed_at))}</div>${!open && t.pnl_usd <= 0 && (t.why || [])[1] ? `<div class="lsub why-peek">${esc(t.why[1])}</div>` : ""}</div>
+      <div class="lmain"><div class="ltitle">${esc(t.symbol)}${t.strategy === "sniper" ? '<span class="stage-tag claude">sniper</span>' : t.strategy === "toptrader" ? '<span class="stage-tag ok">top 10</span>' : ""}${t.trial ? '<span class="stage-tag">prøve</span>' : ""}</div><div class="lsub">${esc(t.exit_reason)} · ${esc(minutes(t.hold_minutes))} · ${esc(stamp(t.closed_at))}</div>${!open && t.pnl_usd <= 0 && (t.why || [])[1] ? `<div class="lsub why-peek">${esc(t.why[1])}</div>` : ""}</div>
       <div class="lright"><b class="${tone(t.pnl_usd)}">${esc(signed(t.pnl_usd))}</b><span class="${tone(t.pnl_pct)}">${esc(spct(t.pnl_pct))}</span></div>
       ${open ? `<div class="ldetail"><div class="stats3 num"><div><span>Indsat</span><b>${esc(money(t.cost_usd))}</b></div><div><span>Top</span><b>${esc(spct(t.peak_pct))}</b></div><div><span>Kilde</span><b style="font-size:12.5px">${esc(t.source)}</b></div></div>${(t.why || []).length ? `<div class="why-list"><b>${t.pnl_usd > 0 ? "Hvorfor den vandt" : "Hvorfor den tabte"}</b><ul>${t.why.map((w) => `<li>${esc(w)}</li>`).join("")}</ul></div>` : ""}<p class="why" style="margin-top:0"><b>Ved køb:</b> ${esc(t.reasoning || "")}</p>${t.ai_summary ? `<p class="why"><b>Claude:</b> ${esc(t.ai_summary)}</p>` : ""}<div class="links">${tokenLinks(t.mint, t.pair_url)}${sigs.map((s) => `<a href="https://solscan.io/tx/${s}" target="_blank" rel="noopener noreferrer">${icon("ext", "sm")}tx ${esc(short(s))}</a>`).join("")}</div></div>` : ""}
     </div>`;
@@ -2422,6 +2428,26 @@ document.getElementById("mom-reset").addEventListener("click", async () => {
   act(async () => { const b = await post("/api/meme/params", { reset: true }); momDirty = false; momKey = ""; return b; }, "Standardindstillingerne er tilbage");
 });
 
+/* ---------- Antal handler og prøvekøb ---------- */
+let tlKey = "";
+function renderTradeLimits(data) {
+  const tl = data.trade_limits;
+  if (!tl) return;
+  document.getElementById("tl-title").innerHTML = icon("bars") + "Antal handler";
+  const t = tl.trials || {};
+  document.getElementById("tl-note").textContent = tl.paper ? `prøvekøb i dag ${t.today || 0} · åbne ${t.open || 0}/${t.max_open || 3}` : "gælder papirkontoen";
+  const key = JSON.stringify(tl.fields.map((f) => [f.name, f.value]));
+  if (key === tlKey || document.activeElement?.dataset?.tl) return;
+  tlKey = key;
+  put("tl-fields", tl.fields.map((f) => `<div class="field"><div class="field-top"><span>${esc(f.label)}</span></div>
+    <div class="row"><input type="number" inputmode="numeric" min="${f.bounds[0]}" max="${f.bounds[1]}" step="1" value="${esc(f.value)}" data-tl="${f.name}" aria-label="${esc(f.label)}"><span class="muted">${esc(fmtNum.format(f.bounds[0]))}–${esc(fmtNum.format(f.bounds[1]))}${f.value !== f.default ? ` · standard ${esc(fmtNum.format(f.default))}` : ""}</span></div></div>`).join(""));
+}
+document.getElementById("tl-save").addEventListener("click", () => {
+  const changes = {};
+  document.querySelectorAll("[data-tl]").forEach((el) => { if (el.value !== "") changes[el.dataset.tl] = Number(el.value); });
+  act(async () => { const b = await post("/api/meme/trade-limits", { changes }); tlKey = ""; return b; }, "Antal handler er gemt");
+});
+
 /* ---------- Automatiske ændringer, som kan fortrydes ---------- */
 const CHANGE_SOURCE = { strammer: "Strammer", "mål": "Bedste mål", "læring": "Læring", skygger: "Skyggehandler", opgradering: "Opgradering" };
 function renderChanges(data) {
@@ -2613,6 +2639,7 @@ function render(data) {
   renderAnalysis(data);
   renderChanges(data);
   renderMomentum(data);
+  renderTradeLimits(data);
   renderOptimizer(data);
   renderDiagnostics(data);
   renderSecurity(data);
@@ -3483,7 +3510,7 @@ function tickTiles() {
 const prevChange = new Map();
 function tileHtml(p) {
   const ch = Number(p.change_pct) || 0;
-  const tag = p.strategy === "sniper" ? "SNIPE" : p.strategy === "toptrader" ? "TOP 10" : "AUTO";
+  const tag = (p.strategy === "sniper" ? "SNIPE" : p.strategy === "toptrader" ? "TOP 10" : "AUTO") + (p.trial ? " · PRØVE" : "");
   const opened = isoS(p.opened_at);
   const deadline = opened && p.max_hold_minutes ? opened + p.max_hold_minutes * 60 : null;
   const lo = isNum(p.stop_pct) ? Number(p.stop_pct) : -0.5;
