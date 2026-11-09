@@ -489,6 +489,7 @@ def shadow_summary(done: list[dict]) -> list[dict]:
 # --------------------------------------------------------------------------- hvad virker? (faktaanalyse)
 
 FACT_LABELS: dict[str, str] = {
+    "score": "Bottens score (0-1)",
     "organic": "Organisk score (Jupiter)",
     "liq": "Likviditet (USD)",
     "mcap": "Markedsværdi (USD)",
@@ -576,6 +577,7 @@ def fact_report(rows: list[dict]) -> list[dict]:
 # scale omregner faktaens enhed til indstillingens (alder i minutter → sniperens sekunder).
 TIGHTEN_RULES: dict[str, list[dict]] = {
     "momentum": [
+        {"fact": "score", "param": "min_score", "kind": "min", "grid": (0.55, 0.6, 0.65, 0.7, 0.75, 0.8)},
         {"fact": "organic", "param": "min_organic_score", "kind": "min", "grid": (20, 30, 40, 50, 60, 70)},
         {"fact": "liq", "param": "min_liquidity_usd", "kind": "min", "grid": (25_000, 40_000, 60_000, 100_000, 150_000)},
         {"fact": "mcap", "param": "min_mcap_usd", "kind": "min", "grid": (60_000, 100_000, 250_000, 500_000)},
