@@ -143,7 +143,7 @@ class DeskSettings:
     key_source: str = ""
     secret_source: str = ""
     ai_daily_budget_usd: float = 0.0  # 0 = intet dagligt loft
-    ai_model: str = "claude-opus-5-5"
+    ai_model: str = "claude-haiku-5-5"  # ca. 40 gange billigere end Opus; følg "Nej med rette" under Læring
     ai_effort: str = "high"
     ai_web_search_tool: str = "web_search_20260209"
     ai_max_search_uses: int = 4
@@ -187,7 +187,7 @@ class DeskSettings:
             key_source="DESK_ALPACA_API_KEY" if clean_key(os.getenv("DESK_ALPACA_API_KEY")) else ("ALPACA_API_KEY" if clean_key(os.getenv("ALPACA_API_KEY")) else ""),
             secret_source="DESK_ALPACA_SECRET_KEY" if clean_key(os.getenv("DESK_ALPACA_SECRET_KEY")) else ("ALPACA_SECRET_KEY" if clean_key(os.getenv("ALPACA_SECRET_KEY")) else ""),
             ai_daily_budget_usd=max(0.0, _float(os.getenv("DESK_AI_DAILY_BUDGET_USD"), 0.0)),
-            ai_model=(os.getenv("DESK_ANTHROPIC_MODEL") or os.getenv("ANTHROPIC_MODEL") or "claude-opus-5-5").strip(),
+            ai_model=(os.getenv("DESK_ANTHROPIC_MODEL") or os.getenv("ANTHROPIC_MODEL") or "claude-haiku-5-5").strip(),
             ai_effort=(os.getenv("DESK_ANTHROPIC_EFFORT") or "high").strip(),
             ai_web_search_tool=(os.getenv("ANTHROPIC_WEB_SEARCH_TOOL") or "web_search_20260209").strip(),
             ai_max_search_uses=max(1, min(10, _int(os.getenv("DESK_ANTHROPIC_MAX_SEARCH_USES"), 4))),
