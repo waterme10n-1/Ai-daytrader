@@ -41,7 +41,7 @@ def test_guard_is_on_by_default_and_can_be_switched_off():
 
 
 def test_guard_puts_a_losing_strategy_on_hold_and_keeps_shadowing():
-    engine, dex, rug, jup, _notes = make_engine(meme_fakes.settings(strategy_guard=True))
+    engine, dex, rug, jup, _notes = make_engine(meme_fakes.settings(strategy_guard=True, max_losses_per_day=0))  # tabsstoppet testes for sig
     _closed(engine, "sniper", [-0.5] * 7 + [0.2])
     engine.tick()
     strategies = {row["id"]: row for row in engine.status()["strategies"]}

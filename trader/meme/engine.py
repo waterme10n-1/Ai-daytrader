@@ -88,12 +88,16 @@ from trader.meme.learning import (
 from trader.meme.research import MemeResearcher, Verdict
 from trader.meme.risk import (
     MOONBAG_TRAIL,
+    SOL_BASELINE_MAX_SECONDS,
     EntryContext,
     daily_loss_hit,
     drawdown_hit,
     evaluate_entry,
     exit_decision,
+    losses_halt,
     sniper_exit_decision,
+    sol_drop_pct,
+    sol_halt,
     top_exit_decision,
 )
 from trader.meme.safety import (
@@ -331,6 +335,7 @@ class MemeEngine:
         self._scan_requested = False
         self._last_snapshot = 0.0
         self._sol_usd = (0.0, 0.0)
+        self._sol_hist: list[tuple[float, float]] = []  # (tidspunkt, SOL-kurs), til markedsfilteret
         self._wallet_sol: float | None = None
         self._wallet_sol_at = 0.0
         self._marked_shadow_budget = SHADOW_MARKED_PER_SCAN
@@ -919,8 +924,33 @@ class MemeEngine:
             if price > 0:
                 return price
             raise SourceError("Ingen SOL-kurs fra Jupiter eller DexScreener.")
-        self._sol_usd = (fresh, time.time())
+        now = time.time()
+        self._sol_usd = (fresh, now)
+        self._sol_hist = [item for item in self._sol_hist if now - item[0] <= SOL_BASELINE_MAX_SECONDS + 600]
+        self._sol_hist.append((now, fresh))
         return fresh
+
+    def _entry_halt(self, day: str) -> str:
+        """Hvorfor botten ikke køber nye tokens lige nu. Tom streng, hvis den må købe. Salg berøres aldrig."""
+        drop = sol_drop_pct(self._sol_hist, time.time())
+        if sol_halt(drop, self.settings):
+            return (
+                f"SOL er ned {str(round(abs(drop), 1)).replace('.', ',')} % den seneste time "
+                f"(grænsen er {str(self.settings.sol_filter_pct).replace('.', ',')} %). Botten køber ikke nye tokens, mens markedet falder."
+            )
+        losses = self.store.losses_closed_on(self.mode, day)
+        if losses_halt(losses, self.settings):
+            return f"Der er lukket {losses} handler med tab i dag (grænsen er {self.settings.max_losses_per_day}). Botten køber ikke flere nye tokens i dag."
+        return ""
+
+    def _note_entry_halt(self, day: str, why: str) -> None:
+        """Én besked om stoppet, højst hvert halve time, så loggen ikke fyldes op."""
+        key = f"entry_halt_note:{self.mode}:{day}"
+        last = float(self.store.get_state(key, "0") or 0)
+        if time.time() - last < 1800:
+            return
+        self.store.set_state(key, str(time.time()))
+        self.store.add_event("warning", why + " Salg fortsætter.")
 
     # ------------------------------------------------------------------ hovedrunde
     def request_scan(self) -> None:
@@ -962,9 +992,14 @@ class MemeEngine:
                     self._daily_review()
                 halted_day, halted_dd = self._halts(totals, day, wallet, sol_usd)
                 requested = force_scan or self._scan_requested
-                entries_allowed = not (self.kill_switch or self.paused or halted_day or halted_dd)
+                entry_halt = self._entry_halt(day)
+                if entry_halt:
+                    self._note_entry_halt(day, entry_halt)
+                entries_allowed = not (self.kill_switch or self.paused or halted_day or halted_dd or entry_halt)
                 # Top 10 har ingen daglig tabsgrænse, medmindre du slår den til. Nødstop, pause og samlet tabsgrænse gælder altid.
-                top_entries_allowed = not (self.kill_switch or self.paused or halted_dd or (halted_day and self.top_cfg.daily_loss_stop))
+                top_entries_allowed = not (
+                    self.kill_switch or self.paused or halted_dd or entry_halt or (halted_day and self.top_cfg.daily_loss_stop)
+                )
                 # Lidt slæk, så en runde der vågner et øjeblik for tidligt ikke venter en hel runde mere.
                 now = time.time() + 0.25
                 if requested or now - self._last_scan >= self.settings.scan_seconds:

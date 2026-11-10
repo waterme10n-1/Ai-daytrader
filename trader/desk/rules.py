@@ -37,7 +37,7 @@ def index_move(bars: list[Bar], now: datetime) -> float | None:
 
 def market_weak(move: float | None, *, limit_pct: float) -> bool:
     """Indekset er ned mere end limit_pct siden åbningen. Et limit på 0 slår filteret fra."""
-    return limit_pct > 0 and move is not None and move <= -limit_pct - 1e-9
+    return limit_pct > 0 and move is not None and move <= -limit_pct + 1e-9
 
 
 # ---------------------------------------------------------------------- SCOUT

@@ -219,6 +219,8 @@ Den daglige tabsgrænse er **slået fra som standard**, og den samlede tabsgræn
 
 - **Dagligt tabsstop**: når dagens tab når `MEME_DAILY_LOSS_PCT` af bankroll (standard 25 %), køber botten ikke mere resten af døgnet (UTC). Åbne positioner beholder deres stop.
 - **Samlet tabsstop**: når det samlede tab når `MEME_MAX_DRAWDOWN_PCT` (standard 50 %), sælges alt, og botten står stille, indtil du trykker **Genoptag**.
+- **Stop efter tab i dag** (`MEME_MAX_LOSSES_PER_DAY`, standard 3): når tre handler er lukket med tab i dag (UTC), køber botten ikke flere nye tokens den dag. Samme regel som bordet. **Genoptag** ændrer det ikke, fordi stoppet er til for at beskytte dig mod en dårlig dag.
+- **Markedsfilter på SOL** (`MEME_SOL_FILTER_PCT`, standard 5): er SOL ned mere end 5 % den seneste time, køber botten ingen nye tokens, mens markedet falder. Salg fortsætter, og åbne positioner beholder deres stop. Botten skriver kun en besked om stoppet, højst hvert halve time.
 
 **Nødstop** sælger alt med det samme og virker altid. Sniperen og den almindelige strategi har stadig deres egne stop-loss pr. position.
 

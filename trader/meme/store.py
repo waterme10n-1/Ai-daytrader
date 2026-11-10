@@ -395,6 +395,14 @@ class MemeStore:
         """Handler fra tidligere papirrunder (før "Start forfra")."""
         return self._all("SELECT * FROM positions WHERE mode LIKE 'paper-arkiv-%' ORDER BY id DESC LIMIT ?", (limit,))
 
+    def losses_closed_on(self, mode: str, day: str) -> int:
+        """Handler lukket med tab på en UTC-dag."""
+        row = self._one(
+            "SELECT COUNT(*) AS n FROM positions WHERE mode = ? AND status = 'closed' AND substr(closed_at, 1, 10) = ? AND pnl_usd < 0",
+            (mode, day),
+        )
+        return int(row["n"]) if row else 0
+
     def closed_positions(self, mode: str) -> list[dict[str, Any]]:
         return self._all(
             "SELECT * FROM positions WHERE mode = ? AND status = 'closed' AND pnl_usd IS NOT NULL ORDER BY id",
