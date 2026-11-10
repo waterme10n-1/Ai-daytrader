@@ -49,9 +49,10 @@ def test_guard_puts_a_losing_strategy_on_hold_and_keeps_shadowing():
     assert strategies["momentum"]["hold"] is None
     assert any("Sniper er på hold" in alert["text"] for alert in engine.status()["alerts"])
 
-    # En ny token, der ellers ville blive købt, skrives ned i stedet, så skyggehandlerne lærer videre.
+    # Uden prøvekøb skrives en ny token, der ellers ville blive købt, ned i stedet, så skyggehandlerne lærer videre.
     from test_meme_sniper import NEW, _arm
 
+    engine.update_trade_limits({"trial_per_day": 0})
     _arm(dex, rug, jup)
     engine.tick(force_scan=True)
     assert engine.store.open_positions("paper") == []
@@ -65,6 +66,10 @@ def test_hold_expires_doubles_next_time_and_resets_on_profit():
     engine._check_guard()
     hold = engine._holds()["momentum"]
     assert hold["hours"] == 24
+    # Under pausen viser de tokens, den ville have købt, overskud efter gebyrer.
+    for index in range(15):
+        shadow = engine.store.add_shadow({"mode": "paper", "mint": f"Proof{index}", "symbol": "P", "strategy": "momentum", "stage": "risiko", "entry_price": 1.0})
+        engine.store.update_shadow(shadow, status="done", sim_pnl_pct=0.05, verdict="missed", done_at=now_iso())
     hold["until"] = time.time() - 1  # pausen er ovre
     engine._save_holds({"momentum": hold})
     engine._check_guard()

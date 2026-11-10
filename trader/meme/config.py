@@ -114,8 +114,8 @@ class MemeSettings:
     # når SOL er faldet så mange procent den seneste time (0 = fra). Salg fortsætter altid.
     max_losses_per_day: int = 3
     sol_filter_pct: float = 5.0
-    sniper_max_open: int = 2
-    sniper_max_per_day: int = 10
+    sniper_max_open: int = 3
+    sniper_max_per_day: int = 15
     sniper_scan_seconds: int = 10
     withdraw_address: str = ""
     sweep_above_usd: float = 0.0
@@ -170,8 +170,8 @@ class MemeSettings:
             x_daily_requests=max(0, _int(os.getenv("X_DAILY_REQUESTS"), 40)),
             bankroll_usd=bankroll,
             position_usd=min(bankroll, max(0.5, _float(os.getenv("MEME_POSITION_USD"), 3.0))),
-            max_open=max(1, min(10, _int(os.getenv("MEME_MAX_OPEN"), 3))),
-            max_trades_per_day=max(1, min(50, _int(os.getenv("MEME_MAX_TRADES_PER_DAY"), 8))),
+            max_open=max(1, min(10, _int(os.getenv("MEME_MAX_OPEN"), 4))),
+            max_trades_per_day=max(1, min(50, _int(os.getenv("MEME_MAX_TRADES_PER_DAY"), 15))),
             daily_loss_pct=min(0.9, max(0.05, _float(os.getenv("MEME_DAILY_LOSS_PCT"), 0.25))),
             max_drawdown_pct=min(0.95, max(0.1, _float(os.getenv("MEME_MAX_DRAWDOWN_PCT"), 0.5))),
             max_losses_per_day=max(0, min(50, _int(os.getenv("MEME_MAX_LOSSES_PER_DAY"), 3))),
@@ -205,8 +205,8 @@ class MemeSettings:
             db_path=os.getenv("MEME_DB_PATH", "").strip() or default_db,
             sniper_enabled=_flag(os.getenv("MEME_SNIPER_ENABLED"), True),
             sniper_position_usd=max(0.5, _float(os.getenv("MEME_SNIPER_POSITION_USD"), 1.5)),
-            sniper_max_open=max(1, min(10, _int(os.getenv("MEME_SNIPER_MAX_OPEN"), 2))),
-            sniper_max_per_day=max(1, min(100, _int(os.getenv("MEME_SNIPER_MAX_PER_DAY"), 10))),
+            sniper_max_open=max(1, min(10, _int(os.getenv("MEME_SNIPER_MAX_OPEN"), 3))),
+            sniper_max_per_day=max(1, min(100, _int(os.getenv("MEME_SNIPER_MAX_PER_DAY"), 15))),
             sniper_scan_seconds=max(5, _int(os.getenv("MEME_SNIPER_SCAN_SECONDS"), 10)),
             withdraw_address=os.getenv("MEME_WITHDRAW_ADDRESS", "").strip(),
             sweep_above_usd=max(0.0, _float(os.getenv("MEME_SWEEP_ABOVE_USD"), 0.0)),
