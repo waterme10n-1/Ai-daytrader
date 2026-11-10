@@ -72,7 +72,7 @@ python tests/meme_soak.py 50 250 hard
 
 ## Dashboardet
 
-Efter login lander du på `/meme`. Siden er bygget til mobilen først og opdaterer sig selv hvert 8. sekund. Under **Menu → Udseende** (øverst til højre) vælger du mellem fem udseender: **Neon** (mørk blå med cyan og magenta, standard), **Volt** (grafit og syregrøn), **Is** (lyst med elektrisk blå), **Rav** (varm sort og ravgul) og **Papir** (lyst papir). Valget huskes på telefonen. På telefonen ligger menuen i bunden. På en computer ligger den i venstre side.
+Efter login lander du på `/meme`. Siden er bygget til mobilen først og opdaterer sig selv hvert 8. sekund. Memebot og Handelsbordet har nu samme udseende: de samme farver, skrifter og kort. Du skifter mellem lys og mørk tilstand i **Menu**, og valget huskes på telefonen. Navigationen ligger i bunden på telefonen og øverst på en computer, ligesom på handelsbordet.
 
 - **Hjem** er bottens kontrolrum. Alt, der tæller, tæller rigtigt: siden får de præcise tider fra motoren og tæller selv ned sekund for sekund.
   - Øverst står klokken og hvad botten laver lige nu (fx *Scan om 0:42* eller *Scanner · 0:03*). Under den kører et bånd med dine åbne positioner og dagens tal.
