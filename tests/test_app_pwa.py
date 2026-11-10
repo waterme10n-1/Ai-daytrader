@@ -101,12 +101,31 @@ def test_home_counts_down_from_the_engine_clock(tmp_path):
         assert "#9945ff" not in page.split('<style id="future">')[1]  # ingen lilla neon i det nye tema
 
 
-def test_five_looks_can_be_picked_and_neon_is_default(tmp_path):
+def _tokens(page: str, selector: str) -> dict[str, str]:
+    """Farvetokens i den første blok med selector, fx ':root {'."""
+    import re
+
+    block = page.split(selector, 1)[1].split("}", 1)[0]
+    return dict(re.findall(r"(--[a-z-]+):\s*([^;]+);", block))
+
+
+def test_memebot_and_desk_share_one_design(tmp_path):
     with _client(tmp_path) as client:
         assert _login(client).status_code == 303
-        page = client.get("/meme").text
-        assert 'data-skin="neon"' in page.split(">", 2)[1]  # <html ... data-skin="neon">
-        for skin in ("neon", "volt", "is", "rav", "papir"):
-            assert f':root[data-skin="{skin}"]' in page, skin
-        assert 'id="skins"' in page and 'id="skin-fonts"' in page and 'id="reactor"' in page
-        assert "meme-skin" in page.split("</head>")[0]  # valgt udseende sættes, før siden tegnes
+        meme = client.get("/meme").text
+        desk = client.get("/desk").text
+    # Ét udseende: ingen skins, ingen skrifter fra andre looks, og den samme farvepalet på begge sider.
+    assert "data-skin" not in meme and 'id="skins"' not in meme and "skin-fonts" not in meme
+    assert "fonts.googleapis.com" not in meme
+    assert 'id="reactor"' in meme
+    shared = ["--bg", "--surface", "--raised", "--text", "--muted", "--accent", "--up", "--down", "--warn"]
+    for selector in (":root {", ':root[data-theme="light"] {'):
+        meme_tokens = _tokens(meme, selector)
+        desk_tokens = _tokens(desk, selector)
+        for name in shared:
+            key = "--surface" if name == "--surface" else name
+            desk_name = {"--surface": "--card", "--raised": "--raise"}.get(key, key)
+            assert meme_tokens.get(key) == desk_tokens.get(desk_name), (selector, key, meme_tokens.get(key), desk_tokens.get(desk_name))
+    # Ingen uppercase-mærkater og ingen farvede skygger på memebot-siden.
+    assert "text-transform: uppercase" not in meme
+    assert "text-shadow" not in meme
