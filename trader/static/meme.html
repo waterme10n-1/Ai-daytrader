@@ -201,6 +201,10 @@
   }
   textarea { height: auto; padding: 10px 13px; font: 14px/1.5 var(--mono); width: 100%; }
   input:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+  /* Knapper og links fik ingen synlig fokusring; nu gør de det ved tastatur */
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .skip { position: absolute; left: 12px; top: -60px; z-index: 200; padding: 9px 14px; border-radius: 10px; background: var(--text); color: var(--bg); font: 600 14px var(--font); text-decoration: none; }
+  .skip:focus-visible { top: 12px; outline: 2px solid var(--accent); outline-offset: 2px; }
   input[type="range"] { width: 100%; height: 30px; accent-color: var(--accent); margin: 2px 0; }
   .field { padding: 13px 0; border-bottom: 1px solid var(--border); }
   .why-list { margin: 0 0 10px; padding: 10px 12px; border-radius: 10px; background: color-mix(in srgb, var(--raised) 70%, transparent); font-size: 13px; }
@@ -965,6 +969,7 @@
 </style>
 </head>
 <body>
+<a class="skip" href="#main">Gå til indholdet</a>
 <nav class="appnav" aria-label="Skift side"><div class="appnav-in"><a href="/meme" aria-current="page">Memebot</a><a href="/desk">Handelsbordet</a></div></nav>
 
 <header class="appbar" id="appbar">
@@ -990,7 +995,7 @@
 </nav>
 <div class="ptr" id="ptr" aria-hidden="true"></div>
 
-<main class="shell">
+<main class="shell" id="main" tabindex="-1">
 <div class="shell-in">
   <div class="page-head" id="page-head" hidden><h2 id="page-title"></h2></div>
   <div class="segmented" id="seg" role="tablist" hidden></div>

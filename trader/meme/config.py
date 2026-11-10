@@ -110,6 +110,10 @@ class MemeSettings:
     db_path: str
     sniper_enabled: bool = True
     sniper_position_usd: float = 1.5
+    # Samme regler som bordet: ingen nye køb efter så mange tabende handler i dag (0 = fra), og ingen nye køb,
+    # når SOL er faldet så mange procent den seneste time (0 = fra). Salg fortsætter altid.
+    max_losses_per_day: int = 3
+    sol_filter_pct: float = 5.0
     sniper_max_open: int = 3
     sniper_max_per_day: int = 15
     sniper_scan_seconds: int = 10
@@ -170,6 +174,8 @@ class MemeSettings:
             max_trades_per_day=max(1, min(50, _int(os.getenv("MEME_MAX_TRADES_PER_DAY"), 15))),
             daily_loss_pct=min(0.9, max(0.05, _float(os.getenv("MEME_DAILY_LOSS_PCT"), 0.25))),
             max_drawdown_pct=min(0.95, max(0.1, _float(os.getenv("MEME_MAX_DRAWDOWN_PCT"), 0.5))),
+            max_losses_per_day=max(0, min(50, _int(os.getenv("MEME_MAX_LOSSES_PER_DAY"), 3))),
+            sol_filter_pct=min(30.0, max(0.0, _float(os.getenv("MEME_SOL_FILTER_PCT"), 5.0))),
             # Ingen daglig tabsgrænse som standard. Den samlede tabsgrænse er slået til.
             daily_loss_limit=_flag(os.getenv("MEME_DAILY_LOSS_LIMIT"), False),
             drawdown_limit=_flag(os.getenv("MEME_DRAWDOWN_LIMIT"), True),

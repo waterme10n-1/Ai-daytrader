@@ -26,6 +26,20 @@ def completed(bars: list[Bar], now: datetime) -> list[Bar]:
     return [bar for bar in bars if bar.ts + timedelta(minutes=1) <= now]
 
 
+# ---------------------------------------------------------------------- markedsfilter
+def index_move(bars: list[Bar], now: datetime) -> float | None:
+    """Indekset i dag: fra første åbning til seneste afsluttede minut. None, hvis der er for få minutter."""
+    done = completed(bars, now)
+    if len(done) < MIN_BARS or done[0].open <= 0:
+        return None
+    return (done[-1].close - done[0].open) / done[0].open * 100.0
+
+
+def market_weak(move: float | None, *, limit_pct: float) -> bool:
+    """Indekset er ned mere end limit_pct siden åbningen. Et limit på 0 slår filteret fra."""
+    return limit_pct > 0 and move is not None and move <= -limit_pct + 1e-9
+
+
 # ---------------------------------------------------------------------- SCOUT
 @dataclass
 class Flag:

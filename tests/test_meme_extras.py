@@ -373,7 +373,7 @@ def test_telegram_ignores_other_chats():
 
 
 def test_drawdown_halt_sells_everything_and_blocks_until_resume():
-    engine, dex, rug, _jup, notes = make_engine(meme_fakes.settings(daily_loss_pct=0.9, max_drawdown_pct=0.5, max_trades_per_day=20))
+    engine, dex, rug, _jup, notes = make_engine(meme_fakes.settings(daily_loss_pct=0.9, max_drawdown_pct=0.5, max_trades_per_day=20, max_losses_per_day=0))  # tabsstoppet testes for sig
     mints = [f"Crash{i}" + "x" * 30 for i in range(5)]
 
     def buy_and_crash(mint):

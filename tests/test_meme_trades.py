@@ -83,8 +83,8 @@ def test_trials_have_their_own_limits_and_do_not_block_regular_buys():
 
 
 def test_a_paused_strategy_keeps_learning_with_small_trial_buys():
-    engine, dex, rug, jup, _notes = make_engine(meme_fakes.settings(strategy_guard=True))
-    _closed(engine, "sniper", [-0.5] * 7 + [0.2])  # under dagens tabsgrænse i testopsætningen
+    engine, dex, rug, jup, _notes = make_engine(meme_fakes.settings(strategy_guard=True, max_losses_per_day=0))  # tabsstoppet testes for sig
+    _closed(engine, "sniper", [-0.5] * 7 + [0.2])
     engine._check_guard()
     assert engine._on_hold("sniper")
     from test_meme_sniper import NEW, _arm as arm_sniper

@@ -136,6 +136,9 @@ class DeskSettings:
     # Prøvekøb: siger SKEPTIC WAIT til en handel med en klar grund og en ren opstilling, køber bordet halv størrelse
     # alligevel. Så kommer der flere handler på papir, og bordet lærer af rigtige resultater i stedet for kun skygger.
     trial_buys: bool = True
+    market_filter_pct: float = 1.0  # er indekset ned så meget siden åbningen, køber bordet ingen nye aktier (0 = fra)
+    time_stop_min: int = 90  # en handel, der stadig ligger under købskursen efter så mange minutter, lukkes (0 = fra)
+    max_losses_per_day: int = 2  # efter så mange handler med tab i dag køber bordet ikke mere den dag (0 = fra)
     max_chase_pct: float = 0.5
     alpaca_api_key: str = ""
     alpaca_secret_key: str = ""
@@ -143,7 +146,7 @@ class DeskSettings:
     key_source: str = ""
     secret_source: str = ""
     ai_daily_budget_usd: float = 0.0  # 0 = intet dagligt loft
-    ai_model: str = "claude-opus-5-5"
+    ai_model: str = "claude-haiku-5-5"  # ca. 40 gange billigere end Opus; følg "Nej med rette" under Læring
     ai_effort: str = "high"
     ai_web_search_tool: str = "web_search_20260209"
     ai_max_search_uses: int = 4
@@ -179,6 +182,9 @@ class DeskSettings:
             scan_minutes=max(1, min(30, _int(os.getenv("DESK_SCAN_MINUTES"), 1))),
             auto_approve=_flag(os.getenv("DESK_AUTO_APPROVE"), True),
             trial_buys=_flag(os.getenv("DESK_TRIAL_BUYS"), True),
+            market_filter_pct=min(5.0, max(0.0, _float(os.getenv("DESK_MARKET_FILTER_PCT"), 1.0))),
+            time_stop_min=max(0, min(390, _int(os.getenv("DESK_TIME_STOP_MIN"), 90))),
+            max_losses_per_day=max(0, min(20, _int(os.getenv("DESK_MAX_LOSSES_PER_DAY"), 2))),
             max_chase_pct=min(2.0, max(0.1, _float(os.getenv("DESK_MAX_CHASE_PCT"), 0.5))),
             # Egen papirkonto til bordet. ALPACA_API_KEY bruges, hvis du allerede har den sat.
             alpaca_api_key=clean_key(os.getenv("DESK_ALPACA_API_KEY") or os.getenv("ALPACA_API_KEY")),
@@ -187,7 +193,7 @@ class DeskSettings:
             key_source="DESK_ALPACA_API_KEY" if clean_key(os.getenv("DESK_ALPACA_API_KEY")) else ("ALPACA_API_KEY" if clean_key(os.getenv("ALPACA_API_KEY")) else ""),
             secret_source="DESK_ALPACA_SECRET_KEY" if clean_key(os.getenv("DESK_ALPACA_SECRET_KEY")) else ("ALPACA_SECRET_KEY" if clean_key(os.getenv("ALPACA_SECRET_KEY")) else ""),
             ai_daily_budget_usd=max(0.0, _float(os.getenv("DESK_AI_DAILY_BUDGET_USD"), 0.0)),
-            ai_model=(os.getenv("DESK_ANTHROPIC_MODEL") or os.getenv("ANTHROPIC_MODEL") or "claude-opus-5-5").strip(),
+            ai_model=(os.getenv("DESK_ANTHROPIC_MODEL") or os.getenv("ANTHROPIC_MODEL") or "claude-haiku-5-5").strip(),
             ai_effort=(os.getenv("DESK_ANTHROPIC_EFFORT") or "high").strip(),
             ai_web_search_tool=(os.getenv("ANTHROPIC_WEB_SEARCH_TOOL") or "web_search_20260209").strip(),
             ai_max_search_uses=max(1, min(10, _int(os.getenv("DESK_ANTHROPIC_MAX_SEARCH_USES"), 4))),

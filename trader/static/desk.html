@@ -54,6 +54,11 @@
   button, input, textarea { font: inherit; color: inherit; letter-spacing: inherit; }
   button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
   :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  /* Felter, der fjerner standardringen, får en ring ved tastatur-fokus i stedet */
+  input:focus-visible, textarea:focus-visible { box-shadow: 0 0 0 2px var(--accent); }
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+  .skip { position: absolute; left: 12px; top: -60px; z-index: 200; padding: 9px 14px; border-radius: 10px; background: var(--text); color: var(--bg); font: 600 14px var(--font); text-decoration: none; }
+  .skip:focus-visible { top: 12px; outline: 2px solid var(--accent); outline-offset: 2px; }
   a { color: var(--accent); text-decoration: none; }
   [hidden] { display: none !important; }
   .wrap { width: min(1080px, 100%); margin: 0 auto; padding: 0 16px; }
@@ -303,7 +308,7 @@
   .overlay { position: fixed; inset: 0; z-index: 70; background: rgba(0, 0, 0, 0.45); display: flex; align-items: flex-end; justify-content: center; animation: fadein 0.2s ease; }
   @keyframes fadein { from { opacity: 0; } }
   .overlay.top { align-items: flex-start; }
-  .sheet { width: min(560px, 100%); max-height: 90vh; overflow: auto; background: var(--card); border-radius: 22px 22px 0 0; padding: 10px 20px calc(22px + var(--safe-b)); animation: rise 0.28s cubic-bezier(.2, .9, .3, 1); }
+  .sheet { overscroll-behavior: contain; width: min(560px, 100%); max-height: 90vh; overflow: auto; background: var(--card); border-radius: 22px 22px 0 0; padding: 10px 20px calc(22px + var(--safe-b)); animation: rise 0.28s cubic-bezier(.2, .9, .3, 1); }
   .grab { width: 36px; height: 5px; border-radius: 3px; background: var(--fill-2); margin: 0 auto 12px; }
   .sheet h2 { margin: 0; font: 700 24px var(--display); letter-spacing: -0.02em; }
   .facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
@@ -314,7 +319,7 @@
   .meter.hot i { background: var(--warn); }
   .pal { width: min(560px, calc(100% - 24px)); margin-top: 12vh; background: var(--card); border-radius: 16px; overflow: hidden; box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45); animation: rise 0.18s ease; }
   .pal input { width: 100%; border: 0; border-bottom: 0.5px solid var(--sep); background: transparent; padding: 16px 18px; font-size: 17px; outline: none; }
-  .pal-list { max-height: 52vh; overflow: auto; padding: 6px; }
+  .pal-list { overscroll-behavior: contain; max-height: 52vh; overflow: auto; padding: 6px; }
   .pal-list button { display: flex; align-items: center; width: 100%; text-align: left; border: 0; background: transparent; padding: 11px 12px; border-radius: 10px; font-size: 15px; }
   .pal-list button.sel { background: var(--accent); color: #fff; }
   .pal-list .k { margin-left: auto; font-size: 12px; opacity: 0.6; }
@@ -493,6 +498,7 @@
 </style>
 </head>
 <body>
+<a class="skip" href="#main">Gå til indholdet</a>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
   <linearGradient id="rg-open" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#30d158"/><stop offset="1" stop-color="#40c8e0"/></linearGradient>
   <linearGradient id="rg-closed" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0a84ff"/><stop offset="1" stop-color="#bf5af2"/></linearGradient>
@@ -503,7 +509,7 @@
 
 <header class="top">
   <div class="wrap bar">
-    <div class="title"><span class="logo" aria-hidden="true"><svg viewBox="0 0 32 32"><defs><linearGradient id="logo-g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0a84ff"/><stop offset="1" stop-color="#bf5af2"/></linearGradient></defs><rect width="32" height="32" rx="9" fill="url(#logo-g)"/><path d="M7.5 21.5l5.5-5.5 4 4 7.5-8.5" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="24.5" cy="11.5" r="2.2" fill="#fff"/></svg></span><span class="name">Handelsbordet</span><small id="today"></small></div>
+    <div class="title"><span class="logo" aria-hidden="true"><svg viewBox="0 0 32 32"><defs><linearGradient id="logo-g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0a84ff"/><stop offset="1" stop-color="#bf5af2"/></linearGradient></defs><rect width="32" height="32" rx="9" fill="url(#logo-g)"/><path d="M7.5 21.5l5.5-5.5 4 4 7.5-8.5" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="24.5" cy="11.5" r="2.2" fill="#fff"/></svg></span><span class="name">Handelsbordet</span><h1 class="sr-only">Handelsbordet</h1><small id="today"></small></div>
     <button class="status" id="status" type="button" title="Systemstatus"><span class="dot"></span><span class="lbl-s" id="status-t">Forbinder</span></button>
     <button class="btn danger" id="pause-btn" type="button">Stop</button>
     <button class="round" id="pal-btn" type="button" title="Søg og kommandoer (⌘K)" aria-label="Søg og kommandoer"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></button>
@@ -511,7 +517,7 @@
   <nav class="tabs" role="tablist"><div class="seg" id="tabs"></div></nav>
 </header>
 
-<main class="wrap">
+<main class="wrap" id="main" tabindex="-1">
   <div id="issue"></div>
 
   <section id="tab-home">
@@ -625,21 +631,24 @@
     <article class="card">
       <div class="card-h"><h2>Indstillinger</h2></div>
       <form class="form" id="params">
-        <label class="wide toggle"><span class="tx">Autopilot<span>Bordet køber selv på papir, når SKEPTIC siger BUY.</span></span><input name="auto_approve" type="checkbox"></label>
-        <label class="wide toggle"><span class="tx">Prøvekøb<span>Siger SKEPTIC WAIT, eller finder NEWS ingen grund, til en kursbevægelse med en ren opstilling, køber bordet halv størrelse alligevel. Flere handler på papir. Taber køb uden grund, lærer bordet det og stopper dem selv.</span></span><input name="trial_buys" type="checkbox"></label>
-        <label class="wide toggle"><span class="tx"><span id="pre-lbl" style="display:inline;font:inherit;color:inherit">Før åbning</span><span id="pre-sub">SCOUT og NEWS kigger på gaps fra kl. 10 dansk tid, og et gap, der holder, kan købes ved åbningen.</span></span><input name="premarket" type="checkbox"></label>
+        <label class="wide toggle"><span class="tx">Autopilot<span>Bordet køber selv på papir, når SKEPTIC siger BUY.</span></span><input autocomplete="off" name="auto_approve" type="checkbox"></label>
+        <label class="wide toggle"><span class="tx">Prøvekøb<span>Siger SKEPTIC WAIT, eller finder NEWS ingen grund, til en kursbevægelse med en ren opstilling, køber bordet halv størrelse alligevel. Flere handler på papir. Taber køb uden grund, lærer bordet det og stopper dem selv.</span></span><input autocomplete="off" name="trial_buys" type="checkbox"></label>
+        <label class="wide toggle"><span class="tx"><span id="pre-lbl" style="display:inline;font:inherit;color:inherit">Før åbning</span><span id="pre-sub">SCOUT og NEWS kigger på gaps fra kl. 10 dansk tid, og et gap, der holder, kan købes ved åbningen.</span></span><input autocomplete="off" name="premarket" type="checkbox"></label>
         <label class="wide toggle"><span class="tx">Lyd og vibration<span>Ved køb og salg (gemmes på denne enhed).</span></span><input id="sound-toggle" type="checkbox"></label>
         <label class="wide toggle"><span class="tx">Lyst tema<span>Gemmes på denne enhed.</span></span><input id="theme-toggle" type="checkbox"></label>
         <label class="wide"><span id="wl-lbl">Watchlist (10–20 aktier du kender)</span><textarea name="watchlist" rows="2"></textarea></label>
-        <label>SCOUT: bevægelse på en time (%)<input name="move_pct" type="number" step="0.1" min="0.5" max="20"></label>
-        <label>SCOUT: volumen (gange normal)<input name="volume_x" type="number" step="0.1" min="1.2" max="20"></label>
-        <label>SCOUT: højst markeringer pr. dag (på kursbevægelse)<input name="max_flags_per_day" type="number" step="1" min="1"></label>
-        <label>SCOUT: kigger hvert (minutter)<input name="scan_minutes" type="number" step="1" min="1" max="30"></label>
-        <label>SCOUT: gap siden i går (%)<input name="gap_pct" type="number" step="0.5" min="1" max="20"></label>
-        <label>CHART: stop højst (% under indgang)<input name="stop_max_pct" type="number" step="0.1" min="0.3"></label>
-        <label>CHART: målet mindst (gange stoppet)<input name="reward_risk" type="number" step="0.1" min="1.5" max="5"></label>
-        <label>SIZER: højst (% af kontoen pr. handel)<input name="position_pct" type="number" step="0.5" min="0.5"></label>
-        <label>SIZER: højst åbne handler<input name="max_open" type="number" step="1" min="1"></label>
+        <label>SCOUT: bevægelse på en time (%)<input autocomplete="off" name="move_pct" type="number" step="0.1" min="0.5" max="20"></label>
+        <label>SCOUT: volumen (gange normal)<input autocomplete="off" name="volume_x" type="number" step="0.1" min="1.2" max="20"></label>
+        <label>SCOUT: højst markeringer pr. dag (på kursbevægelse)<input autocomplete="off" name="max_flags_per_day" type="number" step="1" min="1"></label>
+        <label>SCOUT: kigger hvert (minutter)<input autocomplete="off" name="scan_minutes" type="number" step="1" min="1" max="30"></label>
+        <label>SCOUT: gap siden i går (%)<input autocomplete="off" name="gap_pct" type="number" step="0.5" min="1" max="20"></label>
+        <label>CHART: stop højst (% under indgang)<input autocomplete="off" name="stop_max_pct" type="number" step="0.1" min="0.3"></label>
+        <label>CHART: målet mindst (gange stoppet)<input autocomplete="off" name="reward_risk" type="number" step="0.1" min="1.5" max="5"></label>
+        <label>SIZER: højst (% af kontoen pr. handel)<input autocomplete="off" name="position_pct" type="number" step="0.5" min="0.5"></label>
+        <label>SIZER: højst åbne handler<input autocomplete="off" name="max_open" type="number" step="1" min="1"></label>
+        <label>Markedsfilter: ingen nye køb, når indekset er ned mere end (%, 0 = fra)<input name="market_filter_pct" type="number" step="0.1" min="0" max="5"></label>
+        <label>Tidsstop: luk en handel under købskursen efter (minutter, 0 = fra)<input name="time_stop_min" type="number" step="5" min="0" max="390"></label>
+        <label>Stop efter tab: ingen nye køb, når så mange handler er lukket med tab i dag (0 = fra)<input name="max_losses_per_day" type="number" step="1" min="0" max="20"></label>
         <div class="row wide"><button class="btn primary" type="submit">Gem regler</button><button class="btn" type="button" id="reset-params">Standard</button><span class="cap" id="hard"></span></div>
       </form>
     </article>
@@ -656,7 +665,7 @@
     </form>
   </div>
 </div>
-<div class="toast" id="toast" hidden></div>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 <button class="banner" id="banner" type="button" aria-live="polite"></button>
 <div class="overlay" id="sheet-bg" hidden><div class="sheet" id="sheet" role="dialog" aria-modal="true"></div></div>
 <div class="overlay top" id="pal-bg" hidden><div class="pal" role="dialog" aria-modal="true" aria-label="Søg og kommandoer"><input id="pal-input" placeholder="Søg efter en aktie eller en kommando" autocomplete="off" spellcheck="false"><div class="pal-list" id="pal-list"></div></div></div>
@@ -1253,7 +1262,7 @@ function renderBots(d) {
   $("hard").textContent = `Lofter: ${p.hard.position_pct} % pr. handel, ${p.hard.max_open} åbne, stop ${p.hard.stop_max_pct} %.`;
   if (paramsFilled && form.contains(document.activeElement)) return;
   form.watchlist.value = p.watchlist.join(", ");
-  ["move_pct", "volume_x", "max_flags_per_day", "scan_minutes", "gap_pct", "stop_max_pct", "reward_risk", "position_pct", "max_open"].forEach((k) => { form[k].value = p[k]; });
+  ["move_pct", "volume_x", "max_flags_per_day", "scan_minutes", "gap_pct", "stop_max_pct", "reward_risk", "position_pct", "max_open", "market_filter_pct", "time_stop_min", "max_losses_per_day"].forEach((k) => { form[k].value = p[k]; });
   form.auto_approve.checked = !!p.auto_approve;
   form.trial_buys.checked = !!p.trial_buys;
   form.premarket.checked = !!p.premarket;
@@ -1354,7 +1363,7 @@ $("close-btn").onclick = () => { if (confirm("Luk alle bordets positioner nu?"))
 $("params").onsubmit = async (e) => {
   e.preventDefault();
   const f = e.target, body = { watchlist: f.watchlist.value, auto_approve: f.auto_approve.checked, trial_buys: f.trial_buys.checked, premarket: f.premarket.checked };
-  ["move_pct", "volume_x", "max_flags_per_day", "scan_minutes", "gap_pct", "stop_max_pct", "reward_risk", "position_pct", "max_open"].forEach((k) => { body[k] = f[k].value; });
+  ["move_pct", "volume_x", "max_flags_per_day", "scan_minutes", "gap_pct", "stop_max_pct", "reward_risk", "position_pct", "max_open", "market_filter_pct", "time_stop_min", "max_losses_per_day"].forEach((k) => { body[k] = f[k].value; });
   try { await post("/api/desk/params", body); paramsFilled = false; toast("Gemt."); refresh(); } catch (err) { toast(err.message); }
 };
 $("params").trial_buys.onchange = async (e) => { try { await post("/api/desk/params", { trial_buys: e.target.checked }); toast(e.target.checked ? "Prøvekøb er slået til: WAIT med en grund købes til halv størrelse." : "Prøvekøb er slået fra."); refresh(); } catch (err) { toast(err.message); } };

@@ -42,6 +42,7 @@ ET = ZoneInfo(ET_NAME)
 PRE_SCAN_MINUTES = 5  # før åbning kigger SCOUT hvert 5. minut
 RETRY_MINUTES = 30  # en aktie, CHART sagde "ingen opstilling" til, kan markeres igen efter en halv time
 MAX_TRIES = 2  # højst to markeringer på kursbevægelse pr. aktie pr. dag
+HALT_NOTE_MINUTES = 30  # højst én besked om, hvorfor bordet ikke køber, hvert halve time
 CACHE_SECONDS = 30.0
 REFUSALS = ("wait", "skip", "rejected", "expired", "sized_zero")
 STOP_WORDS = {"stop nu", "stop", "stop now", "pause", "stop alt"}
@@ -60,7 +61,7 @@ STATUS_DA = {
     "closed": "Lukket",
     "failed": "Fejlede",
 }
-EXIT_DA = {"stop": "stop", "target": "mål", "flatten": "lukketid", "outside": "lukket udefra", "manual": "lukket af dig"}
+EXIT_DA = {"stop": "stop", "target": "mål", "flatten": "lukketid", "outside": "lukket udefra", "manual": "lukket af dig", "time": "tidsstop"}
 
 
 def _notify(settings: Settings, text: str) -> None:
@@ -170,10 +171,10 @@ class DeskEngine:
         watch = parse_watchlist(params.get("watchlist"), self.market.key) if params.get("watchlist") is not None else []
         if watch:
             values["watchlist"] = tuple(watch)
-        for name in ("move_pct", "volume_x", "position_pct", "stop_max_pct", "reward_risk", "gap_pct"):
+        for name in ("move_pct", "volume_x", "position_pct", "stop_max_pct", "reward_risk", "gap_pct", "market_filter_pct"):
             if isinstance(params.get(name), (int, float)) and not isinstance(params.get(name), bool):
                 values[name] = float(params[name])
-        for name in ("max_open", "max_flags_per_day", "scan_minutes"):
+        for name in ("max_open", "max_flags_per_day", "scan_minutes", "time_stop_min", "max_losses_per_day"):
             if isinstance(params.get(name), int):
                 values[name] = int(params[name])
         for name in ("auto_approve", "premarket", "trial_buys"):
@@ -194,6 +195,9 @@ class DeskEngine:
             "max_flags_per_day": (1, HARD_MAX_FLAGS, int),
             "scan_minutes": (1, 30, int),
             "gap_pct": (1.0, 20.0, float),
+            "market_filter_pct": (0.0, 5.0, float),
+            "time_stop_min": (0, 390, int),
+            "max_losses_per_day": (0, 20, int),
         }
         changes: list[str] = []
         if "premarket" in body and body["premarket"] is not None:
@@ -411,6 +415,7 @@ class DeskEngine:
                 return
             if self.paused:
                 return
+            self._time_stop(broker, now)
             in_window = self.market.scan_start <= (now.hour, now.minute) < self.market.scan_end(now.date())
             if in_window and (now.minute % self.cfg.scan_minutes == 0):
                 self.scan(now)
@@ -596,6 +601,11 @@ class DeskEngine:
             moves.sort(key=lambda item: (item.by_gap, abs(item.move_pct), item.volume_x), reverse=True)
             volume_only.sort(key=lambda item: item.volume_x, reverse=True)
             chosen = moves[: max(0, left_move)] + volume_only[: max(0, left_volume)]
+            # Markedsfilteret og stoppet efter tab: markeringerne vises, men der lægges ingen forslag.
+            halt = self._halt_reason(day, now, intraday)
+            if halt and chosen:
+                self._note_halt(day, now, halt, chosen)
+                chosen = []
             done = 0
             for flag in chosen:
                 if self.paused:
@@ -1014,6 +1024,81 @@ class DeskEngine:
                 expires = _parse_ts(row.get("expires_at"))
                 if expires is None or now >= expires:
                     self._set_expired(row, "Du nåede ikke at svare.")
+
+    # ------------------------------------------------------------------ stopregler
+    def _halt_reason(self, day: str, now: datetime, intraday: dict) -> str:
+        """Hvorfor bordet ikke køber nye aktier lige nu. Tom streng, hvis det må købe."""
+        cfg = self.cfg
+        index = rules.index_move(intraday.get(self.market.benchmark, []), now)
+        if rules.market_weak(index, limit_pct=cfg.market_filter_pct):
+            return (
+                f"{self.market.benchmark_name} er ned {pct(abs(index), sign=False)} siden åbningen "
+                f"(grænsen er {short(cfg.market_filter_pct)} %). Markedet falder, så bordet køber ikke nye aktier."
+            )
+        losses = self._losses_today(day)
+        if cfg.max_losses_per_day > 0 and losses >= cfg.max_losses_per_day:
+            return f"Der er lukket {losses} handler med tab i dag (grænsen er {cfg.max_losses_per_day}). Bordet køber ikke mere i dag."
+        return ""
+
+    def _note_halt(self, day: str, now: datetime, why: str, chosen: list) -> None:
+        """Én besked om pausen, højst hvert halve time, så Gruppen ikke fyldes op."""
+        key = f"halt_note:{day}"
+        last = _parse_ts(self.store.get_state(key))
+        if last is not None and now - last < timedelta(minutes=HALT_NOTE_MINUTES):
+            return
+        self.store.set_state(key, now.isoformat(timespec="seconds"))
+        names = ", ".join(flag.symbol for flag in chosen[:5])
+        self.store.post(
+            "executor",
+            "info",
+            f"{why} Det var fx {names}. De bliver ikke gemt som forslag, så de kan markeres igen, når forholdene er bedre.",
+        )
+
+    def _losses_today(self, day: str) -> int:
+        return sum(1 for row in self.store.proposals_on(day) if row.get("status") == "closed" and float(row.get("pnl") or 0) < 0)
+
+    def _time_stop(self, broker, now: datetime) -> int:
+        """Tidsstop: en handel, der stadig ligger under købskursen efter time_stop_min minutter, lukkes nu.
+        Så bliver pladsen fri, og kapitalen sidder ikke fast i en handel, der ikke går nogen steder."""
+        minutes = self.cfg.time_stop_min
+        if minutes <= 0:
+            return 0
+        with self._order_lock:
+            old: list[dict] = []
+            for row in self.store.proposals_with_status("placed"):
+                since = _parse_ts(row.get("decided_at"))
+                if since is not None and now - since >= timedelta(minutes=minutes):
+                    old.append(row)
+            if not old:
+                return 0
+            prices = {position.symbol: position.market_price for position in broker.get_positions()}
+            closed = 0
+            for row in old:
+                symbol = row["symbol"]
+                fill = float(row.get("fill_price") or row.get("entry") or 0)
+                price = prices.get(symbol)
+                if not price or fill <= 0 or price >= fill:
+                    continue
+                try:
+                    # Den danske papirkonto skriver årsagen i sin egen bog. Alpaca kender ingen årsag.
+                    if self.own_ledger:
+                        broker.close_position(symbol, reason="time")
+                    else:
+                        broker.close_position(symbol)
+                except BrokerError as exc:
+                    self.store.post("executor", "error", f"{symbol} kunne ikke lukkes ved tidsstop: {exc}", symbol=symbol, proposal_id=row["id"])
+                    continue
+                exit_price = self._exit_after_close(broker, row) or price
+                self._close(row, fill, float(exit_price), "time", now)
+                self.store.post(
+                    "executor",
+                    "info",
+                    f"{symbol}: under købskursen efter {minutes} minutter. Bordet lukker den nu, så pladsen bliver fri.",
+                    symbol=symbol,
+                    proposal_id=row["id"],
+                )
+                closed += 1
+            return closed
 
     # ------------------------------------------------------------------ åbne handler
     def _sync(self, broker, now: datetime) -> None:
@@ -1587,6 +1672,9 @@ class DeskEngine:
                 "trial_buys": cfg.trial_buys,
                 "premarket": cfg.premarket,
                 "gap_pct": cfg.gap_pct,
+                "market_filter_pct": cfg.market_filter_pct,
+                "time_stop_min": cfg.time_stop_min,
+                "max_losses_per_day": cfg.max_losses_per_day,
                 "daily_loss_pct": cfg.daily_loss_pct,
                 "max_chase_pct": cfg.max_chase_pct,
                 "log_time_et": self.market.hhmm(self.market.log_at(now.date())),

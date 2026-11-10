@@ -195,3 +195,34 @@ def top_exit_decision(
     if minutes_held >= cfg.max_hold_minutes:
         return ExitDecision(True, 1.0, "time", f"Holdt i {minutes_held:.0f} min. uden at traderen solgte. Tidsgrænsen er nået.")
     return HOLD
+
+
+# ---------------------------------------------------------------------- stop for nye køb
+SOL_BASELINE_MIN_SECONDS = 50 * 60  # sammenligningskursen er mindst 50 minutter gammel
+SOL_BASELINE_MAX_SECONDS = 70 * 60  # og højst 70 minutter gammel, så det er "den seneste time"
+
+
+def sol_drop_pct(samples: list[tuple[float, float]], now: float) -> float | None:
+    """SOL's bevægelse den seneste time i procent. samples er (tidspunkt, kurs) i tidsorden. None uden historik."""
+    if not samples:
+        return None
+    latest = samples[-1][1]
+    baseline = None
+    for stamp, price in samples:
+        age = now - stamp
+        if SOL_BASELINE_MIN_SECONDS <= age <= SOL_BASELINE_MAX_SECONDS and price > 0:
+            baseline = price  # den seneste af de gamle nok
+    if baseline is None or latest <= 0:
+        return None
+    return (latest - baseline) / baseline * 100.0
+
+
+def sol_halt(drop: float | None, settings: MemeSettings) -> bool:
+    """SOL er ned mere end sol_filter_pct den seneste time. Et filter på 0 slår det fra."""
+    return settings.sol_filter_pct > 0 and drop is not None and drop <= -settings.sol_filter_pct + 1e-9
+
+
+def losses_halt(losses_today: int, settings: MemeSettings) -> bool:
+    """Så mange handler er lukket med tab i dag, at der ikke købes mere i dag. 0 slår det fra."""
+    return settings.max_losses_per_day > 0 and losses_today >= settings.max_losses_per_day
+

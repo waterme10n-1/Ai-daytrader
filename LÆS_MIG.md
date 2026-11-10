@@ -222,6 +222,8 @@ Den daglige tabsgrænse er **slået fra som standard**, og den samlede tabsgræn
 
 - **Dagligt tabsstop**: når dagens tab når `MEME_DAILY_LOSS_PCT` af bankroll (standard 25 %), køber botten ikke mere resten af døgnet (UTC). Åbne positioner beholder deres stop.
 - **Samlet tabsstop**: når det samlede tab når `MEME_MAX_DRAWDOWN_PCT` (standard 50 %), sælges alt, og botten står stille, indtil du trykker **Genoptag**.
+- **Stop efter tab i dag** (`MEME_MAX_LOSSES_PER_DAY`, standard 3): når tre handler er lukket med tab i dag (UTC), køber botten ikke flere nye tokens den dag. Samme regel som bordet. **Genoptag** ændrer det ikke, fordi stoppet er til for at beskytte dig mod en dårlig dag.
+- **Markedsfilter på SOL** (`MEME_SOL_FILTER_PCT`, standard 5): er SOL ned mere end 5 % den seneste time, køber botten ingen nye tokens, mens markedet falder. Salg fortsætter, og åbne positioner beholder deres stop. Botten skriver kun en besked om stoppet, højst hvert halve time.
 
 **Nødstop** sælger alt med det samme og virker altid. Sniperen og den almindelige strategi har stadig deres egne stop-loss pr. position.
 
@@ -309,6 +311,12 @@ SCOUT, CHART og SIZER er bevidst almindelig kode. Tal fra en sprogmodel kan vær
 
 **Prøvekøb er også slået til som standard** (`DESK_TRIAL_BUYS=true`, eller **Prøvekøb** under **Bots → Indstillinger**). Har en aktie flyttet sig, og har CHART en ren opstilling, køber bordet alligevel, men kun halv størrelse (2,5 % af kontoen i stedet for 5 %), når SKEPTIC siger WAIT, eller når NEWS ikke fandt en grund (SKIP). Et SKIP fra Claude med en nyhed i hånden respekteres. Det giver flere handler at se på papir, og bordet lærer af rigtige resultater i stedet for kun skyggeregnskab. Taber køb uden en grund fra NEWS mindst 3 gange med højst en tredjedel vindere, slår den lærte regel "Køb uden en grund fra NEWS" til, og så stopper bordet dem selv. Prøvekøb sker aldrig på en markering kun på volumen og aldrig, når en lært regel siger nej. Lofterne for åbne handler og dagens tab gælder som altid. Prøvekøb står som "prøvekøb" ved handlen og i Gruppen.
 
+**Tre stopregler, der gør bordet mere forsigtigt, når det går dårligt.** Alle tre kan slås fra med 0.
+
+- **Markedsfilter** (`DESK_MARKET_FILTER_PCT`, standard 1). Er S&P 500 eller C25 ned mere end 1 % siden åbningen, køber bordet ingen nye aktier, så længe markedet falder. Markeringerne vises stadig, og de tæller ikke som forslag, så de kan komme igen, når markedet vender.
+- **Tidsstop** (`DESK_TIME_STOP_MIN`, standard 90). En handel, der efter 90 minutter stadig ligger under købskursen, lukkes til markedskurs. Pladsen bliver fri til en ny aktie, og kapitalen sidder ikke fast i en handel, der ikke går nogen steder. Handler over købskursen får lov at køre til stop eller mål.
+- **Stop efter tab** (`DESK_MAX_LOSSES_PER_DAY`, standard 2). Når to handler er lukket med tab i dag, køber bordet ikke mere den dag. Det holder ikke en dårlig dag i gang.
+
 Slår du autopiloten fra, ender hver BUY som et kort under **Godkend** (og i chatten) med hele kæden: markering, nyhed med link, de tre modargumenter og beløbet. Du har 10 minutter. Når du trykker **Godkend køb**, tjekker EXECUTOR igen, at kursen ikke er løbet mere end 0,5 % over indgangen og stadig ligger mellem stop og mål, og at SIZER's grænser holder. Ellers lægges ordren ikke. Er Telegram sat op, får du også en besked på telefonen.
 
 ## Tal med bordet
@@ -341,7 +349,7 @@ Forsiden **Overblik** viser papirkontoen, en nedtælling til børsen (New York e
 ## Opsætning
 
 1. Opret en papirkonto på [app.alpaca.markets](https://app.alpaca.markets) (kontonavnet øverst til venstre → **Open New Paper Account** → **API Keys → Generate New Keys**) og sæt `DESK_ALPACA_API_KEY` og `DESK_ALPACA_SECRET_KEY` i Railway. Står `ALPACA_API_KEY` og `ALPACA_SECRET_KEY` der allerede, bruges de.
-2. `ANTHROPIC_API_KEY` slår Claude til for NEWS og SKEPTIC. Der er intet dagligt loft som standard; sæt `DESK_AI_DAILY_BUDGET_USD` (fx 2) for at få et. Knappen **Test Claude** under Bots viser, om Claude svarer, og ellers præcis hvorfor (forkert nøgle, ingen kredit, ukendt model). Et abonnement på Claude (Pro eller Max) dækker ikke API'et: API-kredit købes for sig under Billing i Claude Console. Fejler Claude på en måde, der ikke går over af sig selv (ingen kredit, forkert nøgle eller model), holder bordet 15 minutters pause fra Claude, bruger faste regler imens og prøver så igen; **Test Claude** prøver altid med det samme. Siden viser det som en gul besked, for bordet handler videre. Uden Claude tager faste regler over, og de er strengere: kun en Alpaca-overskrift fra de sidste 18 timer (fra i går aftes og frem) tæller som grund, og SKEPTIC siger WAIT, hvis kursen ligger mere end 2 % over VWAP.
+2. `ANTHROPIC_API_KEY` slår Claude til for NEWS og SKEPTIC. Bordet bruger `claude-haiku-5-5` som standard (`DESK_ANTHROPIC_MODEL` skifter den). Haiku koster ca. en fyrretyvendedel af Opus, men den vurderer også SKEPTIC's BUY og WAIT, så følg **Nej med rette** under Læring. Kør **Test Claude** først, og se at svaret er grønt. Der er intet dagligt loft som standard; sæt `DESK_AI_DAILY_BUDGET_USD` (fx 2) for at få et. Knappen **Test Claude** under Bots viser, om Claude svarer, og ellers præcis hvorfor (forkert nøgle, ingen kredit, ukendt model). Et abonnement på Claude (Pro eller Max) dækker ikke API'et: API-kredit købes for sig under Billing i Claude Console. Fejler Claude på en måde, der ikke går over af sig selv (ingen kredit, forkert nøgle eller model), holder bordet 15 minutters pause fra Claude, bruger faste regler imens og prøver så igen; **Test Claude** prøver altid med det samme. Siden viser det som en gul besked, for bordet handler videre. Uden Claude tager faste regler over, og de er strengere: kun en Alpaca-overskrift fra de sidste 18 timer (fra i går aftes og frem) tæller som grund, og SKEPTIC siger WAIT, hvis kursen ligger mere end 2 % over VWAP.
 3. Alle `DESK_*`-variabler står i `.env.example`. På Railway ligger databasen som `/data/desk.db`.
 
 SCOUT kigger hvert minut fra 9:45 til 15:30 ET (15:45–21:30 dansk tid). Intet her er finansiel rådgivning: bottene foreslår, du beslutter.
