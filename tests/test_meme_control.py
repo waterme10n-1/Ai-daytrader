@@ -80,7 +80,7 @@ def test_the_tightener_leaves_a_filter_you_set_alone():
         _done_shadow(engine, "momentum", {"organic": 32 + (i % 8), "liq": 90_000}, -0.3, i)
     for i in range(60):
         _done_shadow(engine, "momentum", {"organic": 45 + i % 40, "liq": 90_000}, 0.08, 100 + i)
-    engine.update_params({"min_organic_score": 30})  # samme tal, men ingen ændring = ingen lås
+    engine.update_params({"min_organic_score": 20})  # samme tal, men ingen ændring = ingen lås
     assert engine._locked("momentum") == set()
     engine.update_params({"min_organic_score": 31})
     engine._auto_tighten(time.time())
@@ -104,7 +104,7 @@ def test_learning_skips_locked_sniper_filters_and_logs_the_rest():
         _closed(engine, "sniper", "rug_liquidity", -0.9, learned=False, index=index)
     engine._learn()
     assert engine.sniper.min_liquidity_usd == 9_000  # låst af dig
-    assert engine.sniper.min_holders == 35  # strammet efter rugs
+    assert engine.sniper.min_holders == 25  # strammet efter rugs
     entry = engine.store.get_json("auto_changes")[-1]
     assert entry["source"] == "læring" and {item["param"] for item in entry["changes"]} == {"min_holders", "max_top10_pct", "min_age_seconds"}
 
@@ -123,10 +123,10 @@ def test_automatic_changes_are_logged_and_can_be_undone(tmp_path):
     with _client(engine, tmp_path) as client:
         change = client.get("/api/meme/status").json()["auto_changes"][0]
         assert change["source"] == "strammer" and change["can_undo"] is True
-        assert change["changes"][0]["old_text"] == "30" and change["changes"][0]["new_text"] == "40"
+        assert change["changes"][0]["old_text"] == "20" and change["changes"][0]["new_text"] == "40"
         body = client.post("/api/meme/changes/undo", json={"id": change["id"]}).json()
         assert "Fortrudt" in body["message"]
-        assert engine.params.min_organic_score == 30
+        assert engine.params.min_organic_score == 20
         assert "min_organic_score" in engine._locked("momentum")
         after = body["status"]["auto_changes"][0]
         assert after["undone_at"] and after["can_undo"] is False

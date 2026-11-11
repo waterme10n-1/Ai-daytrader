@@ -97,7 +97,7 @@ def test_features_weigh_telegram_and_x_over_a_website_and_count_insiders():
 
 def test_momentum_skips_bot_driven_suspicious_and_insider_heavy_tokens():
     engine, dex, rug, jup, _notes = make_engine()
-    assert engine.params.min_organic_score == 30
+    assert engine.params.min_organic_score == 20
     cases = {
         "LowOrganic11": ({"organicScore": 10}, {}),
         "Suspicious11": ({"audit": {"isSus": True}}, {}),
@@ -303,7 +303,7 @@ def test_research_upgrade_gives_saved_sniper_settings_the_new_wait_once():
 
 def test_old_params_without_the_new_fields_get_the_new_defaults():
     params = StrategyParams.from_dict({"min_liquidity_usd": 40_000})
-    assert params.min_organic_score == 30 and params.max_insiders == 50 and params.max_dev_mints == 50
+    assert params.min_organic_score == 20 and params.max_insiders == 50 and params.max_dev_mints == 50
     assert StrategyParams.from_dict({"max_insiders": 9.6}).max_insiders == 10
 
 
@@ -328,7 +328,7 @@ def test_export_has_trades_shadows_and_settings_but_no_secrets(tmp_path, monkeyp
     data = response.json()
     assert data["positions"][0]["safety"]["facts"]["organic"] == 60
     assert data["shadows"][0]["facts"] == {"organic": 50}
-    assert data["params"]["min_organic_score"] == 30 and "weights" in data["model"]
+    assert data["params"]["min_organic_score"] == 20 and "weights" in data["model"]
     engine.restart_paper(50)
     archived = engine.export_data()["archived_positions"]
     assert archived and archived[0]["mode"].startswith("paper-arkiv-")

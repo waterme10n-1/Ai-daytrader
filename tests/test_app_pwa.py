@@ -98,7 +98,9 @@ def test_home_counts_down_from_the_engine_clock(tmp_path):
         page = client.get("/meme").text
         for marker in ('id="motor"', 'id="lanes"', 'id="clock"', 'id="equity"', "function secondTick", "function jobState"):
             assert marker in page, marker
-        assert "#9945ff" not in page.split('<style id="future">')[1]  # ingen lilla neon i det nye tema
+        # Ingen lilla neon i standardtemaet. Lilla findes kun som en farve, man selv vælger (data-accent="solana").
+        future = page.split('<style id="future">')[1]
+        assert all("#9945ff" not in line or "solana" in line for line in future.splitlines())
 
 
 def _tokens(page: str, selector: str) -> dict[str, str]:
