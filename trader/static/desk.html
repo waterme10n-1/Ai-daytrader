@@ -7,6 +7,7 @@
 <title>Handelsbordet</title>
 <link rel="manifest" href="/manifest.webmanifest">
 <meta name="theme-color" content="#000000">
+<script>(function(){try{var d=document.documentElement,t=localStorage.getItem("look-theme")||localStorage.getItem("desk-theme")||"dark",a=localStorage.getItem("look-accent");if(a&&a!=="lime")d.dataset.accent=a;var l=t==="light"||(t==="auto"&&matchMedia("(prefers-color-scheme: light)").matches);d.dataset.theme=l?"light":"dark";if(t==="midnat")d.dataset.bg="midnat";}catch(e){}})();</script>
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -538,6 +539,41 @@
   }
   :focus-visible { outline-color: var(--accent); }
 </style>
+<style id="look-css">
+  /* ---------- Udseende: baggrund og farve (Indstillinger → Udseende), delt med Memebot ---------- */
+  :root[data-accent="blaa"] { --accent: #0a84ff; --accent-bg: color-mix(in srgb, #0a84ff 14%, transparent); --on-accent: #ffffff; }
+  :root[data-theme="light"][data-accent="blaa"] { --accent: #007aff; --accent-bg: color-mix(in srgb, #007aff 12%, transparent); --on-accent: #ffffff; }
+  :root[data-accent="indigo"] { --accent: #5e5ce6; --accent-bg: color-mix(in srgb, #5e5ce6 14%, transparent); --on-accent: #ffffff; }
+  :root[data-theme="light"][data-accent="indigo"] { --accent: #4b49d1; --accent-bg: color-mix(in srgb, #4b49d1 12%, transparent); --on-accent: #ffffff; }
+  :root[data-accent="lilla"] { --accent: #bf5af2; --accent-bg: color-mix(in srgb, #bf5af2 14%, transparent); --on-accent: #ffffff; }
+  :root[data-theme="light"][data-accent="lilla"] { --accent: #9b3fd6; --accent-bg: color-mix(in srgb, #9b3fd6 12%, transparent); --on-accent: #ffffff; }
+  :root[data-accent="pink"] { --accent: #ff375f; --accent-bg: color-mix(in srgb, #ff375f 14%, transparent); --on-accent: #ffffff; }
+  :root[data-theme="light"][data-accent="pink"] { --accent: #d6244c; --accent-bg: color-mix(in srgb, #d6244c 12%, transparent); --on-accent: #ffffff; }
+  :root[data-accent="orange"] { --accent: #ff9f0a; --accent-bg: color-mix(in srgb, #ff9f0a 14%, transparent); --on-accent: #1c1c1e; }
+  :root[data-theme="light"][data-accent="orange"] { --accent: #c76b00; --accent-bg: color-mix(in srgb, #c76b00 12%, transparent); --on-accent: #ffffff; }
+  :root[data-accent="guld"] { --accent: #ffd60a; --accent-bg: color-mix(in srgb, #ffd60a 14%, transparent); --on-accent: #1c1c1e; }
+  :root[data-theme="light"][data-accent="guld"] { --accent: #9a7a00; --accent-bg: color-mix(in srgb, #9a7a00 12%, transparent); --on-accent: #ffffff; }
+  :root[data-accent="groen"] { --accent: #30d158; --accent-bg: color-mix(in srgb, #30d158 14%, transparent); --on-accent: #0b1a10; }
+  :root[data-theme="light"][data-accent="groen"] { --accent: #1f9d48; --accent-bg: color-mix(in srgb, #1f9d48 12%, transparent); --on-accent: #ffffff; }
+  :root[data-accent="mint"] { --accent: #66d4cf; --accent-bg: color-mix(in srgb, #66d4cf 14%, transparent); --on-accent: #062321; }
+  :root[data-theme="light"][data-accent="mint"] { --accent: #0a8f89; --accent-bg: color-mix(in srgb, #0a8f89 12%, transparent); --on-accent: #ffffff; }
+  :root[data-accent="solana"] { --accent: #9945ff; --accent-bg: color-mix(in srgb, #9945ff 14%, transparent); --on-accent: #ffffff; }
+  :root[data-theme="light"][data-accent="solana"] { --accent: #7a2fe0; --accent-bg: color-mix(in srgb, #7a2fe0 12%, transparent); --on-accent: #ffffff; }
+  :root[data-bg="midnat"]:not([data-theme="light"]) {
+    --bg: #070b16; --card: #0f1526; --card-2: #141b2f; --raise: #1a2238; --sep: rgba(160,180,255,0.09);
+    --fill: rgba(160,180,255,0.07); --fill-2: rgba(160,180,255,0.12); --bar: rgba(10,14,28,0.88);
+  }
+  .look { grid-column: 1 / -1; }
+  .look .lbl { display: block; margin: 0 0 8px; color: var(--muted); font-size: 12.5px; font-weight: 600; }
+  .look-modes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-bottom: 12px; }
+  .look-modes button { height: 54px; border-radius: 13px; border: 1.5px solid transparent; background: var(--fill); color: var(--text); font: 600 12.5px var(--font); display: grid; place-items: center; gap: 2px; padding: 6px 2px; }
+  .look-modes button i { width: 22px; height: 14px; border-radius: 4px; border: 1px solid var(--fill-2); }
+  .look-modes button[aria-pressed="true"] { border-color: var(--accent); }
+  .look-colors { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 5px; max-width: 460px; }
+  .look-colors button { aspect-ratio: 1; max-width: 40px; width: 100%; justify-self: center; border-radius: 50%; border: 0; padding: 0; background: var(--sw); position: relative; }
+  .look-colors button[aria-pressed="true"]::after { content: ""; position: absolute; inset: -4px; border-radius: 50%; border: 2px solid var(--sw); }
+  .look-colors button[aria-pressed="true"]::before { content: ""; position: absolute; inset: 35%; border-radius: 50%; background: #fff; }
+</style>
 </head>
 <body>
 <a class="skip" href="#main">Gå til indholdet</a>
@@ -677,7 +713,7 @@
         <label class="wide toggle"><span class="tx">Prøvekøb<span>Siger SKEPTIC WAIT, eller finder NEWS ingen grund, til en kursbevægelse med en ren opstilling, køber bordet halv størrelse alligevel. Flere handler på papir. Taber køb uden grund, lærer bordet det og stopper dem selv.</span></span><input autocomplete="off" name="trial_buys" type="checkbox"></label>
         <label class="wide toggle"><span class="tx"><span id="pre-lbl" style="display:inline;font:inherit;color:inherit">Før åbning</span><span id="pre-sub">SCOUT og NEWS kigger på gaps fra kl. 10 dansk tid, og et gap, der holder, kan købes ved åbningen.</span></span><input autocomplete="off" name="premarket" type="checkbox"></label>
         <label class="wide toggle"><span class="tx">Lyd og vibration<span>Ved køb og salg (gemmes på denne enhed).</span></span><input id="sound-toggle" type="checkbox"></label>
-        <label class="wide toggle"><span class="tx">Lyst tema<span>Gemmes på denne enhed.</span></span><input id="theme-toggle" type="checkbox"></label>
+        <div class="look" id="look" aria-label="Udseende"></div>
         <label class="wide"><span id="wl-lbl">Watchlist (10–20 aktier du kender)</span><textarea name="watchlist" rows="2"></textarea></label>
         <label>SCOUT: bevægelse på en time (%)<input autocomplete="off" name="move_pct" type="number" step="0.1" min="0.5" max="20"></label>
         <label>SCOUT: volumen (gange normal)<input autocomplete="off" name="volume_x" type="number" step="0.1" min="1.2" max="20"></label>
@@ -842,10 +878,43 @@ const mini = (values, color) => {
   return `<svg viewBox="0 0 84 30" preserveAspectRatio="none" aria-hidden="true">${area}${d ? `<path d="${d}" fill="none" stroke="${color}" stroke-width="1.6" stroke-linecap="round" vector-effect="non-scaling-stroke"/>` : ""}</svg>`;
 };
 
-// tema og lyd (gemmes på enheden)
-function setTheme(light) { document.documentElement.dataset.theme = light ? "light" : "dark"; $("theme-toggle").checked = light; try { localStorage.setItem("desk-theme", light ? "light" : "dark"); } catch (e) {} }
-try { setTheme(localStorage.getItem("desk-theme") === "light"); } catch (e) { setTheme(false); }
-$("theme-toggle").onchange = (e) => setTheme(e.target.checked);
+// udseende (delt med Memebot, gemmes på enheden) og lyd
+const LOOK_MODES = [["dark", "Mørk", "#08080a"], ["midnat", "Midnat", "#070b16"], ["light", "Lys", "#eeeee9"], ["auto", "Telefon", "linear-gradient(135deg,#08080a 50%,#eeeee9 50%)"]];
+const LOOK_COLORS = [["lime", "Lime", "#c6ff3d"], ["blaa", "Blå", "#0a84ff"], ["indigo", "Indigo", "#5e5ce6"], ["lilla", "Lilla", "#bf5af2"], ["pink", "Pink", "#ff375f"], ["orange", "Orange", "#ff9f0a"], ["guld", "Guld", "#ffd60a"], ["groen", "Grøn", "#30d158"], ["mint", "Mint", "#66d4cf"], ["solana", "Solana", "linear-gradient(135deg,#9945ff,#14f195)"]];
+let lookMode = "dark", lookColor = "lime";
+const lookGet = (key, old, fallback) => { try { return localStorage.getItem(key) || (old && localStorage.getItem(old)) || fallback; } catch (e) { return fallback; } };
+const lookSet = (key, value) => { try { localStorage.setItem(key, value); } catch (e) {} };
+function setTheme(mode, save = true) {
+  lookMode = LOOK_MODES.some((m) => m[0] === mode) ? mode : "dark";
+  const light = lookMode === "light" || (lookMode === "auto" && window.matchMedia && matchMedia("(prefers-color-scheme: light)").matches);
+  const root = document.documentElement;
+  root.dataset.theme = light ? "light" : "dark";
+  if (lookMode === "midnat") root.dataset.bg = "midnat"; else delete root.dataset.bg;
+  if (save) lookSet("look-theme", lookMode);
+  renderLook();
+}
+function setAccent(name, save = true) {
+  lookColor = LOOK_COLORS.some((c) => c[0] === name) ? name : "lime";
+  if (lookColor === "lime") delete document.documentElement.dataset.accent; else document.documentElement.dataset.accent = lookColor;
+  if (save) lookSet("look-accent", lookColor);
+  renderLook();
+}
+function renderLook() {
+  const box = $("look");
+  if (!box) return;
+  box.innerHTML = `<span class="lbl">Udseende (gælder også Memebot)</span>
+    <div class="look-modes" role="group" aria-label="Baggrund">${LOOK_MODES.map(([id, label, bg]) => `<button type="button" data-look-mode="${id}" aria-pressed="${id === lookMode}"><i style="background:${bg}"></i>${label}</button>`).join("")}</div>
+    <span class="lbl">Farve</span>
+    <div class="look-colors" role="group" aria-label="Farve">${LOOK_COLORS.map(([id, label, sw]) => `<button type="button" data-look-color="${id}" aria-pressed="${id === lookColor}" aria-label="${label}" title="${label}" style="--sw:${sw}"></button>`).join("")}</div>`;
+}
+$("look").addEventListener("click", (ev) => {
+  const mode = ev.target.closest("[data-look-mode]"), color = ev.target.closest("[data-look-color]");
+  if (mode) { ev.preventDefault(); setTheme(mode.dataset.lookMode); }
+  else if (color) { ev.preventDefault(); setAccent(color.dataset.lookColor); }
+});
+if (window.matchMedia) { const mq = matchMedia("(prefers-color-scheme: light)"); if (mq.addEventListener) mq.addEventListener("change", () => { if (lookMode === "auto") setTheme("auto", false); }); }
+setAccent(lookGet("look-accent", null, "lime"), false);
+setTheme(lookGet("look-theme", "desk-theme", "dark"), false);
 let soundOn = false, audio = null;
 try { soundOn = localStorage.getItem("desk-sound") === "1"; } catch (e) {}
 function setSound(on) { soundOn = on; $("sound-toggle").checked = on; try { localStorage.setItem("desk-sound", on ? "1" : "0"); } catch (e) {} }

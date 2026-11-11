@@ -8,7 +8,7 @@
 <link rel="icon" type="image/png" href="/icons/icon-192.png">
 <link rel="manifest" href="/manifest.webmanifest">
 <meta name="theme-color" content="#000000">
-<script>(function(){try{var d=document.documentElement,t=localStorage.getItem("meme-theme")||"dark",a=localStorage.getItem("meme-accent");if(a)d.dataset.accent=a;var l=t==="light"||(t==="auto"&&matchMedia("(prefers-color-scheme: light)").matches);d.dataset.theme=l?"light":"dark";if(t==="midnat")d.dataset.bg="midnat";}catch(e){}})();</script>
+<script>(function(){try{var d=document.documentElement,t=localStorage.getItem("look-theme")||localStorage.getItem("meme-theme")||"dark",a=localStorage.getItem("look-accent")||localStorage.getItem("meme-accent");if(a&&a!=="lime")d.dataset.accent=a;var l=t==="light"||(t==="auto"&&matchMedia("(prefers-color-scheme: light)").matches);d.dataset.theme=l?"light":"dark";if(t==="midnat")d.dataset.bg="midnat";}catch(e){}})();</script>
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -906,7 +906,7 @@
   .look-modes button { height: 54px; border-radius: 13px; border: 1.5px solid transparent; background: var(--surface-2); color: var(--text); font: 650 12.5px var(--font); cursor: pointer; display: grid; place-items: center; gap: 2px; padding: 6px 2px; }
   .look-modes button i { width: 22px; height: 14px; border-radius: 4px; border: 1px solid var(--border-strong); }
   .look-modes button[aria-pressed="true"] { border-color: var(--accent); }
-  .look-colors { display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 6px; }
+  .look-colors { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 5px; }
   .look-colors button { aspect-ratio: 1; max-width: 40px; width: 100%; justify-self: center; border-radius: 50%; border: 0; cursor: pointer; background: var(--sw); position: relative; }
   .look-colors button[aria-pressed="true"]::after { content: ""; position: absolute; inset: -4px; border-radius: 50%; border: 2px solid var(--sw); }
   .look-colors button[aria-pressed="true"]::before { content: ""; position: absolute; inset: 35%; border-radius: 50%; background: #fff; }
@@ -1589,10 +1589,11 @@ function axiomLink(mint, pairUrl) {
 
 /* ---------- Tema, farver og faner ---------- */
 const LOOK_MODES = [["dark", "Mørk", "#000000"], ["midnat", "Midnat", "#070b16"], ["light", "Lys", "#f2f2f7"], ["auto", "Telefon", "linear-gradient(135deg,#000 50%,#f2f2f7 50%)"]];
-const LOOK_COLORS = [["blaa", "Blå", "#0a84ff"], ["indigo", "Indigo", "#5e5ce6"], ["lilla", "Lilla", "#bf5af2"], ["pink", "Pink", "#ff375f"], ["orange", "Orange", "#ff9f0a"], ["guld", "Guld", "#ffd60a"], ["groen", "Grøn", "#30d158"], ["mint", "Mint", "#66d4cf"], ["solana", "Solana", "linear-gradient(135deg,#9945ff,#14f195)"]];
-let lookMode = "dark", lookColor = "blaa";
-function lookGet(key, fallback) { try { return localStorage.getItem(key) || fallback; } catch (e) { return fallback; } }
-function lookSet(key, value) { try { localStorage.setItem(key, value); } catch (e) {} }
+const LOOK_COLORS = [["lime", "Lime", "#c6ff3d"], ["blaa", "Blå", "#0a84ff"], ["indigo", "Indigo", "#5e5ce6"], ["lilla", "Lilla", "#bf5af2"], ["pink", "Pink", "#ff375f"], ["orange", "Orange", "#ff9f0a"], ["guld", "Guld", "#ffd60a"], ["groen", "Grøn", "#30d158"], ["mint", "Mint", "#66d4cf"], ["solana", "Solana", "linear-gradient(135deg,#9945ff,#14f195)"]];
+let lookMode = "dark", lookColor = "lime";
+// Valget deles med Handelsbordet (look-*). Gamle valg fra før (meme-*) bruges, indtil man vælger igen.
+function lookGet(key, fallback) { try { return localStorage.getItem(key.replace("meme-", "look-")) || localStorage.getItem(key) || fallback; } catch (e) { return fallback; } }
+function lookSet(key, value) { try { localStorage.setItem(key.replace("meme-", "look-"), value); } catch (e) {} }
 function applyTheme(theme, save = true) {
   // theme: dark, midnat, light eller auto (følg telefonen)
   lookMode = LOOK_MODES.some((m) => m[0] === theme) ? theme : "dark";
@@ -1609,8 +1610,9 @@ function applyTheme(theme, save = true) {
   if (state) render(state);
 }
 function applyAccent(name, save = true) {
-  lookColor = LOOK_COLORS.some((c) => c[0] === name) ? name : "blaa";
-  document.documentElement.dataset.accent = lookColor;
+  lookColor = LOOK_COLORS.some((c) => c[0] === name) ? name : "lime";
+  if (lookColor === "lime") delete document.documentElement.dataset.accent;  // standardfarven fra designet
+  else document.documentElement.dataset.accent = lookColor;
   if (save) lookSet("meme-accent", lookColor);
   renderLook();
   for (const k of Object.keys(cache)) delete cache[k];
@@ -3021,7 +3023,7 @@ document.getElementById("menu-app").innerHTML = icon("phone") + "Læg på hjemme
 document.getElementById("menu-settings").innerHTML = icon("plug") + "Forbindelser og indstillinger";
 if (csrfToken()) document.getElementById("logout").hidden = false;
 const queryTheme = new URLSearchParams(location.search).get("theme");
-applyAccent(lookGet("meme-accent", "blaa"), false);
+applyAccent(lookGet("meme-accent", "lime"), false);
 applyTheme(queryTheme || lookGet("meme-theme", "dark"), false);
 renderBell();
 renderTabs({ positions: [], kpis: { trades: 0 }, copy_wallets: [], sniper: null });
