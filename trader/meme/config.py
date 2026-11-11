@@ -185,7 +185,7 @@ class MemeSettings:
             sol_reserve=max(0.005, _float(os.getenv("MEME_SOL_RESERVE"), 0.02)),
             slippage_bps=max(50, min(1500, _int(os.getenv("MEME_SLIPPAGE_BPS"), 300))),
             priority_fee_lamports=max(0, min(5_000_000, _int(os.getenv("MEME_PRIORITY_FEE_LAMPORTS"), 100_000))),
-            scan_seconds=max(20, _int(os.getenv("MEME_SCAN_SECONDS"), 60)),
+            scan_seconds=max(10, _int(os.getenv("MEME_SCAN_SECONDS"), 10)),
             monitor_seconds=max(5, _int(os.getenv("MEME_MONITOR_SECONDS"), 15)),
             copy_wallets=_list(os.getenv("MEME_COPY_WALLETS")),
             ai_daily_budget_usd=max(0.0, _float(os.getenv("MEME_AI_DAILY_BUDGET_USD"), 0.5)),

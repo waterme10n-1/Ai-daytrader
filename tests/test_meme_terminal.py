@@ -85,3 +85,14 @@ def test_every_colour_has_a_brand_tint_for_the_fade_and_the_logo():
             assert f':root[data-accent="{colour}"] {{ --brand:' in html, (page, colour)
         assert "var(--logo-1)" in html and "function lookSwap" in html and "startViewTransition" in html
         assert 'data-bg="rod"]:not([data-theme="light"]) body' in html and 'data-theme="dark"]:not([data-bg="rod"]) body' in html
+
+
+def test_the_regular_scan_runs_every_10_seconds_by_default(monkeypatch):
+    from trader.meme.config import MemeSettings
+
+    monkeypatch.delenv("MEME_SCAN_SECONDS", raising=False)
+    assert MemeSettings.from_env().scan_seconds == 10
+    monkeypatch.setenv("MEME_SCAN_SECONDS", "3")
+    assert MemeSettings.from_env().scan_seconds == 10  # aldrig hurtigere end hvert 10. sekund
+    monkeypatch.setenv("MEME_SCAN_SECONDS", "60")
+    assert MemeSettings.from_env().scan_seconds == 60
