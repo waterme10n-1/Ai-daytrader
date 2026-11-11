@@ -7,7 +7,7 @@
 <title>Handelsbordet</title>
 <link rel="manifest" href="/manifest.webmanifest">
 <meta name="theme-color" content="#000000">
-<script>(function(){try{var L=localStorage,d=document.documentElement;if(L.getItem("look-v")!=="2"){var o=L.getItem("look-theme")||L.getItem("meme-theme")||L.getItem("desk-theme"),t0=(!o||o==="dark"||o==="rod")?"rod":o;L.setItem("look-theme",t0);if(t0==="rod")L.setItem("look-accent","hvid");else if(!L.getItem("look-accent")&&L.getItem("meme-accent"))L.setItem("look-accent",L.getItem("meme-accent"));["meme-theme","meme-accent","desk-theme"].forEach(function(k){L.removeItem(k);});L.setItem("look-v","2");}var t=L.getItem("look-theme")||"rod",a=L.getItem("look-accent")||(t==="rod"?"hvid":"");if(a&&a!=="lime")d.dataset.accent=a;var l=t==="light"||(t==="auto"&&matchMedia("(prefers-color-scheme: light)").matches);d.dataset.theme=l?"light":"dark";if(t==="midnat"||t==="rod")d.dataset.bg=t;var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute("content",l?"#f2f2f7":t==="rod"?"#9a1119":t==="midnat"?"#070b16":"#000000");}catch(e){}})();</script>
+<script>(function(){try{var L=localStorage,d=document.documentElement;if(L.getItem("look-v")!=="2"){var o=L.getItem("look-theme")||L.getItem("meme-theme")||L.getItem("desk-theme"),t0=(!o||o==="dark"||o==="rod")?"rod":o;L.setItem("look-theme",t0);if(t0==="rod")L.setItem("look-accent","hvid");else if(!L.getItem("look-accent")&&L.getItem("meme-accent"))L.setItem("look-accent",L.getItem("meme-accent"));["meme-theme","meme-accent","desk-theme"].forEach(function(k){L.removeItem(k);});L.setItem("look-v","2");}var t=L.getItem("look-theme")||"rod",a=L.getItem("look-accent")||(t==="rod"?"hvid":"");if(a&&a!=="lime")d.dataset.accent=a;var l=t==="light"||(t==="auto"&&matchMedia("(prefers-color-scheme: light)").matches);d.dataset.theme=l?"light":"dark";if(t==="midnat"||t==="rod")d.dataset.bg=t;var m=document.querySelector('meta[name="theme-color"]');if(m){var B={lime:"7fbf00",hvid:"e01b26",roed:"e01b26",blaa:"0a84ff",indigo:"5e5ce6",lilla:"b04de6",pink:"f0305a",orange:"f08c00",guld:"e0b000",groen:"22b84c",mint:"2fb3ac",solana:"8a3cf0"},h=B[a]||B.lime,k=t==="rod"?0.66:0.26;m.setAttribute("content",l?"#eeeee9":"#"+[0,2,4].map(function(i){return("0"+Math.round(parseInt(h.substr(i,2),16)*k).toString(16)).slice(-2);}).join(""));}}catch(e){}})();</script>
 <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=2">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -563,16 +563,46 @@
     --bg: #070b16; --card: #0f1526; --card-2: #141b2f; --raise: #1a2238; --sep: rgba(160,180,255,0.09);
     --fill: rgba(160,180,255,0.07); --fill-2: rgba(160,180,255,0.12); --bar: rgba(10,14,28,0.88);
   }
+  /* ---------- Farve-baggrunden (Udseende → Farve): fader i den farve, du vælger ---------- */
+  :root { --brand: #7fbf00; }
+  :root[data-accent="hvid"] { --brand: #e01b26; }
+  :root[data-accent="roed"] { --brand: #e01b26; }
+  :root[data-accent="blaa"] { --brand: #0a84ff; }
+  :root[data-accent="indigo"] { --brand: #5e5ce6; }
+  :root[data-accent="lilla"] { --brand: #b04de6; }
+  :root[data-accent="pink"] { --brand: #f0305a; }
+  :root[data-accent="orange"] { --brand: #f08c00; }
+  :root[data-accent="guld"] { --brand: #e0b000; }
+  :root[data-accent="groen"] { --brand: #22b84c; }
+  :root[data-accent="mint"] { --brand: #2fb3ac; }
+  :root[data-accent="solana"] { --brand: #8a3cf0; }
   :root[data-bg="rod"]:not([data-theme="light"]) {
-    --bg: #3a0609; --card: #3d080c; --card-2: #470a0f; --raise: #561116; --sep: rgba(255,210,210,0.09);
-    --fill: rgba(255,255,255,0.07); --fill-2: rgba(255,255,255,0.13); --bar: rgba(122,13,20,0.92);
-    --text: #fff6f5; --text-2: #f0cfcd; --muted: #cf9895;
-    --up: #4ade80; --up-bg: rgba(74,222,128,0.16); --down: #ffa4a0; --down-bg: rgba(255,164,160,0.16);
-    --warn: #ffc56b; --warn-bg: rgba(255,197,107,0.16);
-    /* Botternes farver i samme varme familie som den røde baggrund */
-    --scout: #ffc56b; --news: #ffd9d6; --chart: #ffab91; --skeptic: #ff8a95; --sizer: #f5b8e6; --executor: #4ade80;
+    --tint: color-mix(in srgb, var(--brand) 66%, #000); --deep: color-mix(in srgb, var(--brand) 18%, #000);
+    --text: color-mix(in srgb, #fff 96%, var(--brand)); --text-2: color-mix(in srgb, #fff 80%, var(--brand)); --muted: color-mix(in srgb, #fff 58%, var(--brand));
+    --up: #4ade80; --down: #ffa4a0; --warn: #ffc56b;
+    --bg: color-mix(in srgb, var(--brand) 38%, #000); --card: color-mix(in srgb, var(--brand) 26%, #000); --card-2: color-mix(in srgb, var(--brand) 31%, #000); --raise: color-mix(in srgb, var(--brand) 38%, #000);
+    --sep: rgba(255,255,255,0.09); --fill: rgba(255,255,255,0.07); --fill-2: rgba(255,255,255,0.13);
+    --bar: color-mix(in srgb, color-mix(in srgb, var(--brand) 55%, #000) 92%, transparent);
+    --up-bg: rgba(74,222,128,0.16); --down-bg: rgba(255,164,160,0.16); --warn-bg: rgba(255,197,107,0.16);
+    --accent: var(--text); --accent-bg: rgba(255,255,255,0.14); --on-accent: var(--deep);
+    /* Botternes farver i lyse, varme toner, der passer til alle farver */
+    --scout: #ffc56b; --news: #ffe1de; --chart: #ffb8a0; --skeptic: #ff8a95; --sizer: #f5c4ee; --executor: #4ade80;
   }
-  :root[data-bg="rod"]:not([data-theme="light"]) body { background: linear-gradient(180deg, #9a1119 0, #6a0b11 420px, #430709 980px, #2a0406 100%) !important; background-color: #2a0406 !important; }
+  /* Baggrunden fader fra den valgte farve øverst til næsten sort nederst */
+  :root[data-bg="rod"]:not([data-theme="light"]) body {
+    background: linear-gradient(180deg, var(--tint) 0, color-mix(in srgb, var(--brand) 46%, #000) 420px, color-mix(in srgb, var(--brand) 29%, #000) 980px, var(--deep) 100%) !important;
+    background-color: var(--deep) !important;
+  }
+  /* Mørk og Midnat får en svagere fade i samme farve */
+  :root[data-theme="dark"]:not([data-bg="rod"]) body {
+    background: linear-gradient(180deg, color-mix(in srgb, var(--brand) 26%, var(--bg)) 0, color-mix(in srgb, var(--brand) 9%, var(--bg)) 380px, var(--bg) 820px) !important;
+    background-color: var(--bg) !important;
+  }
+  /* Skift af farve glider over i stedet for at hoppe */
+  ::view-transition-old(root), ::view-transition-new(root) { animation-duration: 0.5s; }
+  /* Logoet tager farven: lys øverst, mørk nederst */
+  :root { --logo-1: color-mix(in srgb, var(--brand) 70%, #fff); --logo-2: var(--brand); --logo-3: color-mix(in srgb, var(--brand) 48%, #000); }
+  .brand-logo { display: block; width: 100%; height: 100%; }
   :root[data-accent="hvid"] { --accent: #fff3f2; --accent-bg: rgba(255,243,242,0.14); --on-accent: #2a0406; }
   :root[data-theme="light"][data-accent="hvid"] { --accent: #1c1c1e; --accent-bg: rgba(28,28,30,0.1); --on-accent: #ffffff; }
   :root[data-accent="roed"] { --accent: #ff453a; --accent-bg: color-mix(in srgb, #ff453a 14%, transparent); --on-accent: #ffffff; }
@@ -601,7 +631,7 @@
 
 <header class="top">
   <div class="wrap bar">
-    <div class="title"><span class="logo" aria-hidden="true"><img src="/icons/icon-192.png?v=2" alt="" width="34" height="34"></span><span class="name">Handelsbordet</span><h1 class="sr-only">Handelsbordet</h1><small id="today"></small></div>
+    <div class="title"><span class="logo" aria-hidden="true"><svg class="brand-logo" viewBox="0 0 100 100" aria-hidden="true"><defs><linearGradient id="lg-desk" x1="0" y1="0" x2="1" y2="1"><stop offset="0" style="stop-color:var(--logo-1)"/><stop offset="0.55" style="stop-color:var(--logo-2)"/><stop offset="1" style="stop-color:var(--logo-3)"/></linearGradient></defs><rect width="100" height="100" rx="22.5" fill="url(#lg-desk)"/><g transform="translate(7 7) scale(0.86)"><line x1="27" x2="27" y1="50" y2="82" stroke="#fff" stroke-width="3.5" stroke-linecap="round"/><rect x="19.5" y="56" width="15" height="20" rx="3.5" fill="#fff"/><line x1="50" x2="50" y1="34" y2="74" stroke="#fff" stroke-width="3.5" stroke-linecap="round"/><rect x="42.5" y="42" width="15" height="26" rx="3.5" fill="#fff"/><line x1="73" x2="73" y1="18" y2="64" stroke="#fff" stroke-width="3.5" stroke-linecap="round"/><rect x="65.5" y="26" width="15" height="32" rx="3.5" fill="#fff"/><rect x="19" y="84" width="62" height="3" rx="1.5" fill="#fff" opacity="0.55"/><path d="M32 18.5 Q33.5 25.5 40.5 27 Q33.5 28.5 32 35.5 Q30.5 28.5 23.5 27 Q30.5 25.5 32 18.5 Z" fill="#fff"/></g></svg></span><span class="name">Handelsbordet</span><h1 class="sr-only">Handelsbordet</h1><small id="today"></small></div>
     <button class="status" id="status" type="button" title="Systemstatus"><span class="dot"></span><span class="lbl-s" id="status-t">Forbinder</span></button>
     <button class="btn danger" id="pause-btn" type="button">Stop</button>
     <button class="round" id="pal-btn" type="button" title="Søg og kommandoer (⌘K)" aria-label="Søg og kommandoer"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></button>
@@ -893,8 +923,19 @@ const mini = (values, color) => {
 };
 
 // udseende (delt med Memebot, gemmes på enheden) og lyd
-const LOOK_MODES = [["rod", "Rød", "linear-gradient(180deg,#9a1119,#3a0609)"], ["dark", "Mørk", "#08080a"], ["midnat", "Midnat", "#070b16"], ["light", "Lys", "#eeeee9"], ["auto", "Telefon", "linear-gradient(135deg,#08080a 50%,#eeeee9 50%)"]];
+const LOOK_MODES = [["rod", "Farve", "linear-gradient(180deg,var(--brand),#000)"], ["dark", "Mørk", "#08080a"], ["midnat", "Midnat", "#070b16"], ["light", "Lys", "#eeeee9"], ["auto", "Telefon", "linear-gradient(135deg,#08080a 50%,#eeeee9 50%)"]];
 const LOOK_COLORS = [["hvid", "Hvid", "#fff3f2"], ["lime", "Lime", "#c6ff3d"], ["roed", "Rød", "#ff453a"], ["blaa", "Blå", "#0a84ff"], ["indigo", "Indigo", "#5e5ce6"], ["lilla", "Lilla", "#bf5af2"], ["pink", "Pink", "#ff375f"], ["orange", "Orange", "#ff9f0a"], ["guld", "Guld", "#ffd60a"], ["groen", "Grøn", "#30d158"], ["mint", "Mint", "#66d4cf"], ["solana", "Solana", "linear-gradient(135deg,#9945ff,#14f195)"]];
+/* Farven bestemmer også logoet og statuslinjen øverst på telefonen. Skiftet glider over, hvor telefonen kan. */
+const LOOK_BRAND = { lime: "#7fbf00", hvid: "#e01b26", roed: "#e01b26", blaa: "#0a84ff", indigo: "#5e5ce6", lilla: "#b04de6", pink: "#f0305a", orange: "#f08c00", guld: "#e0b000", groen: "#22b84c", mint: "#2fb3ac", solana: "#8a3cf0" };
+function lookBar(mode, color, light, lightHex) {
+  if (light) return lightHex;
+  const hex = LOOK_BRAND[color] || LOOK_BRAND.lime, k = mode === "rod" ? 0.66 : 0.26;
+  return "#" + [1, 3, 5].map((i) => Math.round(parseInt(hex.slice(i, i + 2), 16) * k).toString(16).padStart(2, "0")).join("");
+}
+function lookSwap(fn) {
+  const still = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (document.startViewTransition && !still) document.startViewTransition(fn); else fn();
+}
 let lookMode = "dark", lookColor = "lime";
 const lookGet = (key, old, fallback) => { try { return localStorage.getItem(key) || (old && localStorage.getItem(old)) || fallback; } catch (e) { return fallback; } };
 const lookSet = (key, value) => { try { localStorage.setItem(key, value); } catch (e) {} };
@@ -905,7 +946,7 @@ function setTheme(mode, save = true) {
   root.dataset.theme = light ? "light" : "dark";
   if (lookMode === "midnat" || lookMode === "rod") root.dataset.bg = lookMode; else delete root.dataset.bg;
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute("content", light ? "#eeeee9" : lookMode === "rod" ? "#9a1119" : lookMode === "midnat" ? "#070b16" : "#08080a");
+  if (meta) meta.setAttribute("content", lookBar(lookMode, lookColor, light, "#eeeee9"));
   if (save) lookSet("look-theme", lookMode);
   renderLook();
 }
@@ -913,6 +954,8 @@ function setAccent(name, save = true) {
   lookColor = LOOK_COLORS.some((c) => c[0] === name) ? name : "lime";
   if (lookColor === "lime") delete document.documentElement.dataset.accent; else document.documentElement.dataset.accent = lookColor;
   if (save) lookSet("look-accent", lookColor);
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute("content", lookBar(lookMode, lookColor, document.documentElement.dataset.theme === "light", "#eeeee9"));
   renderLook();
 }
 function renderLook() {
@@ -925,8 +968,8 @@ function renderLook() {
 }
 $("look").addEventListener("click", (ev) => {
   const mode = ev.target.closest("[data-look-mode]"), color = ev.target.closest("[data-look-color]");
-  if (mode) { ev.preventDefault(); setTheme(mode.dataset.lookMode); }
-  else if (color) { ev.preventDefault(); setAccent(color.dataset.lookColor); }
+  if (mode) { ev.preventDefault(); lookSwap(() => setTheme(mode.dataset.lookMode)); }
+  else if (color) { ev.preventDefault(); lookSwap(() => setAccent(color.dataset.lookColor)); }
 });
 if (window.matchMedia) { const mq = matchMedia("(prefers-color-scheme: light)"); if (mq.addEventListener) mq.addEventListener("change", () => { if (lookMode === "auto") setTheme("auto", false); }); }
 setAccent(lookGet("look-accent", null, lookGet("look-theme", null, "rod") === "rod" ? "hvid" : "lime"), false);

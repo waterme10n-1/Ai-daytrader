@@ -8,7 +8,7 @@
 <link rel="icon" type="image/png" href="/icons/icon-192.png?v=2">
 <link rel="manifest" href="/manifest.webmanifest">
 <meta name="theme-color" content="#000000">
-<script>(function(){try{var L=localStorage,d=document.documentElement;if(L.getItem("look-v")!=="2"){var o=L.getItem("look-theme")||L.getItem("meme-theme")||L.getItem("desk-theme"),t0=(!o||o==="dark"||o==="rod")?"rod":o;L.setItem("look-theme",t0);if(t0==="rod")L.setItem("look-accent","hvid");else if(!L.getItem("look-accent")&&L.getItem("meme-accent"))L.setItem("look-accent",L.getItem("meme-accent"));["meme-theme","meme-accent","desk-theme"].forEach(function(k){L.removeItem(k);});L.setItem("look-v","2");}var t=L.getItem("look-theme")||"rod",a=L.getItem("look-accent")||(t==="rod"?"hvid":"");if(a&&a!=="lime")d.dataset.accent=a;var l=t==="light"||(t==="auto"&&matchMedia("(prefers-color-scheme: light)").matches);d.dataset.theme=l?"light":"dark";if(t==="midnat"||t==="rod")d.dataset.bg=t;var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute("content",l?"#f2f2f7":t==="rod"?"#9a1119":t==="midnat"?"#070b16":"#000000");}catch(e){}})();</script>
+<script>(function(){try{var L=localStorage,d=document.documentElement;if(L.getItem("look-v")!=="2"){var o=L.getItem("look-theme")||L.getItem("meme-theme")||L.getItem("desk-theme"),t0=(!o||o==="dark"||o==="rod")?"rod":o;L.setItem("look-theme",t0);if(t0==="rod")L.setItem("look-accent","hvid");else if(!L.getItem("look-accent")&&L.getItem("meme-accent"))L.setItem("look-accent",L.getItem("meme-accent"));["meme-theme","meme-accent","desk-theme"].forEach(function(k){L.removeItem(k);});L.setItem("look-v","2");}var t=L.getItem("look-theme")||"rod",a=L.getItem("look-accent")||(t==="rod"?"hvid":"");if(a&&a!=="lime")d.dataset.accent=a;var l=t==="light"||(t==="auto"&&matchMedia("(prefers-color-scheme: light)").matches);d.dataset.theme=l?"light":"dark";if(t==="midnat"||t==="rod")d.dataset.bg=t;var m=document.querySelector('meta[name="theme-color"]');if(m){var B={lime:"7fbf00",hvid:"e01b26",roed:"e01b26",blaa:"0a84ff",indigo:"5e5ce6",lilla:"b04de6",pink:"f0305a",orange:"f08c00",guld:"e0b000",groen:"22b84c",mint:"2fb3ac",solana:"8a3cf0"},h=B[a]||B.lime,k=t==="rod"?0.66:0.26;m.setAttribute("content",l?"#f2f2f7":"#"+[0,2,4].map(function(i){return("0"+Math.round(parseInt(h.substr(i,2),16)*k).toString(16)).slice(-2);}).join(""));}}catch(e){}})();</script>
 <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=2">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -991,22 +991,50 @@
 </style>
 <style id="terminal">
   /* ---------- Rød baggrund (Menu → Udseende → Rød). Kun mørk. ---------- */
+  /* ---------- Farve-baggrunden (Udseende → Farve): fader i den farve, du vælger ---------- */
+  :root { --brand: #7fbf00; }
+  :root[data-accent="hvid"] { --brand: #e01b26; }
+  :root[data-accent="roed"] { --brand: #e01b26; }
+  :root[data-accent="blaa"] { --brand: #0a84ff; }
+  :root[data-accent="indigo"] { --brand: #5e5ce6; }
+  :root[data-accent="lilla"] { --brand: #b04de6; }
+  :root[data-accent="pink"] { --brand: #f0305a; }
+  :root[data-accent="orange"] { --brand: #f08c00; }
+  :root[data-accent="guld"] { --brand: #e0b000; }
+  :root[data-accent="groen"] { --brand: #22b84c; }
+  :root[data-accent="mint"] { --brand: #2fb3ac; }
+  :root[data-accent="solana"] { --brand: #8a3cf0; }
   :root[data-bg="rod"]:not([data-theme="light"]) {
-    --bg: #3a0609; --surface: rgba(16, 0, 2, 0.34); --surface-2: rgba(0, 0, 0, 0.22); --raised: rgba(255, 255, 255, 0.08); --raised-2: rgba(255, 255, 255, 0.15);
-    --border: rgba(255, 210, 210, 0.08); --border-strong: rgba(255, 210, 210, 0.16); --seg-on: rgba(255, 255, 255, 0.16);
-    --text: #fff6f5; --text-2: #f0cfcd; --muted: #cf9895; --faint: #9a5e5b;
-    --up: #4ade80; --up-soft: rgba(74, 222, 128, 0.16); --down: #ffa4a0; --down-soft: rgba(255, 164, 160, 0.16);
-    --glass: rgba(42, 5, 8, 0.9); --glass-nav: rgba(30, 3, 5, 0.9);
-    --info: #ffd9d6; --info-soft: rgba(255, 217, 214, 0.14); --warn: #ffc56b; --warn-soft: rgba(255, 197, 107, 0.16);
+    --tint: color-mix(in srgb, var(--brand) 66%, #000); --deep: color-mix(in srgb, var(--brand) 18%, #000);
+    --text: color-mix(in srgb, #fff 96%, var(--brand)); --text-2: color-mix(in srgb, #fff 80%, var(--brand)); --muted: color-mix(in srgb, #fff 58%, var(--brand));
+    --up: #4ade80; --down: #ffa4a0; --warn: #ffc56b;
+    --bg: color-mix(in srgb, var(--brand) 38%, #000); --surface: rgba(0, 0, 0, 0.26); --surface-2: rgba(0, 0, 0, 0.2); --raised: rgba(255, 255, 255, 0.08); --raised-2: rgba(255, 255, 255, 0.15);
+    --border: rgba(255, 255, 255, 0.08); --border-strong: rgba(255, 255, 255, 0.16); --seg-on: rgba(255, 255, 255, 0.16);
+    --faint: color-mix(in srgb, #fff 34%, var(--brand));
+    --up-soft: rgba(74, 222, 128, 0.16); --down-soft: rgba(255, 164, 160, 0.16); --warn-soft: rgba(255, 197, 107, 0.16);
+    --glass: color-mix(in srgb, var(--deep) 90%, transparent); --glass-nav: color-mix(in srgb, var(--deep) 90%, transparent);
+    --info: var(--text-2); --info-soft: rgba(255, 255, 255, 0.12);
+    --accent: var(--text); --accent-soft: rgba(255, 255, 255, 0.14); --on-accent: var(--deep); --grad: var(--text);
   }
-  /* Agenterne og relæet i samme varme familie som den røde baggrund */
-  :root[data-bg="rod"]:not([data-theme="light"]) #panel-terminal { --c-scout: #ffd9d6; --c-analyst: #f5b8e6; --c-buyer: #4ade80; --c-risk: #ffc56b; }
-  :root[data-bg="rod"]:not([data-theme="light"]) #panel-relae { --c-scout: #ffd9d6; --c-analyst: #f5b8e6; --c-buyer: #ffc56b; --c-risk: #ff8a95; --c-banker: #4ade80; }
+  /* Agenterne og relæet i lyse toner, der passer til alle farver */
+  :root[data-bg="rod"]:not([data-theme="light"]) #panel-terminal { --c-scout: #ffe1de; --c-analyst: #f5c4ee; --c-buyer: #4ade80; --c-risk: #ffc56b; }
+  :root[data-bg="rod"]:not([data-theme="light"]) #panel-relae { --c-scout: #ffe1de; --c-analyst: #f5c4ee; --c-buyer: #ffc56b; --c-risk: #ff8a95; --c-banker: #4ade80; }
+  /* Baggrunden fader fra den valgte farve øverst til næsten sort nederst */
   :root[data-bg="rod"]:not([data-theme="light"]) body {
-    background: linear-gradient(180deg, #9a1119 0, #6a0b11 420px, #430709 980px, #2a0406 100%) !important;
-    background-color: #2a0406 !important;
+    background: linear-gradient(180deg, var(--tint) 0, color-mix(in srgb, var(--brand) 46%, #000) 420px, color-mix(in srgb, var(--brand) 29%, #000) 980px, var(--deep) 100%) !important;
+    background-color: var(--deep) !important;
   }
-  :root[data-bg="rod"]:not([data-theme="light"]) .sheet { background: #2c0609; }
+  /* Mørk og Midnat får en svagere fade i samme farve */
+  :root[data-theme="dark"]:not([data-bg="rod"]) body {
+    background: linear-gradient(180deg, color-mix(in srgb, var(--brand) 26%, var(--bg)) 0, color-mix(in srgb, var(--brand) 9%, var(--bg)) 380px, var(--bg) 820px) !important;
+    background-color: var(--bg) !important;
+  }
+  /* Skift af farve glider over i stedet for at hoppe */
+  ::view-transition-old(root), ::view-transition-new(root) { animation-duration: 0.5s; }
+  /* Logoet tager farven: lys øverst, mørk nederst */
+  :root { --logo-1: color-mix(in srgb, var(--brand) 70%, #fff); --logo-2: var(--brand); --logo-3: color-mix(in srgb, var(--brand) 48%, #000); }
+  .brand-logo { display: block; width: 100%; height: 100%; }
+  :root[data-bg="rod"]:not([data-theme="light"]) .sheet { background: color-mix(in srgb, var(--brand) 24%, #000); }
   :root[data-bg="rod"]:not([data-theme="light"]) .appbar,
   :root[data-bg="rod"]:not([data-theme="light"]) .appnav { background: transparent; }
   :root[data-accent="hvid"] { --accent: #fff3f2; --accent-soft: rgba(255, 243, 242, 0.14); --on-accent: #2a0406; --grad: #fff3f2; }
@@ -1032,7 +1060,7 @@
   .tm-hero { padding: 6px 2px 0; }
   .tm-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
   .tm-lbl { color: var(--muted); font-size: 13px; font-weight: 550; }
-  .tm-mult { display: inline-flex; align-items: center; height: 28px; padding: 0 10px; border-radius: 9px; font-weight: 750; font-size: 14px; color: #1a0203; background: #fff4f3; font-variant-numeric: tabular-nums; }
+  .tm-mult { display: inline-flex; align-items: center; height: 28px; padding: 0 10px; border-radius: 9px; font-weight: 750; font-size: 14px; color: var(--deep, #1a0203); background: #fff; font-variant-numeric: tabular-nums; }
   :root[data-theme="light"] .tm-mult { color: #fff; background: #1c1c1e; }
   .tm-big { font-size: clamp(3.1rem, 16vw, 4.4rem); font-weight: 800; letter-spacing: -0.045em; line-height: 1; margin: 6px 0 10px; font-variant-numeric: tabular-nums; }
   .tm-big small { font-size: 0.52em; font-weight: 750; letter-spacing: -0.02em; }
@@ -1148,7 +1176,7 @@
   .dp-go .spin { width: 18px; height: 18px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: spin-ring 0.8s linear infinite; }
 
   /* Opstart: logo, tre trin og en streg, der fylder op */
-  .boot { position: fixed; inset: 0; z-index: 120; display: grid; place-items: center; background: linear-gradient(180deg, #9a1119, #4a070b); color: #fff6f5; transition: opacity 0.45s ease; }
+  .boot { position: fixed; inset: 0; z-index: 120; display: grid; place-items: center; background: linear-gradient(180deg, var(--tint, #9a1119), color-mix(in srgb, var(--brand) 30%, #000)); color: #fff; transition: opacity 0.45s ease; }
   :root:not([data-bg="rod"]) .boot { background: var(--bg); color: var(--text); }
   .boot.done { opacity: 0; pointer-events: none; }
   .boot-in { display: grid; justify-items: center; gap: 6px; width: min(70vw, 260px); }
@@ -1179,7 +1207,7 @@
   @keyframes tm-rise { from { opacity: 0; transform: translateY(8px); } }
   .tm-bubbles { position: absolute; inset: 0; pointer-events: none; overflow: visible; }
   .tm-bub { position: absolute; top: 70px; padding: 5px 12px; border-radius: 999px; font: 750 14px var(--font); white-space: nowrap; color: #06210f; background: var(--up); box-shadow: 0 10px 30px -10px rgba(0,0,0,0.6); animation: tm-bub 2.8s cubic-bezier(.2,.8,.2,1) forwards; }
-  .tm-bub.down { color: #2a0406; background: var(--down); } .tm-bub.buy { color: var(--on-accent); background: var(--accent); }
+  .tm-bub.down { color: var(--deep, #2a0406); background: var(--down); } .tm-bub.buy { color: var(--on-accent); background: var(--accent); }
   @keyframes tm-bub { 0% { transform: translateY(16px) scale(0.7); opacity: 0; } 14% { transform: none; opacity: 1; } 70% { opacity: 1; } 100% { transform: translateY(-80px) scale(0.95); opacity: 0; } }
   .tm-scan { height: 2px; border-radius: 2px; background: var(--raised); overflow: hidden; margin: -2px 0 8px; }
   .tm-scan i { display: block; height: 100%; background: var(--up); transform-origin: left; transform: scaleX(0); transition: transform 1s linear; }
@@ -1205,7 +1233,7 @@
 <body>
 <div class="boot" id="boot" hidden aria-hidden="true">
   <div class="boot-in">
-    <div class="boot-logo"><img src="/icons/icon-192.png?v=2" alt="" width="84" height="84"></div>
+    <div class="boot-logo"><svg class="brand-logo" viewBox="0 0 100 100" aria-hidden="true"><defs><linearGradient id="lg-boot" x1="0" y1="0" x2="1" y2="1"><stop offset="0" style="stop-color:var(--logo-1)"/><stop offset="0.55" style="stop-color:var(--logo-2)"/><stop offset="1" style="stop-color:var(--logo-3)"/></linearGradient></defs><rect width="100" height="100" rx="22.5" fill="url(#lg-boot)"/><g transform="translate(7 7) scale(0.86)"><line x1="27" x2="27" y1="50" y2="82" stroke="#fff" stroke-width="3.5" stroke-linecap="round"/><rect x="19.5" y="56" width="15" height="20" rx="3.5" fill="#fff"/><line x1="50" x2="50" y1="34" y2="74" stroke="#fff" stroke-width="3.5" stroke-linecap="round"/><rect x="42.5" y="42" width="15" height="26" rx="3.5" fill="#fff"/><line x1="73" x2="73" y1="18" y2="64" stroke="#fff" stroke-width="3.5" stroke-linecap="round"/><rect x="65.5" y="26" width="15" height="32" rx="3.5" fill="#fff"/><rect x="19" y="84" width="62" height="3" rx="1.5" fill="#fff" opacity="0.55"/><path d="M32 18.5 Q33.5 25.5 40.5 27 Q33.5 28.5 32 35.5 Q30.5 28.5 23.5 27 Q30.5 25.5 32 18.5 Z" fill="#fff"/></g></svg></div>
     <h2>Memebot</h2>
     <small>MEME-TERMINAL</small>
     <div class="boot-step" id="boot-step">Forbinder til Solana</div>
@@ -1218,7 +1246,7 @@
 <header class="appbar" id="appbar">
   <div class="appbar-in">
     <div class="brand">
-      <span class="logo"><img src="/icons/icon-192.png?v=2" alt="" width="36" height="36"></span>
+      <span class="logo"><svg class="brand-logo" viewBox="0 0 100 100" aria-hidden="true"><defs><linearGradient id="lg-head" x1="0" y1="0" x2="1" y2="1"><stop offset="0" style="stop-color:var(--logo-1)"/><stop offset="0.55" style="stop-color:var(--logo-2)"/><stop offset="1" style="stop-color:var(--logo-3)"/></linearGradient></defs><rect width="100" height="100" rx="22.5" fill="url(#lg-head)"/><g transform="translate(7 7) scale(0.86)"><line x1="27" x2="27" y1="50" y2="82" stroke="#fff" stroke-width="3.5" stroke-linecap="round"/><rect x="19.5" y="56" width="15" height="20" rx="3.5" fill="#fff"/><line x1="50" x2="50" y1="34" y2="74" stroke="#fff" stroke-width="3.5" stroke-linecap="round"/><rect x="42.5" y="42" width="15" height="26" rx="3.5" fill="#fff"/><line x1="73" x2="73" y1="18" y2="64" stroke="#fff" stroke-width="3.5" stroke-linecap="round"/><rect x="65.5" y="26" width="15" height="32" rx="3.5" fill="#fff"/><rect x="19" y="84" width="62" height="3" rx="1.5" fill="#fff" opacity="0.55"/><path d="M32 18.5 Q33.5 25.5 40.5 27 Q33.5 28.5 32 35.5 Q30.5 28.5 23.5 27 Q30.5 25.5 32 18.5 Z" fill="#fff"/></g></svg></span>
       <div class="brand-txt">
         <h1>Memebot</h1>
         <p class="status-line"><span class="dot" id="status-dot"></span><span id="status-text">Forbinder…</span></p>
@@ -1233,7 +1261,7 @@
 <div class="ticker" id="ticker" hidden aria-hidden="true"><div class="ticker-track" id="ticker-track"></div></div>
 
 <nav class="tabbar" aria-label="Sektioner">
-  <div class="side-brand"><img src="/icons/icon-192.png?v=2" alt="">Memebot</div>
+  <div class="side-brand"><span class="side-logo"><svg class="brand-logo" viewBox="0 0 100 100" aria-hidden="true"><defs><linearGradient id="lg-side" x1="0" y1="0" x2="1" y2="1"><stop offset="0" style="stop-color:var(--logo-1)"/><stop offset="0.55" style="stop-color:var(--logo-2)"/><stop offset="1" style="stop-color:var(--logo-3)"/></linearGradient></defs><rect width="100" height="100" rx="22.5" fill="url(#lg-side)"/><g transform="translate(7 7) scale(0.86)"><line x1="27" x2="27" y1="50" y2="82" stroke="#fff" stroke-width="3.5" stroke-linecap="round"/><rect x="19.5" y="56" width="15" height="20" rx="3.5" fill="#fff"/><line x1="50" x2="50" y1="34" y2="74" stroke="#fff" stroke-width="3.5" stroke-linecap="round"/><rect x="42.5" y="42" width="15" height="26" rx="3.5" fill="#fff"/><line x1="73" x2="73" y1="18" y2="64" stroke="#fff" stroke-width="3.5" stroke-linecap="round"/><rect x="65.5" y="26" width="15" height="32" rx="3.5" fill="#fff"/><rect x="19" y="84" width="62" height="3" rx="1.5" fill="#fff" opacity="0.55"/><path d="M32 18.5 Q33.5 25.5 40.5 27 Q33.5 28.5 32 35.5 Q30.5 28.5 23.5 27 Q30.5 25.5 32 18.5 Z" fill="#fff"/></g></svg></span>Memebot</div>
   <div id="nav" style="display:contents"></div>
 </nav>
 <div class="ptr" id="ptr" aria-hidden="true"></div>
@@ -1837,7 +1865,19 @@ function axiomLink(mint, pairUrl) {
 }
 
 /* ---------- Tema, farver og faner ---------- */
-const LOOK_MODES = [["rod", "Rød", "linear-gradient(180deg,#9a1119,#3a0609)"], ["dark", "Mørk", "#000000"], ["midnat", "Midnat", "#070b16"], ["light", "Lys", "#f2f2f7"], ["auto", "Telefon", "linear-gradient(135deg,#000 50%,#f2f2f7 50%)"]];
+/* Farven bestemmer også logoet og statuslinjen øverst på telefonen. Skiftet glider over, hvor telefonen kan. */
+const LOOK_BRAND = { lime: "#7fbf00", hvid: "#e01b26", roed: "#e01b26", blaa: "#0a84ff", indigo: "#5e5ce6", lilla: "#b04de6", pink: "#f0305a", orange: "#f08c00", guld: "#e0b000", groen: "#22b84c", mint: "#2fb3ac", solana: "#8a3cf0" };
+function lookBar(mode, color, light, lightHex) {
+  if (light) return lightHex;
+  const hex = LOOK_BRAND[color] || LOOK_BRAND.lime, k = mode === "rod" ? 0.66 : 0.26;
+  return "#" + [1, 3, 5].map((i) => Math.round(parseInt(hex.slice(i, i + 2), 16) * k).toString(16).padStart(2, "0")).join("");
+}
+function lookSwap(fn) {
+  const still = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (document.startViewTransition && !still) document.startViewTransition(fn); else fn();
+}
+
+const LOOK_MODES = [["rod", "Farve", "linear-gradient(180deg,var(--brand),#000)"], ["dark", "Mørk", "#000000"], ["midnat", "Midnat", "#070b16"], ["light", "Lys", "#f2f2f7"], ["auto", "Telefon", "linear-gradient(135deg,#000 50%,#f2f2f7 50%)"]];
 const LOOK_COLORS = [["hvid", "Hvid", "#fff3f2"], ["lime", "Lime", "#c6ff3d"], ["roed", "Rød", "#ff453a"], ["blaa", "Blå", "#0a84ff"], ["indigo", "Indigo", "#5e5ce6"], ["lilla", "Lilla", "#bf5af2"], ["pink", "Pink", "#ff375f"], ["orange", "Orange", "#ff9f0a"], ["guld", "Guld", "#ffd60a"], ["groen", "Grøn", "#30d158"], ["mint", "Mint", "#66d4cf"], ["solana", "Solana", "linear-gradient(135deg,#9945ff,#14f195)"]];
 let lookMode = "dark", lookColor = "lime";
 // Valget deles med Handelsbordet (look-*). Gamle valg fra før (meme-*) bruges, indtil man vælger igen.
@@ -1852,7 +1892,7 @@ function applyTheme(theme, save = true) {
   root.dataset.theme = light ? "light" : "dark";
   if (lookMode === "midnat" || lookMode === "rod") root.dataset.bg = lookMode; else delete root.dataset.bg;
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute("content", light ? "#f2f2f7" : lookMode === "midnat" ? "#070b16" : lookMode === "rod" ? "#9a1119" : "#000000");
+  if (meta) meta.setAttribute("content", lookBar(lookMode, lookColor, light, "#f2f2f7"));
   if (save) lookSet("meme-theme", lookMode);
   renderLook();
   for (const k of Object.keys(cache)) delete cache[k];
@@ -1863,6 +1903,8 @@ function applyAccent(name, save = true) {
   if (lookColor === "lime") delete document.documentElement.dataset.accent;  // standardfarven fra designet
   else document.documentElement.dataset.accent = lookColor;
   if (save) lookSet("meme-accent", lookColor);
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute("content", lookBar(lookMode, lookColor, document.documentElement.dataset.theme === "light", "#f2f2f7"));
   renderLook();
   for (const k of Object.keys(cache)) delete cache[k];
   if (state) render(state);
@@ -1878,8 +1920,8 @@ function renderLook() {
 document.getElementById("look").addEventListener("click", (ev) => {
   const mode = ev.target.closest("[data-look-mode]");
   const color = ev.target.closest("[data-look-color]");
-  if (mode) applyTheme(mode.dataset.lookMode);
-  else if (color) applyAccent(color.dataset.lookColor);
+  if (mode) lookSwap(() => applyTheme(mode.dataset.lookMode));
+  else if (color) lookSwap(() => applyAccent(color.dataset.lookColor));
 });
 if (window.matchMedia) {
   const mq = window.matchMedia("(prefers-color-scheme: light)");

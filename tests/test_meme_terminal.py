@@ -49,11 +49,11 @@ def test_a_closed_trade_keeps_its_price_path_logo_and_market_cap(monkeypatch):
 def test_the_terminal_is_the_home_view_with_deposit_boot_and_red_look():
     html = (STATIC / "meme.html").read_text(encoding="utf-8")
     for marker in ('id="panel-terminal"', 'id="tm-deposit"', 'id="tm-agents"', 'id="tm-act"', 'id="boot"', "/api/meme/paper/restart",
-                   'setTab(location.hash.slice(1) || "terminal"', '["rod", "Rød"', '["hvid", "Hvid"', 'data-bg="rod"',
+                   'setTab(location.hash.slice(1) || "terminal"', '["rod", "Farve"', '["hvid", "Hvid"', 'data-bg="rod"',
                    'id="tm-best"', 'id="tm-scan-bar"', 'id="tm-stats"', "function tmRollEquity", "function tmBubble", 'L.getItem("look-v")!=="2"'):
         assert marker in html, marker
     desk = (STATIC / "desk.html").read_text(encoding="utf-8")
-    for marker in ('["rod", "Rød"', '["hvid", "Hvid"', 'data-bg="rod"', 't==="rod"', 'L.getItem("look-v")!=="2"', 'src="/icons/icon-192.png?v=2"'):
+    for marker in ('["rod", "Farve"', '["hvid", "Hvid"', 'data-bg="rod"', 't==="rod"', 'L.getItem("look-v")!=="2"', 'class="brand-logo"'):
         assert marker in desk, marker
 
 
@@ -76,3 +76,12 @@ def test_new_red_app_icon_and_red_manifest(tmp_path):
         icon = client.get("/icons/icon-192.png?v=2")
         assert icon.status_code == 200 and icon.content[:8] == b"\x89PNG\r\n\x1a\n"
         assert client.get("/apple-touch-icon.png?v=2").status_code == 200
+
+
+def test_every_colour_has_a_brand_tint_for_the_fade_and_the_logo():
+    for page in ("meme.html", "desk.html"):
+        html = (STATIC / page).read_text(encoding="utf-8")
+        for colour in ("hvid", "roed", "blaa", "indigo", "lilla", "pink", "orange", "guld", "groen", "mint", "solana"):
+            assert f':root[data-accent="{colour}"] {{ --brand:' in html, (page, colour)
+        assert "var(--logo-1)" in html and "function lookSwap" in html and "startViewTransition" in html
+        assert 'data-bg="rod"]:not([data-theme="light"]) body' in html and 'data-theme="dark"]:not([data-bg="rod"]) body' in html
