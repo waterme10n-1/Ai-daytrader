@@ -1152,7 +1152,7 @@ def test_status_says_the_desk_trades_on_without_claude(tmp_path):
     desk.brain._failed(_ClaudeError(400, "Your credit balance is too low"))
     status = desk.status()
     assert status["ai"]["resting"] and 1 <= status["ai"]["retry_minutes"] <= 2
-    claude = [a for a in status["alerts"] if a["text"].startswith("Claude:")]
+    claude = [a for a in status["alerts"] if a["text"].startswith("Claude holder pause")]
     assert claude and claude[0]["level"] == "warning" and "Bordet handler videre" in claude[0]["text"]
 
 
