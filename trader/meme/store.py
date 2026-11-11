@@ -296,6 +296,10 @@ class MemeStore:
     def recent_candidates(self, mode: str, limit: int = 120) -> list[dict[str, Any]]:
         return self._all("SELECT * FROM candidates WHERE mode = ? ORDER BY id DESC LIMIT ?", (mode, limit))
 
+    def count_candidates(self, mode: str) -> int:
+        row = self._one("SELECT COUNT(*) AS n FROM candidates WHERE mode = ?", (mode,))
+        return int(row["n"]) if row else 0
+
     def last_candidate_ts(self, mint: str) -> str | None:
         row = self._one("SELECT ts FROM candidates WHERE mint = ? ORDER BY id DESC LIMIT 1", (mint,))
         return row["ts"] if row else None

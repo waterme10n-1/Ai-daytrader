@@ -827,6 +827,86 @@
   #panel-almindelig .field .row input[type="number"] { width: 150px; }
   @media (max-width: 560px) { .savebar .dirty:not([hidden]) { flex: 1 1 100%; } }
 </style>
+
+<style id="relay">
+  /* ---------- Relæ: fem agenter, der giver hinanden stafetten ----------
+     Hver agent har sin farve. Kun transform og opacity animeres, så telefonen ikke skal arbejde. */
+  #panel-relae { --c-scout: #0a84ff; --c-analyst: #bf5af2; --c-buyer: #ff9f0a; --c-risk: #ff375f; --c-banker: #30d158; }
+  :root[data-theme="light"] #panel-relae { --c-scout: #007aff; --c-analyst: #af52de; --c-buyer: #e08600; --c-risk: #e0284f; --c-banker: #1f9d48; }
+  .rl-grid { display: grid; gap: 14px; margin-top: 2px; }
+  @media (min-width: 1000px) { .rl-grid { grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); align-items: start; } .rl-grid .rl-wide { grid-column: 1 / -1; } }
+  .rl-head { display: flex; align-items: center; gap: 12px; margin: 2px 2px 12px; }
+  .rl-logo { width: 42px; height: 42px; border-radius: 13px; display: grid; place-items: center; color: #fff;
+    background: conic-gradient(from 210deg, var(--c-scout), var(--c-analyst), var(--c-buyer), var(--c-risk), var(--c-banker), var(--c-scout)); }
+  .rl-logo .i { width: 20px; height: 20px; }
+  .rl-head h1 { margin: 0; font-size: 22px; font-weight: 750; letter-spacing: -0.02em; line-height: 1.1; }
+  .rl-head small { display: block; color: var(--muted); font-size: 12.5px; font-weight: 500; }
+  .rl-head .live { margin-left: auto; }
+  .rl-eq .lbl { color: var(--muted); font-size: 13px; }
+  .rl-eq .row1 { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+  .rl-big { font-size: clamp(2.6rem, 12vw, 3.6rem); font-weight: 750; letter-spacing: -0.035em; line-height: 1.05; margin: 4px 0 2px; font-variant-numeric: tabular-nums; }
+  .rl-big small { font-size: 0.5em; color: var(--muted); font-weight: 650; letter-spacing: -0.01em; }
+  .rl-mult { display: inline-flex; align-items: center; height: 30px; padding: 0 11px; border-radius: 10px; font-weight: 750; font-size: 15px; color: #fff; background: var(--c-banker); font-variant-numeric: tabular-nums; }
+  .rl-mult.down { background: var(--down); }
+  .rl-eq .row2 { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 13.5px; }
+  .rl-eq .row2 .muted { font-size: 12.5px; }
+  .rl-spark { display: block; width: 100%; height: 64px; margin-top: 10px; }
+  .rl-spark path.l { fill: none; stroke: var(--c-banker); stroke-width: 2.2; stroke-linejoin: round; stroke-linecap: round; }
+  .rl-spark path.a { fill: color-mix(in srgb, var(--c-banker) 14%, transparent); stroke: none; }
+  .rl-spark.down path.l { stroke: var(--down); } .rl-spark.down path.a { fill: color-mix(in srgb, var(--down) 12%, transparent); }
+  .rl-spark circle { fill: var(--c-banker); } .rl-spark.down circle { fill: var(--down); }
+  .rl-pipe { position: relative; }
+  .rl-agent { position: relative; display: grid; grid-template-columns: 38px minmax(0, 7.5rem) minmax(0, 1fr) auto; gap: 10px; align-items: center;
+    padding: 9px 8px; margin: 0 -8px; border-radius: 12px; }
+  .rl-agent + .rl-agent { margin-top: 4px; }
+  .rl-agent::before { content: ""; position: absolute; inset: 0; border-radius: 12px; background: var(--c); opacity: 0; transition: opacity 0.4s; }
+  .rl-agent.on::before { opacity: 0.09; }
+  .rl-agent > * { position: relative; }
+  .rl-ico { width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; color: #fff; background: var(--c); }
+  .rl-ico .i { width: 18px; height: 18px; }
+  .rl-agent.on .rl-ico::after { content: ""; position: absolute; inset: -4px; border-radius: 14px; border: 2px solid var(--c); opacity: 0; animation: rl-ping 1.8s ease-out infinite; }
+  @keyframes rl-ping { 0% { transform: scale(0.85); opacity: 0.7; } 100% { transform: scale(1.25); opacity: 0; } }
+  .rl-name b { display: block; font-size: 14.5px; font-weight: 700; letter-spacing: -0.01em; }
+  .rl-name small { display: block; color: var(--muted); font-size: 11.5px; line-height: 1.25; }
+  .rl-now { min-width: 0; font-size: 13px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rl-now.good { color: var(--up); } .rl-now.bad { color: var(--down); }
+  .rl-count { min-width: 64px; text-align: center; padding: 5px 9px; border-radius: 9px; font-size: 12.5px; font-weight: 700; font-variant-numeric: tabular-nums;
+    color: var(--c); background: color-mix(in srgb, var(--c) 14%, transparent); }
+  .rl-count.pop { animation: rl-pop 0.5s ease-out; }
+  @keyframes rl-pop { 0% { transform: scale(1); } 40% { transform: scale(1.18); } 100% { transform: scale(1); } }
+  /* Stafetten: en lille prik løber ned langs agenterne, når botten arbejder. */
+  .rl-wire { position: absolute; left: 18px; top: 46px; bottom: 46px; width: 2px; border-radius: 2px; overflow: hidden;
+    background: linear-gradient(var(--c-scout), var(--c-analyst), var(--c-buyer), var(--c-risk), var(--c-banker)); opacity: 0.18; pointer-events: none; }
+  .rl-pipe.busy .rl-run { position: absolute; left: 15px; top: 40px; width: 8px; height: 8px; border-radius: 50%; background: #fff; pointer-events: none;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--c-analyst) 45%, transparent); animation: rl-run 2.6s cubic-bezier(.6,0,.4,1) infinite; }
+  @keyframes rl-run { 0% { transform: translateY(0); opacity: 0; } 8% { opacity: 1; } 92% { opacity: 1; } 100% { transform: translateY(calc(var(--rl-h, 230px))); opacity: 0; } }
+  @media (max-width: 560px) {
+    .rl-agent { grid-template-columns: 38px minmax(0, 1fr) auto; grid-template-areas: "i n c" "i t t"; row-gap: 2px; }
+    .rl-ico { grid-area: i; } .rl-name { grid-area: n; } .rl-now { grid-area: t; } .rl-count { grid-area: c; }
+    .rl-name small { display: inline; margin-left: 6px; }
+    .rl-name b { display: inline; }
+  }
+  .rl-feed { list-style: none; margin: 0; padding: 0; font-size: 13px; }
+  .rl-feed li { display: grid; grid-template-columns: 9px 4.6em minmax(0, 1fr); gap: 8px; align-items: baseline; padding: 4px 0; }
+  .rl-feed li i { width: 7px; height: 7px; border-radius: 50%; background: var(--c); transform: translateY(-1px); }
+  .rl-feed time { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 12px; }
+  .rl-feed b { color: var(--c); font-weight: 650; }
+  .rl-feed .t { min-width: 0; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; color: var(--text-2); }
+  .rl-feed .t .up { color: var(--up); } .rl-feed .t .down { color: var(--down); }
+  .rl-feed li.new { animation: rl-in 0.6s ease-out; }
+  @keyframes rl-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+  .rl-goal .track { position: relative; height: 34px; margin: 26px 6px 18px; }
+  .rl-goal .bar { position: absolute; left: 0; right: 0; top: 15px; height: 4px; border-radius: 4px; background: var(--raised); }
+  .rl-goal .fill { position: absolute; left: 0; top: 15px; height: 4px; width: 100%; border-radius: 4px; transform-origin: left; background: linear-gradient(90deg, var(--c-scout), var(--c-banker)); transition: transform 0.8s ease; }
+  .rl-goal .dot { position: absolute; top: 9px; width: 16px; height: 16px; margin-left: -8px; border-radius: 50%; background: var(--surface); border: 2px solid var(--border-strong); }
+  .rl-goal .dot.hit { background: var(--c-banker); border-color: var(--c-banker); }
+  .rl-goal .dot small { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .rl-goal .me { position: absolute; top: -20px; transform: translateX(-50%); padding: 2px 7px; border-radius: 7px; font-size: 11.5px; font-weight: 750; color: #fff; background: var(--text); font-variant-numeric: tabular-nums; transition: left 0.8s ease; white-space: nowrap; }
+  :root[data-theme="light"] .rl-goal .me { color: #fff; background: #1c1c1e; }
+  :root:not([data-theme="light"]) .rl-goal .me { color: #000; background: #f5f5f7; }
+  .rl-goal .meta { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 13px; }
+  @media (prefers-reduced-motion: reduce) { .rl-agent.on .rl-ico::after, .rl-pipe.busy .rl-run, .rl-count.pop, .rl-feed li.new { animation: none !important; } }
+</style>
 </head>
 <body>
 <a class="skip" href="#main">Gå til indholdet</a>
@@ -861,7 +941,31 @@
   <div class="segmented" id="seg" role="tablist" hidden></div>
   <div class="alerts" id="alerts"></div>
 
-  <section class="panel" id="panel-oversigt" role="tabpanel">
+  <section class="panel" id="panel-relae" role="tabpanel">
+    <div class="rl-grid">
+      <div class="card rl-eq">
+        <div class="row1"><span class="lbl" id="rl-start">Egenkapital</span><span class="rl-mult" id="rl-mult">1,00×</span></div>
+        <div class="rl-big" id="rl-equity">—</div>
+        <div class="row2"><span id="rl-delta"></span><span class="muted" id="rl-trades"></span></div>
+        <div id="rl-spark"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2 id="rl-pipe-title"></h2><span class="muted small-txt" id="rl-pipe-note"></span></div>
+        <div class="rl-pipe" id="rl-pipe"><span class="rl-wire" aria-hidden="true"></span><span class="rl-run" aria-hidden="true"></span><div id="rl-agents"></div></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2 id="rl-feed-title"></h2><span class="muted small-txt" id="rl-feed-note"></span></div>
+        <ul class="rl-feed" id="rl-feed"></ul>
+      </div>
+      <div class="card rl-goal">
+        <div class="meta"><b id="rl-goal-title"></b><span class="muted" id="rl-goal-next"></span></div>
+        <div class="track" id="rl-track"></div>
+        <p class="muted small-txt" style="margin:14px 0 0">Alle tre strategier (almindelig, sniper og Top 10) går gennem de samme fem agenter. Analytikeren tjekker altid RugCheck, Jupiters audit (mistænkelig, serie-udvikler, organisk score), insidere, ejerfordeling, X og sociale links, før Køberen må handle.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" id="panel-oversigt" role="tabpanel" hidden>
     <div class="top-grid">
     <div class="card hero mark">
       <div class="hero-top">
@@ -1300,14 +1404,14 @@ function icon(name, cls) { return `<svg class="i${cls ? " " + cls : ""}" viewBox
 
 // Fem steder i bundmenuen. Har et sted to sider, vælges de med et segment øverst.
 const NAV = [
-  ["hjem", "Hjem", "home", ["oversigt"]],
+  ["hjem", "Hjem", "home", ["relae", "oversigt"]],
   ["handler", "Handler", "trades", ["positioner", "journal"]],
   ["snipe", "Strategi", "target", ["almindelig", "sniper", "top", "radar"]],
   ["wallet", "Wallet", "wallet", ["wallets"]],
   ["mere", "Mere", "more", ["laering", "krav"]],
 ];
-const VIEWS = { oversigt: ["Oversigt", "grid"], positioner: ["Åbne", "coins"], journal: ["Historik", "book"], almindelig: ["Almindelig", "activity"], sniper: ["Sniper", "target"], top: ["Top 10", "trophy"], radar: ["Radar", "radar"], wallets: ["Wallet", "wallet"], laering: ["Læring", "brain"], krav: ["Indstillinger", "shield"] };
-const VIEW_ORDER = ["oversigt", "positioner", "almindelig", "sniper", "radar", "journal", "laering", "wallets", "krav"];
+const VIEWS = { relae: ["Relæ", "zap"], oversigt: ["Kontrolrum", "grid"], positioner: ["Åbne", "coins"], journal: ["Historik", "book"], almindelig: ["Almindelig", "activity"], sniper: ["Sniper", "target"], top: ["Top 10", "trophy"], radar: ["Radar", "radar"], wallets: ["Wallet", "wallet"], laering: ["Læring", "brain"], krav: ["Indstillinger", "shield"] };
+const VIEW_ORDER = ["relae", "oversigt", "positioner", "almindelig", "sniper", "journal", "laering", "wallets", "krav"];
 const TITLES = { handler: "Handler", snipe: "Strategier", wallet: "Wallet", mere: "Mere" };
 const lastView = {};
 const STAGES = { "købt": "Købt", sniper: "Sniper-filter", marked: "Markedsfilter", rug: "Rug-tjek", score: "Score", rute: "Exit-rute", claude: "Claude", risiko: "Risiko", "køb": "Køb fejlede" };
@@ -1594,7 +1698,7 @@ function renderHeader(data) {
 }
 function renderAlerts(data) {
   const scanErrors = ((data.engine.last_scan || {}).errors || []).slice(0, 2).map((t) => ({ level: "warning", text: "Datakilde: " + t }));
-  const home = active === "oversigt";
+  const home = active === "oversigt" || active === "relae";
   const all = (data.alerts || []).concat(scanErrors).filter((a) => (a.level === "error" || !dismissed.has(a.text)) && (home || a.level !== "info"));
   const order = { error: 0, warning: 1, info: 2 };
   all.sort((a, b) => (order[a.level] ?? 3) - (order[b.level] ?? 3));
@@ -2261,6 +2365,95 @@ document.getElementById("mom-reset").addEventListener("click", async () => {
   act(async () => { const b = await post("/api/meme/params", { reset: true }); momDirty = false; momKey = ""; return b; }, "Standardindstillingerne er tilbage");
 });
 
+
+/* ---------- Relæ: fem agenter fra bottens rigtige data ---------- */
+const RL_ICON = { scout: "search", analyst: "shield", buyer: "zap", risk: "activity", banker: "check" };
+const RL_COLOR = { scout: "var(--c-scout)", analyst: "var(--c-analyst)", buyer: "var(--c-buyer)", risk: "var(--c-risk)", banker: "var(--c-banker)" };
+const RL_NAME = { scout: "Spejder", analyst: "Analytiker", buyer: "Køber", risk: "Risiko", banker: "Kasserer" };
+let rlCounts = {}, rlSeen = null;
+function rlCount(a) {
+  if (a.count == null) return "—";
+  if (a.unit === "usd") return signed(a.count);
+  if (a.unit === "% bestået") return `${fmtInt.format(a.count)} % ok`;
+  const n = a.count >= 10000 ? fmtNum.format(Math.round(a.count / 100) / 10) + "k" : fmtInt.format(a.count);
+  return `${n} ${a.unit}`;
+}
+function rlSpark(series, down) {
+  const pts = (series || []).map((r) => Number(r.equity)).filter((v) => Number.isFinite(v));
+  if (pts.length < 2) return "";
+  const w = 300, h = 64, lo = Math.min(...pts), hi = Math.max(...pts), span = hi - lo || 1;
+  const xy = pts.map((v, i) => [(i / (pts.length - 1)) * w, h - 6 - ((v - lo) / span) * (h - 12)]);
+  const line = xy.map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(1)},${y.toFixed(1)}`).join("");
+  const [lx, ly] = xy[xy.length - 1];
+  return `<svg class="rl-spark${down ? " down" : ""}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true"><path class="a" d="${line}L${w},${h}L0,${h}Z"/><path class="l" d="${line}"/><circle cx="${lx.toFixed(1)}" cy="${ly.toFixed(1)}" r="3.5"/></svg>`;
+}
+function renderRelay(data) {
+  const r = data.relay;
+  if (!r) return;
+  const k = data.kpis;
+  const eq = Number(k.equity) || 0;
+  const whole = Math.trunc(eq), cents = Math.round(Math.abs(eq - whole) * 100).toString().padStart(2, "0");
+  put("rl-equity", `${eq < 0 ? "-" : ""}${esc(fmtInt.format(Math.abs(whole)))}<small>,${cents} $</small>`);
+  document.getElementById("rl-start").textContent = `Egenkapital · startede med ${money(r.start)}`;
+  const mult = document.getElementById("rl-mult");
+  mult.textContent = `${fmtNum.format(Math.round(r.multiple * 100) / 100)}×`;
+  mult.className = "rl-mult" + (r.multiple < 1 ? " down" : "");
+  put("rl-delta", `<b class="${tone(k.total_pnl)}">${esc(signed(k.total_pnl))} (${esc(spct(k.return_pct))})</b>`);
+  document.getElementById("rl-trades").textContent = `${fmtInt.format(k.trades)} handler${k.win_rate == null ? "" : ` · ${pct(k.win_rate)} vinder`}`;
+  put("rl-spark", rlSpark((data.equity || {})["24h"], (k.total_pnl || 0) < 0));
+
+  document.getElementById("rl-pipe-title").innerHTML = icon("zap") + "Relæet";
+  const busy = r.agents.filter((a) => a.active).length;
+  document.getElementById("rl-pipe-note").textContent = `5 agenter · ${busy} i gang`;
+  const pipe = document.getElementById("rl-pipe");
+  pipe.classList.toggle("busy", busy > 0);
+  const html = r.agents.map((a) => {
+    const cls = a.id === "analyst" && a.active ? (a.ok ? " good" : " bad") : a.id === "risk" && a.change != null ? (a.change > 0 ? " good" : a.change < 0 ? " bad" : "") : "";
+    return `<div class="rl-agent${a.active ? " on" : ""}" style="--c:${RL_COLOR[a.id]}" data-agent="${a.id}">
+      <span class="rl-ico">${icon(RL_ICON[a.id])}</span>
+      <span class="rl-name"><b>${esc(a.name)}</b><small>${esc(a.role)}</small></span>
+      <span class="rl-now${cls}" title="${esc(a.text)}">${esc(a.text)}</span>
+      <span class="rl-count num" data-count="${a.id}"${a.unit === "usd" && a.count < 0 ? ' style="--c:var(--down)"' : ""}>${esc(rlCount(a))}</span></div>`;
+  }).join("");
+  if (put("rl-agents", html) !== false) {
+    for (const a of r.agents) {
+      const text = rlCount(a);
+      if (rlCounts[a.id] !== undefined && rlCounts[a.id] !== text) {
+        const el = document.querySelector(`[data-count="${a.id}"]`);
+        if (el) { el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop"); }
+      }
+      rlCounts[a.id] = text;
+    }
+    pipe.style.setProperty("--rl-h", Math.max(60, pipe.offsetHeight - 90) + "px");
+  }
+
+  document.getElementById("rl-feed-title").innerHTML = icon("activity") + "Aktivitet";
+  document.getElementById("rl-feed-note").textContent = `${fmtInt.format(r.wins)} vindere · ${fmtInt.format(r.losses)} tabere`;
+  const first = rlSeen === null;
+  const known = rlSeen || new Set();
+  rlSeen = new Set(r.activity.map((x) => x.ts + x.agent + x.text));
+  put("rl-feed", r.activity.length ? r.activity.slice(0, 14).map((x) => {
+    const d = new Date(x.ts);
+    const t = Number.isNaN(d.getTime()) ? "" : `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
+    const fresh = !first && !known.has(x.ts + x.agent + x.text) ? ' class="new"' : "";
+    const body = esc(x.text).replace(/([+-]\d[\d.,]*\s?(?:%|\$))/g, (m) => `<span class="${m.startsWith("-") ? "down" : "up"}">${m}</span>`);
+    return `<li${fresh} style="--c:${RL_COLOR[x.agent]}"><i></i><time>${esc(t)}</time><span class="t"><b>${esc(RL_NAME[x.agent])}</b> ${body}</span></li>`;
+  }).join("") : `<li>${empty("Agenterne varmer op. Første scanning kommer om lidt.", "zap")}</li>`);
+
+  document.getElementById("rl-goal-title").textContent = `Mål: ${fmtNum.format(r.goal)}×`;
+  document.getElementById("rl-goal-next").textContent = r.next ? `næste ${fmtNum.format(r.next)}× · ${money(Math.max(0, r.to_next))} tilbage` : "Målet er nået";
+  const lad = [1, ...r.ladder];
+  const pos = (m) => { // ligelige afstande mellem trinene
+    if (m <= 1) return 0;
+    for (let i = 1; i < lad.length; i++) if (m <= lad[i]) return ((i - 1) + (m - lad[i - 1]) / (lad[i] - lad[i - 1])) / (lad.length - 1) * 100;
+    return 100;
+  };
+  const me = Math.max(0, Math.min(100, pos(r.multiple)));
+  put("rl-track", `<div class="bar"></div><div class="fill" style="transform:scaleX(${(me / 100).toFixed(4)})"></div>
+    ${lad.map((m) => `<span class="dot${r.multiple >= m ? " hit" : ""}" style="left:${pos(m)}%"><small>${esc(fmtNum.format(m))}×</small></span>`).join("")}
+    <span class="me" style="left:${me}%">${esc(fmtNum.format(Math.round(r.multiple * 100) / 100))}×</span>`);
+}
+
 /* ---------- Antal handler og prøvekøb ---------- */
 let tlKey = "";
 function renderTradeLimits(data) {
@@ -2437,7 +2630,7 @@ function detectChanges(data) {
   const closed = new Set((data.trades || []).map((t) => t.id));
   if (seenOpen && seenClosed) {
     for (const p of data.positions || []) if (!seenOpen.has(p.id)) toast("buy", `Købt ${p.symbol}`, `${money(p.cost_usd)} · ${p.source}`);
-    for (const t of data.trades || []) if (!seenClosed.has(t.id)) toast(t.pnl_usd > 0 ? "up" : "down", `Solgt ${t.symbol} ${signed(t.pnl_usd)}`, `${spct(t.pnl_pct)} · ${t.exit_reason}`);
+    for (const t of data.trades || []) if (!seenClosed.has(t.id)) toast(t.pnl_usd > 0 ? "up" : "down", `Solgt ${t.symbol} ${signed(t.pnl_usd)}`, `${spct(t.pnl_pct)} · fundet → tjekket → købt → fulgt → solgt (${t.exit_reason})`);
   }
   seenOpen = open; seenClosed = closed;
 }
@@ -2471,6 +2664,7 @@ function render(data) {
   renderShadows(data);
   renderAnalysis(data);
   renderChanges(data);
+  renderRelay(data);
   renderMomentum(data);
   renderTradeLimits(data);
   renderOptimizer(data);
@@ -2711,7 +2905,7 @@ const queryTheme = new URLSearchParams(location.search).get("theme");
 applyTheme(storedTheme === "light" || queryTheme === "light" ? "light" : "dark", false);
 renderBell();
 renderTabs({ positions: [], kpis: { trades: 0 }, copy_wallets: [], sniper: null });
-setTab(location.hash.slice(1) || "oversigt", false);
+setTab(location.hash.slice(1) || "relae", false);
 bindEquityHover();
 bindDailyHover();
 (() => {

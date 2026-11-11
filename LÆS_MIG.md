@@ -74,7 +74,15 @@ python tests/meme_soak.py 50 250 hard
 
 Efter login lander du på `/meme`. Siden er bygget til mobilen først og opdaterer sig selv hvert 8. sekund. Memebot og Handelsbordet har nu samme udseende: de samme farver, skrifter og kort. Du skifter mellem lys og mørk tilstand i **Menu**, og valget huskes på telefonen. Navigationen ligger i bunden på telefonen og øverst på en computer, ligesom på handelsbordet.
 
-- **Hjem** er bottens kontrolrum. Alt, der tæller, tæller rigtigt: siden får de præcise tider fra motoren og tæller selv ned sekund for sekund.
+- **Hjem → Relæ** (det første, du ser) viser botten som fem agenter, der giver stafetten videre:
+  - **Spejder** finder nye tokens (scanningen, sniperen og Top 10-signaler) og tæller, hvor mange den har set.
+  - **Analytiker** tjekker hvert token: RugCheck (rug, mint/freeze, LP, ejerfordeling), Jupiters audit (mistænkelig, serie-udvikler, organisk score), insidere, X-omtale og sociale links. Tallet er andelen, der består.
+  - **Køber** udfører købet for den strategi, tokenet kom fra (almindelig, sniper eller Top 10), inkl. prøvekøb.
+  - **Risiko** følger de åbne positioner (stop-loss, trailing stop, rug-alarm).
+  - **Kasserer** sælger og viser det samlede realiserede resultat.
+
+  Over relæet står egenkapitalen med en gange-faktor i forhold til startbeløbet, under det en aktivitetslog med agentens farve, og nederst en målstige (1,25×, 1,5×, 2×, 3×, 5× og 10×). Alle tal kommer fra bottens rigtige kandidater, positioner og handler. Alle tre strategier går gennem den samme analytiker, også Top 10, som nu også tjekker Jupiters audit, insidere og X.
+- **Hjem → Kontrolrum** er bottens kontrolrum. Alt, der tæller, tæller rigtigt: siden får de præcise tider fra motoren og tæller selv ned sekund for sekund.
   - Øverst står klokken og hvad botten laver lige nu (fx *Scan om 0:42* eller *Scanner · 0:03*). Under den kører et bånd med dine åbne positioner og dagens tal.
   - **Egenkapitalen** ruller som på en tavle og blinker grønt eller rødt, når den ændrer sig. Grafen viser 24 t, 7 d eller alt.
   - **Motoren** er en reaktor med tre ringe: den yderste er markeds-scanningen (hvert minut, ét lys pr. sekund), den midterste sniperen (hvert 10. sekund) og den inderste Top 10 (hvert 8. sekund). Ringen fyldes, mens der tælles ned, og drejer rundt, mens opgaven kører. I midten står tiden til næste scanning. Ved siden af står, hvad sidste runde fandt, og nederst hvornår positionerne sidst blev tjekket, hvor længe botten har kørt, og hvornår den nye dag (UTC) starter. Trykker du **Scan nu**, kan du se scanningen køre med det samme. Mister siden forbindelsen, står der *Ingen forbindelse* i stedet for en nedtælling, der ikke passer.
