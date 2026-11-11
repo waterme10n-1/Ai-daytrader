@@ -366,6 +366,8 @@ Hver markering koster typisk to Claude-kald (NEWS og SKEPTIC), og hvert gap før
 
 ## Københavns børs
 
+> **Slået fra lige nu.** Københavns børs er skjult, indtil kurserne fra Yahoo virker stabilt. Sæt `DESK_DK_ENABLED=true` i Railway for at slå den til igen.
+
 Bordet handler også danske aktier på Nasdaq Copenhagen, side om side med New York. Skift mellem **USA** og **Danmark** øverst på siden. Siden husker dit valg. Hver børs har sin egen chat, sine egne handler, sin egen læring og sin egen database (`desk_dk.db`), men de samme seks bots og regler.
 
 Alpaca handler kun amerikanske aktier, så København kører på **bordets egen papirkonto** i kroner:
@@ -393,4 +395,4 @@ Der er ingen handel før åbning i København, så kortet **Før åbning** finde
 
 Yahoo er gratis, men svarer 429 ("for mange forespørgsler"), hvis bordet spørger for tit. Derfor kigger SCOUT i København hvert 5. minut (`DESK_DK_SCAN_MINUTES`). Det er nok til bevægelser på en time. Mellem scanningerne spørger bordet ikke Yahoo, åbne handler tjekkes hvert 2. minut mod alle minutter siden sidst (så intet stop overses), og når børsen er lukket, hentes kurserne hvert 30. minut. SCOUT markerer i København fra 1,5 % på en time (`DESK_DK_MOVE_PCT`), fordi store danske aktier flytter sig mindre end de livlige amerikanske. Watchlisten er 16 likvide C25-aktier: NOVO-B, DSV, DANSKE, ORSTED, VWS, GMAB, PNDORA, CARL-B, COLO-B, NSIS-B, DEMANT, GN, NKT, BAVA, ZEAL og AMBU-B. Skriv tickers, som Yahoo skriver dem, uden `.CO` (fx `NOVO-B`). Bordet måles mod C25-indekset.
 
-`DESK_DK_ENABLED=false` slår København fra.
+København er **slået fra som standard**, indtil kurserne fra Yahoo virker stabilt. `DESK_DK_ENABLED=true` slår den til igen, og så kommer **Danmark** frem i menuen.

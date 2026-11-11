@@ -547,7 +547,7 @@
   <linearGradient id="mg-up" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#30d158" stop-opacity="0.28"/><stop offset="1" stop-color="#30d158" stop-opacity="0"/></linearGradient>
   <linearGradient id="mg-dn" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff453a" stop-opacity="0.26"/><stop offset="1" stop-color="#ff453a" stop-opacity="0"/></linearGradient>
 </defs></svg>
-<nav class="appnav" aria-label="Skift side"><div class="appnav-in"><a href="/meme">Memebot</a><a href="/desk?m=us" data-m="us" aria-label="Handelsbordet i USA" aria-current="page">USA<i class="ldot" hidden></i></a><a href="/desk?m=dk" data-m="dk" id="nav-dk" aria-label="Handelsbordet i Danmark">Danmark<i class="ldot" hidden></i></a></div></nav>
+<nav class="appnav" aria-label="Skift side"><div class="appnav-in"><a href="/meme">Memebot</a><a href="/desk?m=us" data-m="us" aria-label="Handelsbordet i USA" aria-current="page">USA<i class="ldot" hidden></i></a><a href="/desk?m=dk" data-m="dk" id="nav-dk" aria-label="Handelsbordet i Danmark" hidden>Danmark<i class="ldot" hidden></i></a></div></nav>
 
 <header class="top">
   <div class="wrap bar">
@@ -764,7 +764,8 @@ const api = (url) => (DK ? url + (url.includes("?") ? "&" : "?") + "market=dk" :
     const list = d.markets || [], keys = list.map((m) => m.key);
     if (first) {
       first = false;
-      if (!keys.includes("dk")) { document.getElementById("nav-dk").hidden = true; if (DK) location.replace("/desk?m=us"); }
+      document.getElementById("nav-dk").hidden = !keys.includes("dk");
+      if (!keys.includes("dk")) { if (DK) location.replace("/desk?m=us"); }
       else if (!keys.includes("us") && !DK) location.replace("/desk?m=dk");
     }
     list.forEach((m) => {
