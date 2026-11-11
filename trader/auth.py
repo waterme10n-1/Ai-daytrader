@@ -331,10 +331,10 @@ _LOGIN_HTML = """<!DOCTYPE html>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="dark light">
 <title>Log ind · Memebot</title>
-<link rel="icon" type="image/png" href="/icons/icon-192.png">
+<link rel="icon" type="image/png" href="/icons/icon-192.png?v=2">
 <link rel="manifest" href="/manifest.webmanifest">
-<meta name="theme-color" content="#05060d">
-<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="theme-color" content="#9a1119">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png?v=2">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -345,13 +345,14 @@ _LOGIN_HTML = """<!DOCTYPE html>
 <style>
   :root {
     color-scheme: dark;
-    --bg: #05060d; --surface: #0b0d19; --surface-2: #0f1220; --raised: #161a2c;
-    --border: rgba(120,190,255,0.12); --border-strong: rgba(120,190,255,0.22);
-    --text: #e9f1ff; --muted: #6f7d9e; --accent: #2ee6ff; --accent-soft: rgba(46,230,255,0.14); --on-accent: #03141a;
-    --bad: #ff4d6d; --bad-soft: rgba(255,77,109,0.13);
+    --bg: #4a070b; --surface: rgba(16,0,2,0.38); --surface-2: rgba(0,0,0,0.24); --raised: rgba(255,255,255,0.08);
+    --border: rgba(255,210,210,0.1); --border-strong: rgba(255,210,210,0.2);
+    --text: #fff6f5; --muted: #d6a19e; --accent: #fff3f2; --accent-soft: rgba(255,243,242,0.16); --on-accent: #2a0406;
+    --bad: #ffd2cf; --bad-soft: rgba(0,0,0,0.28);
     --font: "Saira", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-    --mono: "Oxanium", "Saira", system-ui, sans-serif; --dot: rgba(46,230,255,0.09);
+    --mono: "Oxanium", "Saira", system-ui, sans-serif; --dot: rgba(255,220,220,0.08);
   }
+  :root:not([data-theme="light"]) body { background: linear-gradient(180deg, #9a1119 0%, #5c0a0f 55%, #2a0406 100%); }
   :root[data-theme="light"] {
     color-scheme: light;
     --bg: #eaeef5; --surface: #ffffff; --surface-2: #f5f7fb; --raised: #eceff6;
@@ -377,7 +378,7 @@ _LOGIN_HTML = """<!DOCTYPE html>
   .brand img { width: 72px; height: 72px; border-radius: 18px; display: block; margin: 0 auto 16px; }
   h1 { margin: 0; font: 700 30px var(--mono); letter-spacing: 0.02em; }
   .brand p { margin: 6px 0 0; color: var(--muted); font: 12px var(--mono); letter-spacing: 0.06em; text-transform: uppercase; }
-  form { display: grid; gap: 14px; background: linear-gradient(180deg, rgba(46,230,255,0.04), transparent 120px), var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 22px 20px; }
+  form { display: grid; gap: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 22px 20px; }
   .field { display: grid; gap: 7px; font: 600 10.5px var(--mono); letter-spacing: 0.09em; text-transform: uppercase; color: var(--muted); }
   input {
     height: 52px; padding: 0 16px; border-radius: 10px; border: 1px solid var(--border-strong); background: var(--surface-2);
@@ -387,7 +388,7 @@ _LOGIN_HTML = """<!DOCTYPE html>
   input[name="code"] { letter-spacing: 0.25em; text-align: center; font: 20px var(--mono); }
   button[type="submit"] {
     height: 54px; margin-top: 4px; border: 0; border-radius: 10px; background: var(--accent); color: var(--on-accent);
-    font: 700 16px var(--mono); letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer; box-shadow: 0 0 22px -6px var(--accent); touch-action: manipulation;
+    font: 700 16px var(--mono); letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer; touch-action: manipulation;
   }
   button[type="submit"]:active { transform: scale(0.985); }
   .error { margin: 0; padding: 12px 14px; border-radius: 10px; background: var(--bad-soft); color: var(--bad); font-size: 14px; font-weight: 550; }
@@ -399,7 +400,7 @@ _LOGIN_HTML = """<!DOCTYPE html>
 <body>
 <main>
   <div class="brand">
-    <img src="/icons/icon-192.png" alt="">
+    <img src="/icons/icon-192.png?v=2" alt="">
     <h1>Memebot</h1>
     <p>Log ind for at følge din bot</p>
   </div>
@@ -421,19 +422,20 @@ _LOGIN_HTML = """<!DOCTYPE html>
   <button class="theme" id="theme" type="button">Lyst tema</button>
 </main>
 <script>
-function applyTheme(theme) {
+// Samme udseende som appen (look-theme). Siden gemmer kun, når du selv trykker på knappen.
+function applyTheme(theme, save) {
   document.documentElement.dataset.theme = theme;
-  try { localStorage.setItem("meme-theme", theme); } catch (e) {}
+  if (save) { try { localStorage.setItem("look-theme", theme === "dark" ? "rod" : "light"); } catch (e) {} }
   document.getElementById("theme").textContent = theme === "dark" ? "Lyst tema" : "Mørkt tema";
   var meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute("content", theme === "dark" ? "#05060d" : "#eaeef5");
+  if (meta) meta.setAttribute("content", theme === "dark" ? "#9a1119" : "#eaeef5");
 }
 var stored = null;
-try { stored = localStorage.getItem("meme-theme"); } catch (e) {}
+try { stored = localStorage.getItem("look-theme"); } catch (e) {}
 var query = new URLSearchParams(location.search).get("theme");
-applyTheme(query === "dark" || query === "light" ? query : (stored || "dark"));
+applyTheme(query === "dark" || query === "light" ? query : (stored === "light" ? "light" : "dark"), false);
 document.getElementById("theme").addEventListener("click", function () {
-  applyTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
+  applyTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark", true);
 });
 </script>
 </body>

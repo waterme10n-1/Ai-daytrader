@@ -5,11 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="dark light">
 <title>Memebot</title>
-<link rel="icon" type="image/png" href="/icons/icon-192.png">
+<link rel="icon" type="image/png" href="/icons/icon-192.png?v=2">
 <link rel="manifest" href="/manifest.webmanifest">
 <meta name="theme-color" content="#000000">
-<script>(function(){try{var d=document.documentElement,s=localStorage.getItem("look-theme")||localStorage.getItem("meme-theme"),t=s||"rod",a=localStorage.getItem("look-accent")||localStorage.getItem("meme-accent")||(s?"":"hvid");if(a&&a!=="lime")d.dataset.accent=a;var l=t==="light"||(t==="auto"&&matchMedia("(prefers-color-scheme: light)").matches);d.dataset.theme=l?"light":"dark";if(t==="midnat"||t==="rod")d.dataset.bg=t;}catch(e){}})();</script>
-<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<script>(function(){try{var L=localStorage,d=document.documentElement;if(L.getItem("look-v")!=="2"){var o=L.getItem("look-theme")||L.getItem("meme-theme")||L.getItem("desk-theme"),t0=(!o||o==="dark"||o==="rod")?"rod":o;L.setItem("look-theme",t0);if(t0==="rod")L.setItem("look-accent","hvid");else if(!L.getItem("look-accent")&&L.getItem("meme-accent"))L.setItem("look-accent",L.getItem("meme-accent"));["meme-theme","meme-accent","desk-theme"].forEach(function(k){L.removeItem(k);});L.setItem("look-v","2");}var t=L.getItem("look-theme")||"rod",a=L.getItem("look-accent")||(t==="rod"?"hvid":"");if(a&&a!=="lime")d.dataset.accent=a;var l=t==="light"||(t==="auto"&&matchMedia("(prefers-color-scheme: light)").matches);d.dataset.theme=l?"light":"dark";if(t==="midnat"||t==="rod")d.dataset.bg=t;var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute("content",l?"#f2f2f7":t==="rod"?"#9a1119":t==="midnat"?"#070b16":"#000000");}catch(e){}})();</script>
+<link rel="apple-touch-icon" href="/apple-touch-icon.png?v=2">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -997,7 +997,11 @@
     --text: #fff6f5; --text-2: #f0cfcd; --muted: #cf9895; --faint: #9a5e5b;
     --up: #4ade80; --up-soft: rgba(74, 222, 128, 0.16); --down: #ffa4a0; --down-soft: rgba(255, 164, 160, 0.16);
     --glass: rgba(42, 5, 8, 0.9); --glass-nav: rgba(30, 3, 5, 0.9);
+    --info: #ffd9d6; --info-soft: rgba(255, 217, 214, 0.14); --warn: #ffc56b; --warn-soft: rgba(255, 197, 107, 0.16);
   }
+  /* Agenterne og relæet i samme varme familie som den røde baggrund */
+  :root[data-bg="rod"]:not([data-theme="light"]) #panel-terminal { --c-scout: #ffd9d6; --c-analyst: #f5b8e6; --c-buyer: #4ade80; --c-risk: #ffc56b; }
+  :root[data-bg="rod"]:not([data-theme="light"]) #panel-relae { --c-scout: #ffd9d6; --c-analyst: #f5b8e6; --c-buyer: #ffc56b; --c-risk: #ff8a95; --c-banker: #4ade80; }
   :root[data-bg="rod"]:not([data-theme="light"]) body {
     background: linear-gradient(180deg, #9a1119 0, #6a0b11 420px, #430709 980px, #2a0406 100%) !important;
     background-color: #2a0406 !important;
@@ -1015,7 +1019,7 @@
   /* ---------- Terminal: egenkapital, fire agenter og aktivitet ----------
      Store tal, en graf med handlerne sat på, og agenterne med det token, de arbejder med lige nu. */
   #panel-terminal { --c-scout: #5aa9ff; --c-analyst: #c58bff; --c-buyer: #4ade80; --c-risk: #ffb547; }
-  .tm { display: grid; gap: 14px; }
+  .tm { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
   @media (min-width: 1000px) { .tm { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; } .tm .tm-wide { grid-column: 1 / -1; } }
   .tm-tape { overflow: hidden; margin: -4px -16px 0; padding: 2px 0; mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent); -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent); }
   @media (min-width: 1000px) { .tm-tape { margin: 0; border-radius: 12px; } }
@@ -1157,13 +1161,51 @@
   .boot-bar { width: 100%; height: 3px; border-radius: 3px; background: rgba(255,255,255,0.18); overflow: hidden; }
   :root:not([data-bg="rod"]) .boot-bar { background: var(--raised); }
   .boot-bar i { display: block; height: 100%; width: 100%; background: currentColor; transform-origin: left; transform: scaleX(0.08); transition: transform 0.6s ease; }
+  /* Bevægelse: tallet ruller og blinker, grafen tegner sig, salg sender en boble op, aktive agenter glimter */
+  .tm-hero { position: relative; }
+  .tm-big.flash-up { animation: tm-flash-up 1.1s ease; } .tm-big.flash-down { animation: tm-flash-down 1.1s ease; }
+  @keyframes tm-flash-up { 30% { color: var(--up); } }
+  @keyframes tm-flash-down { 30% { color: var(--down); } }
+  .tm-chart .ln.draw { stroke-dasharray: 1; stroke-dashoffset: 1; animation: tm-draw 1.3s cubic-bezier(.45,0,.2,1) forwards; }
+  @keyframes tm-draw { to { stroke-dashoffset: 0; } }
+  .tm-chart svg.drawing .ar, .tm-chart svg.drawing .tmk, .tm-chart svg.drawing .end, .tm-chart svg.drawing .ping { animation: tm-fade 0.6s ease 1s both; }
+  .tm-chart svg.drawing .ping { animation: tm-fade 0.6s ease 1s both, tm-ping 2s ease-out 1.6s infinite; }
+  @keyframes tm-fade { from { opacity: 0; } }
+  .tm-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 14px; }
+  .tm-stats div { padding: 9px 8px; border-radius: 12px; background: var(--surface); border: 1px solid var(--border); min-width: 0; animation: tm-rise 0.5s ease both; animation-delay: calc(var(--i) * 70ms); }
+  .tm-stats small { display: block; font-size: 11px; color: var(--muted); }
+  .tm-stats b { display: block; font-size: 14px; letter-spacing: -0.02em; font-weight: 750; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tm-stats b.up { color: var(--up); } .tm-stats b.down { color: var(--down); }
+  @keyframes tm-rise { from { opacity: 0; transform: translateY(8px); } }
+  .tm-bubbles { position: absolute; inset: 0; pointer-events: none; overflow: visible; }
+  .tm-bub { position: absolute; top: 70px; padding: 5px 12px; border-radius: 999px; font: 750 14px var(--font); white-space: nowrap; color: #06210f; background: var(--up); box-shadow: 0 10px 30px -10px rgba(0,0,0,0.6); animation: tm-bub 2.8s cubic-bezier(.2,.8,.2,1) forwards; }
+  .tm-bub.down { color: #2a0406; background: var(--down); } .tm-bub.buy { color: var(--on-accent); background: var(--accent); }
+  @keyframes tm-bub { 0% { transform: translateY(16px) scale(0.7); opacity: 0; } 14% { transform: none; opacity: 1; } 70% { opacity: 1; } 100% { transform: translateY(-80px) scale(0.95); opacity: 0; } }
+  .tm-scan { height: 2px; border-radius: 2px; background: var(--raised); overflow: hidden; margin: -2px 0 8px; }
+  .tm-scan i { display: block; height: 100%; background: var(--up); transform-origin: left; transform: scaleX(0); transition: transform 1s linear; }
+  .tm-head .on .muted { margin-left: 2px; }
+  .tm-head .on .muted:not(:empty)::before { content: "· "; }
+  .tm-ag.on::before { content: ""; position: absolute; inset: 0; border-radius: 12px; pointer-events: none;
+    background: linear-gradient(100deg, transparent 30%, color-mix(in srgb, var(--c) 18%, transparent) 50%, transparent 70%); background-size: 250% 100%; animation: tm-shim 2.4s linear infinite; }
+  @keyframes tm-shim { from { background-position: 130% 0; } to { background-position: -130% 0; } }
+  .tm-best { display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory; margin: 0 -14px; padding: 2px 14px 6px; scrollbar-width: none; }
+  .tm-best::-webkit-scrollbar { display: none; }
+  .tm-bc { flex: 0 0 auto; width: 158px; scroll-snap-align: start; display: grid; gap: 6px; padding: 12px; border-radius: 16px; border: 1px solid var(--border); background: var(--surface-2); color: inherit; font: inherit; text-align: left; cursor: pointer; animation: tm-rise 0.5s ease both; animation-delay: calc(var(--i) * 80ms); }
+  .tm-bc .who { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 13px; font-weight: 700; }
+  .tm-bc .who span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tm-bc .pnl { font-size: 18px; font-weight: 800; color: var(--up); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+  .tm-bc small { color: var(--muted); font-size: 11.5px; }
+  .tm-bc svg { width: 100%; height: 26px; display: block; }
+  .tm-bc svg path { fill: none; stroke: var(--up); stroke-width: 1.6; stroke-linejoin: round; stroke-linecap: round; }
+  .tm-best .none { color: var(--muted); font-size: 13.5px; padding: 4px 0 8px; }
+  @media (prefers-reduced-motion: reduce) { .tm-big, .tm-chart .ln.draw, .tm-chart svg.drawing *, .tm-stats div, .tm-bub, .tm-ag.on::before, .tm-bc { animation: none !important; } .tm-chart .ln.draw { stroke-dasharray: none; stroke-dashoffset: 0; } }
   @media (prefers-reduced-motion: reduce) { .tm-tape-in, .tm-chart .ping, .tm-ag.on .ic::after, .boot-logo, .dp-go .spin { animation: none !important; } .boot { transition: none; } }
 </style>
 </head>
 <body>
 <div class="boot" id="boot" hidden aria-hidden="true">
   <div class="boot-in">
-    <div class="boot-logo"><img src="/icons/icon-192.png" alt="" width="84" height="84"></div>
+    <div class="boot-logo"><img src="/icons/icon-192.png?v=2" alt="" width="84" height="84"></div>
     <h2>Memebot</h2>
     <small>MEME-TERMINAL</small>
     <div class="boot-step" id="boot-step">Forbinder til Solana</div>
@@ -1176,7 +1218,7 @@
 <header class="appbar" id="appbar">
   <div class="appbar-in">
     <div class="brand">
-      <span class="logo"><img src="/icons/icon-192.png" alt="" width="36" height="36"></span>
+      <span class="logo"><img src="/icons/icon-192.png?v=2" alt="" width="36" height="36"></span>
       <div class="brand-txt">
         <h1>Memebot</h1>
         <p class="status-line"><span class="dot" id="status-dot"></span><span id="status-text">Forbinder…</span></p>
@@ -1191,7 +1233,7 @@
 <div class="ticker" id="ticker" hidden aria-hidden="true"><div class="ticker-track" id="ticker-track"></div></div>
 
 <nav class="tabbar" aria-label="Sektioner">
-  <div class="side-brand"><img src="/icons/icon-192.png" alt="">Memebot</div>
+  <div class="side-brand"><img src="/icons/icon-192.png?v=2" alt="">Memebot</div>
   <div id="nav" style="display:contents"></div>
 </nav>
 <div class="ptr" id="ptr" aria-hidden="true"></div>
@@ -1209,11 +1251,18 @@
         <div class="tm-top"><span class="tm-lbl" id="tm-start">Egenkapital</span><span class="tm-mult" id="tm-mult">1,00×</span></div>
         <div class="tm-big" id="tm-equity" role="img" aria-label="Egenkapital">—</div>
         <div class="tm-row"><span class="tm-pill" id="tm-delta">—</span><button class="tm-dep" id="tm-deposit" type="button"></button></div>
+        <div class="tm-stats" id="tm-stats"></div>
+        <div class="tm-bubbles" id="tm-bubbles" aria-hidden="true"></div>
         <div class="tm-chart" id="tm-chart"></div>
         <div class="tm-ranges" id="tm-ranges" role="group" aria-label="Tidsrum"></div>
       </div>
+      <div class="tm-card tm-wide">
+        <div class="tm-head"><h2>Ugens bedste handler</h2><span class="on" id="tm-best-note">7 dage</span></div>
+        <div class="tm-best" id="tm-best"></div>
+      </div>
       <div class="tm-card">
-        <div class="tm-head"><h2>Agenter</h2><span class="on" id="tm-online"><i></i>4 online</span></div>
+        <div class="tm-head"><h2>Agenter</h2><span class="on" id="tm-online"><i></i><span id="tm-online-txt">4 online</span><span class="muted" id="tm-scan-txt"></span></span></div>
+        <div class="tm-scan" aria-hidden="true"><i id="tm-scan-bar"></i></div>
         <div id="tm-agents"></div>
       </div>
       <div class="tm-card">
@@ -1792,7 +1841,7 @@ const LOOK_MODES = [["rod", "Rød", "linear-gradient(180deg,#9a1119,#3a0609)"], 
 const LOOK_COLORS = [["hvid", "Hvid", "#fff3f2"], ["lime", "Lime", "#c6ff3d"], ["roed", "Rød", "#ff453a"], ["blaa", "Blå", "#0a84ff"], ["indigo", "Indigo", "#5e5ce6"], ["lilla", "Lilla", "#bf5af2"], ["pink", "Pink", "#ff375f"], ["orange", "Orange", "#ff9f0a"], ["guld", "Guld", "#ffd60a"], ["groen", "Grøn", "#30d158"], ["mint", "Mint", "#66d4cf"], ["solana", "Solana", "linear-gradient(135deg,#9945ff,#14f195)"]];
 let lookMode = "dark", lookColor = "lime";
 // Valget deles med Handelsbordet (look-*). Gamle valg fra før (meme-*) bruges, indtil man vælger igen.
-function lookGet(key, fallback) { try { return localStorage.getItem(key.replace("meme-", "look-")) || localStorage.getItem(key) || fallback; } catch (e) { return fallback; } }
+function lookGet(key, fallback) { try { return localStorage.getItem(key.replace("meme-", "look-")) || fallback; } catch (e) { return fallback; } }
 function lookSet(key, value) { try { localStorage.setItem(key.replace("meme-", "look-"), value); } catch (e) {} }
 function applyTheme(theme, save = true) {
   // theme: rod, dark, midnat, light eller auto (følg telefonen)
@@ -1853,7 +1902,7 @@ function setTab(name, push) {
   delete cache.nav;
   if (state) { delete cache.alerts; renderAlerts(state); }
   if (push && location.hash !== "#" + name) history.replaceState(null, "", "#" + name);
-  if (state) { renderTicker(state); if (name === "terminal") { delete cache["tm-chart-key"]; renderTerminal(state); } }
+  if (state) { renderTicker(state); if (name === "terminal" && changed) { delete cache["tm-chart-key"]; tmDraw = true; renderTerminal(state); } }
   if (changed) {
     window.scrollTo(0, 0);
     if (name === "oversigt" && state) { delete cache["equity-svg"]; renderHero(state); }
@@ -2830,8 +2879,7 @@ function renderTerminal(data) {
 
   // Egenkapital
   const eq = Number(k.equity) || 0;
-  const whole = Math.trunc(eq), cents = Math.round(Math.abs(eq - whole) * 100).toString().padStart(2, "0");
-  put("tm-equity", `${eq < 0 ? "-" : ""}${esc(fmtInt.format(Math.abs(whole)))}<small>,${cents} $</small>`);
+  tmRollEquity(eq);
   document.getElementById("tm-equity").setAttribute("aria-label", `Egenkapital ${money(eq)}`);
   document.getElementById("tm-start").textContent = `Egenkapital · startede med ${money(r.start || k.bankroll)}`;
   document.getElementById("tm-mult").textContent = `${fmt2d.format(Math.round((r.multiple || 1) * 100) / 100)}×`;
@@ -2841,6 +2889,10 @@ function renderTerminal(data) {
   put("tm-deposit", icon("plus") + (data.mode === "live" ? "Indskud" : "Startbeløb"));
   put("tm-ranges", TM_RANGES.map(([id, label]) => `<button type="button" data-tm-range="${id}" aria-pressed="${id === tmRange}">${id === "live" ? '<i class="dot"></i>' : ""}${esc(label)}</button>`).join(""));
   tmChart(data);
+  put("tm-stats", [["I dag", signed(k.today_pnl), tone(k.today_pnl)], ["Vinder", k.win_rate == null ? "—" : pct(k.win_rate), ""],
+    ["Åbne", fmtInt.format((data.positions || []).length), ""], ["Handler", fmtInt.format(k.trades || 0), ""]]
+    .map(([label, value, cls], i) => `<div style="--i:${i}"><small>${esc(label)}</small><b class="${cls}">${esc(value)}</b></div>`).join(""));
+  tmBest(data);
 
   // Agenterne: hvem arbejder med hvilket token lige nu
   const ra = Object.fromEntries((r.agents || []).map((a) => [a.id, a]));
@@ -2860,7 +2912,8 @@ function renderTerminal(data) {
   const stopped = data.kill_switch || data.paused;
   const online = document.getElementById("tm-online");
   online.className = "on" + (stopped ? " off" : "");
-  online.lastChild.textContent = stopped ? (data.kill_switch ? "nødstop" : "pauset") : "4 online";
+  document.getElementById("tm-online-txt").textContent = stopped ? (data.kill_switch ? "nødstop" : "pauset") : "4 online";
+  tmTick();
   put("tm-agents", TM_AGENTS.map(([id, name, role, ic]) => {
     const x = rows[id], a = ra[id] || {};
     const target = x.pos != null && x.sym ? ` data-tm-pos="${esc(x.pos)}"` : x.go ? ` data-tm-go="${x.go}"` : "";
@@ -2896,6 +2949,71 @@ function renderTerminal(data) {
   }).join("") : `<li class="empty-row">Ingen handler endnu. Agenterne leder efter det første køb.</li>`);
 
   if (tmToken != null) tmRenderSheet(false);
+}
+
+/* Bevægelse og de nye felter */
+let tmShown = null, tmAnim = 0, tmDraw = true;
+function tmEquityHtml(v) {
+  const [whole, cents] = Math.abs(v).toFixed(2).split(".");
+  return `${v < 0 ? "-" : ""}${esc(fmtInt.format(Number(whole)))}<small>,${cents} $</small>`;
+}
+function tmRollEquity(target) {
+  const el = document.getElementById("tm-equity");
+  const still = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  el.setAttribute("aria-label", `Egenkapital ${money(target)}`);
+  if (tmShown === null || still) { tmShown = target; el.innerHTML = tmEquityHtml(target); return; }
+  if (Math.abs(target - tmShown) < 0.005) return;
+  const from = tmShown, t0 = performance.now(), dur = 900;
+  el.classList.remove("flash-up", "flash-down");
+  void el.offsetWidth;
+  el.classList.add(target > from ? "flash-up" : "flash-down");
+  cancelAnimationFrame(tmAnim);
+  const step = (now) => {
+    const k = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - k, 3);
+    tmShown = k < 1 ? from + (target - from) * e : target;
+    el.innerHTML = tmEquityHtml(tmShown);
+    if (k < 1) tmAnim = requestAnimationFrame(step);
+  };
+  tmAnim = requestAnimationFrame(step);
+}
+function tmBubble(text, cls) {
+  if (active !== "terminal" || document.hidden) return;
+  const box = document.getElementById("tm-bubbles");
+  if (!box) return;
+  const el = document.createElement("span");
+  el.className = "tm-bub " + (cls || "");
+  el.textContent = text;
+  el.style.left = `${10 + Math.random() * 45}%`;
+  box.appendChild(el);
+  setTimeout(() => el.remove(), 3000);
+}
+function tmTick() {
+  if (!state || active !== "terminal") return;
+  const total = Number(state.engine.scan_seconds) || 60;
+  const left = Math.max(0, Math.round((Number(state.engine.next_scan_in) || 0) - (Date.now() - countdownBase) / 1000));
+  const bar = document.getElementById("tm-scan-bar"), txt = document.getElementById("tm-scan-txt");
+  const stopped = state.kill_switch || state.paused;
+  if (bar) bar.style.transform = `scaleX(${stopped ? 0 : Math.max(0, Math.min(1, 1 - left / total)).toFixed(3)})`;
+  if (txt) txt.textContent = stopped ? "" : left > 0 ? `scan om ${Math.floor(left / 60)}:${pad2(left % 60)}` : "scanner…";
+}
+function tmSpark(path) {
+  const v = (path || []).map(Number).filter((x) => x > 0);
+  if (v.length < 2) return "";
+  const lo = Math.min(...v), hi = Math.max(...v), span = hi - lo || 1;
+  const d = v.map((x, i) => `${i ? "L" : "M"}${(i / (v.length - 1) * 100).toFixed(1)},${(24 - (x - lo) / span * 22).toFixed(1)}`).join(" ");
+  return `<svg viewBox="0 0 100 26" preserveAspectRatio="none" aria-hidden="true"><path d="${d}"/></svg>`;
+}
+function tmBest(data) {
+  const since = Date.now() - 7 * 864e5;
+  const best = (data.trades || []).filter((t) => Number(t.pnl_usd) > 0 && new Date(t.closed_at).getTime() >= since)
+    .sort((a, b) => Number(b.pnl_usd) - Number(a.pnl_usd)).slice(0, 8);
+  const week = (data.trades || []).filter((t) => new Date(t.closed_at).getTime() >= since);
+  const sum = week.reduce((acc, t) => acc + (Number(t.pnl_usd) || 0), 0);
+  document.getElementById("tm-best-note").textContent = week.length ? `7 dage · ${signed(sum)}` : "7 dage";
+  put("tm-best", best.length ? best.map((t, i) => `<button type="button" class="tm-bc" style="--i:${i}" data-tm-pos="${esc(t.id)}">
+    <span class="who">${tmAv(t.symbol, t.image)}<span>${esc(t.symbol)}</span></span>
+    <span class="pnl">${esc(signed(t.pnl_usd))}</span><small>${esc(spct(t.pnl_pct))} · ${esc(tmStrategy(t))}</small>${tmSpark(t.path)}</button>`).join("")
+    : `<div class="none">Ingen vindere de sidste 7 dage endnu. De dukker op her, når botten sælger med gevinst.</div>`);
 }
 
 function tmChart(data) {
@@ -2947,9 +3065,11 @@ function tmChart(data) {
   const bank = Number(k.bankroll);
   const base = bank >= min && bank <= max ? `<line class="base" x1="${pl}" x2="${w - pr}" y1="${y(bank).toFixed(1)}" y2="${y(bank).toFixed(1)}"/>` : "";
   const flat = Math.max(...vals) - Math.min(...vals) < 0.005;
-  box.innerHTML = `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="Egenkapital over tid">
+  const draw = tmDraw && !(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
+  tmDraw = false;
+  box.innerHTML = `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="Egenkapital over tid"${draw ? ' class="drawing"' : ""}>
     <defs><linearGradient id="tm-g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--text);stop-opacity:0.2"/><stop offset="1" style="stop-color:var(--text);stop-opacity:0"/></linearGradient></defs>
-    ${base}<path class="ar" d="${area}" fill="url(#tm-g)"/><path class="ln" d="${line}"/>${mk}
+    ${base}<path class="ar" d="${area}" fill="url(#tm-g)"/><path class="ln${draw ? " draw" : ""}" pathLength="1" d="${line}"/>${mk}
     <circle class="ping" cx="${ex}" cy="${ey}" r="5"/><circle class="end" cx="${ex}" cy="${ey}" r="3.5"/></svg>${flat && !(data.trades || []).length && !(data.positions || []).length ? '<div class="note">Kurven bevæger sig, når botten køber sit første token.</div>' : ""}`;
 }
 
@@ -3141,7 +3261,7 @@ document.getElementById("tm-deposit").addEventListener("click", openDeposit);
 document.getElementById("tm-all").addEventListener("click", () => { tmAllOpen = !tmAllOpen; if (state) renderTerminal(state); });
 document.getElementById("panel-terminal").addEventListener("click", (ev) => {
   const rg = ev.target.closest("[data-tm-range]"), pos = ev.target.closest("[data-tm-pos]"), go = ev.target.closest("[data-tm-go]");
-  if (rg) { tmRange = rg.dataset.tmRange; try { localStorage.setItem("meme-tm-range", tmRange); } catch (e) {} if (state) renderTerminal(state); }
+  if (rg) { tmRange = rg.dataset.tmRange; tmDraw = true; try { localStorage.setItem("meme-tm-range", tmRange); } catch (e) {} if (state) renderTerminal(state); }
   else if (pos) { tmToken = Number(pos.dataset.tmPos); tmRenderSheet(true); }
   else if (go) setTab(go.dataset.tmGo, true);
 });
@@ -3346,6 +3466,8 @@ function detectChanges(data) {
   const open = new Set((data.positions || []).map((p) => p.id));
   const closed = new Set((data.trades || []).map((t) => t.id));
   if (seenOpen && seenClosed) {
+    for (const p of data.positions || []) if (!seenOpen.has(p.id)) tmBubble(`Købt ${p.symbol}`, "buy");
+    for (const t of data.trades || []) if (!seenClosed.has(t.id)) tmBubble(`${t.symbol} ${signed(t.pnl_usd)}`, Number(t.pnl_usd) >= 0 ? "" : "down");
     for (const p of data.positions || []) if (!seenOpen.has(p.id)) toast("buy", `Købt ${p.symbol}`, `${money(p.cost_usd)} · ${p.source}`);
     for (const t of data.trades || []) if (!seenClosed.has(t.id)) toast(t.pnl_usd > 0 ? "up" : "down", `Solgt ${t.symbol} ${signed(t.pnl_usd)}`, `${spct(t.pnl_pct)} · fundet → tjekket → købt → fulgt → solgt (${t.exit_reason})`);
   }
@@ -3620,10 +3742,10 @@ document.getElementById("menu-app").innerHTML = icon("phone") + "Læg på hjemme
 document.getElementById("menu-settings").innerHTML = icon("plug") + "Forbindelser og indstillinger";
 if (csrfToken()) document.getElementById("logout").hidden = false;
 const queryTheme = new URLSearchParams(location.search).get("theme");
-// Uden et gemt valg ser Memebot ud som terminalen: rød baggrund og hvid farve.
-const savedLook = lookGet("meme-theme", "");
-applyAccent(lookGet("meme-accent", savedLook ? "lime" : "hvid"), false);
-applyTheme(queryTheme || savedLook || "rod", false);
+// Uden et gemt valg ser begge sider ud som terminalen: rød baggrund og hvid farve (se scriptet i <head>).
+const savedLook = lookGet("meme-theme", "rod");
+applyAccent(lookGet("meme-accent", savedLook === "rod" ? "hvid" : "lime"), false);
+applyTheme(queryTheme || savedLook, false);
 renderBell();
 renderTabs({ positions: [], kpis: { trades: 0 }, copy_wallets: [], sniper: null });
 setTab(location.hash.slice(1) || "terminal", false);
@@ -4390,6 +4512,7 @@ function secondTick() {
   if (!document.hidden) {
     tickHeader();
     if (state && (active === "oversigt" || active === "positioner")) { tickMotor(); tickTiles(); }
+    tmTick();
     const c = clockOf(state), scan = c && c.jobs && c.jobs.scan;
     const js = jobState(scan, nowS(), "scan");
     if (js.running && nowS() - js.since < 90 && Date.now() - lastPoll >= 2000) { lastPoll = Date.now(); refresh(); }

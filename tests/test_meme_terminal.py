@@ -49,8 +49,30 @@ def test_a_closed_trade_keeps_its_price_path_logo_and_market_cap(monkeypatch):
 def test_the_terminal_is_the_home_view_with_deposit_boot_and_red_look():
     html = (STATIC / "meme.html").read_text(encoding="utf-8")
     for marker in ('id="panel-terminal"', 'id="tm-deposit"', 'id="tm-agents"', 'id="tm-act"', 'id="boot"', "/api/meme/paper/restart",
-                   'setTab(location.hash.slice(1) || "terminal"', '["rod", "Rød"', '["hvid", "Hvid"', 'data-bg="rod"'):
+                   'setTab(location.hash.slice(1) || "terminal"', '["rod", "Rød"', '["hvid", "Hvid"', 'data-bg="rod"',
+                   'id="tm-best"', 'id="tm-scan-bar"', 'id="tm-stats"', "function tmRollEquity", "function tmBubble", 'L.getItem("look-v")!=="2"'):
         assert marker in html, marker
     desk = (STATIC / "desk.html").read_text(encoding="utf-8")
-    for marker in ('["rod", "Rød"', '["hvid", "Hvid"', 'data-bg="rod"', 't==="rod"'):
+    for marker in ('["rod", "Rød"', '["hvid", "Hvid"', 'data-bg="rod"', 't==="rod"', 'L.getItem("look-v")!=="2"', 'src="/icons/icon-192.png?v=2"'):
         assert marker in desk, marker
+
+
+def test_new_red_app_icon_and_red_manifest(tmp_path):
+    import dataclasses
+
+    from fastapi.testclient import TestClient
+
+    from trader.app import MANIFEST, create_app
+    from trader.config import Settings
+
+    assert MANIFEST["theme_color"] == "#9a1119"
+    assert all(icon["src"].endswith("?v=2") for icon in MANIFEST["icons"])
+    engine, *_ = make_engine()
+    engine.start = lambda: None
+    engine.stop = lambda: None
+    settings = dataclasses.replace(Settings.from_env(), db_path=str(tmp_path / "t.db"), host="127.0.0.1", app_username="",
+                                   app_password="", app_password_hash="", session_secret="")
+    with TestClient(create_app(settings=settings, meme_engine=engine)) as client:
+        icon = client.get("/icons/icon-192.png?v=2")
+        assert icon.status_code == 200 and icon.content[:8] == b"\x89PNG\r\n\x1a\n"
+        assert client.get("/apple-touch-icon.png?v=2").status_code == 200

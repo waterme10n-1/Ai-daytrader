@@ -7,8 +7,8 @@
 <title>Handelsbordet</title>
 <link rel="manifest" href="/manifest.webmanifest">
 <meta name="theme-color" content="#000000">
-<script>(function(){try{var d=document.documentElement,t=localStorage.getItem("look-theme")||localStorage.getItem("desk-theme")||"dark",a=localStorage.getItem("look-accent");if(a&&a!=="lime")d.dataset.accent=a;var l=t==="light"||(t==="auto"&&matchMedia("(prefers-color-scheme: light)").matches);d.dataset.theme=l?"light":"dark";if(t==="midnat"||t==="rod")d.dataset.bg=t;}catch(e){}})();</script>
-<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<script>(function(){try{var L=localStorage,d=document.documentElement;if(L.getItem("look-v")!=="2"){var o=L.getItem("look-theme")||L.getItem("meme-theme")||L.getItem("desk-theme"),t0=(!o||o==="dark"||o==="rod")?"rod":o;L.setItem("look-theme",t0);if(t0==="rod")L.setItem("look-accent","hvid");else if(!L.getItem("look-accent")&&L.getItem("meme-accent"))L.setItem("look-accent",L.getItem("meme-accent"));["meme-theme","meme-accent","desk-theme"].forEach(function(k){L.removeItem(k);});L.setItem("look-v","2");}var t=L.getItem("look-theme")||"rod",a=L.getItem("look-accent")||(t==="rod"?"hvid":"");if(a&&a!=="lime")d.dataset.accent=a;var l=t==="light"||(t==="auto"&&matchMedia("(prefers-color-scheme: light)").matches);d.dataset.theme=l?"light":"dark";if(t==="midnat"||t==="rod")d.dataset.bg=t;var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute("content",l?"#f2f2f7":t==="rod"?"#9a1119":t==="midnat"?"#070b16":"#000000");}catch(e){}})();</script>
+<link rel="apple-touch-icon" href="/apple-touch-icon.png?v=2">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -400,7 +400,7 @@
   /* titel med logo */
   .title { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 11px; align-items: center; }
   .title .logo { grid-row: 1 / 3; width: 34px; height: 34px; border-radius: 10px; box-shadow: 0 6px 18px -6px rgba(10, 132, 255, 0.7); }
-  .title .logo svg { display: block; width: 100%; height: 100%; }
+  .title .logo svg, .title .logo img { display: block; width: 100%; height: 100%; border-radius: inherit; }
   .title .name, .title small { grid-column: 2; }
   :root:not([data-theme="light"]) .title .name { background: linear-gradient(180deg, #fff 35%, #c3c6cf); -webkit-background-clip: text; background-clip: text; color: transparent; }
 
@@ -565,9 +565,12 @@
   }
   :root[data-bg="rod"]:not([data-theme="light"]) {
     --bg: #3a0609; --card: #3d080c; --card-2: #470a0f; --raise: #561116; --sep: rgba(255,210,210,0.09);
-    --fill: rgba(255,255,255,0.07); --fill-2: rgba(255,255,255,0.13); --bar: rgba(42,5,8,0.9);
+    --fill: rgba(255,255,255,0.07); --fill-2: rgba(255,255,255,0.13); --bar: rgba(122,13,20,0.92);
     --text: #fff6f5; --text-2: #f0cfcd; --muted: #cf9895;
     --up: #4ade80; --up-bg: rgba(74,222,128,0.16); --down: #ffa4a0; --down-bg: rgba(255,164,160,0.16);
+    --warn: #ffc56b; --warn-bg: rgba(255,197,107,0.16);
+    /* Botternes farver i samme varme familie som den røde baggrund */
+    --scout: #ffc56b; --news: #ffd9d6; --chart: #ffab91; --skeptic: #ff8a95; --sizer: #f5b8e6; --executor: #4ade80;
   }
   :root[data-bg="rod"]:not([data-theme="light"]) body { background: linear-gradient(180deg, #9a1119 0, #6a0b11 420px, #430709 980px, #2a0406 100%) !important; background-color: #2a0406 !important; }
   :root[data-accent="hvid"] { --accent: #fff3f2; --accent-bg: rgba(255,243,242,0.14); --on-accent: #2a0406; }
@@ -598,7 +601,7 @@
 
 <header class="top">
   <div class="wrap bar">
-    <div class="title"><span class="logo" aria-hidden="true"><svg viewBox="0 0 32 32"><defs><linearGradient id="logo-g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0a84ff"/><stop offset="1" stop-color="#bf5af2"/></linearGradient></defs><rect width="32" height="32" rx="9" fill="url(#logo-g)"/><path d="M7.5 21.5l5.5-5.5 4 4 7.5-8.5" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="24.5" cy="11.5" r="2.2" fill="#fff"/></svg></span><span class="name">Handelsbordet</span><h1 class="sr-only">Handelsbordet</h1><small id="today"></small></div>
+    <div class="title"><span class="logo" aria-hidden="true"><img src="/icons/icon-192.png?v=2" alt="" width="34" height="34"></span><span class="name">Handelsbordet</span><h1 class="sr-only">Handelsbordet</h1><small id="today"></small></div>
     <button class="status" id="status" type="button" title="Systemstatus"><span class="dot"></span><span class="lbl-s" id="status-t">Forbinder</span></button>
     <button class="btn danger" id="pause-btn" type="button">Stop</button>
     <button class="round" id="pal-btn" type="button" title="Søg og kommandoer (⌘K)" aria-label="Søg og kommandoer"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></button>
@@ -901,6 +904,8 @@ function setTheme(mode, save = true) {
   const root = document.documentElement;
   root.dataset.theme = light ? "light" : "dark";
   if (lookMode === "midnat" || lookMode === "rod") root.dataset.bg = lookMode; else delete root.dataset.bg;
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute("content", light ? "#eeeee9" : lookMode === "rod" ? "#9a1119" : lookMode === "midnat" ? "#070b16" : "#08080a");
   if (save) lookSet("look-theme", lookMode);
   renderLook();
 }
@@ -924,8 +929,8 @@ $("look").addEventListener("click", (ev) => {
   else if (color) { ev.preventDefault(); setAccent(color.dataset.lookColor); }
 });
 if (window.matchMedia) { const mq = matchMedia("(prefers-color-scheme: light)"); if (mq.addEventListener) mq.addEventListener("change", () => { if (lookMode === "auto") setTheme("auto", false); }); }
-setAccent(lookGet("look-accent", null, "lime"), false);
-setTheme(lookGet("look-theme", "desk-theme", "dark"), false);
+setAccent(lookGet("look-accent", null, lookGet("look-theme", null, "rod") === "rod" ? "hvid" : "lime"), false);
+setTheme(lookGet("look-theme", null, "rod"), false);
 let soundOn = false, audio = null;
 try { soundOn = localStorage.getItem("desk-sound") === "1"; } catch (e) {}
 function setSound(on) { soundOn = on; $("sound-toggle").checked = on; try { localStorage.setItem("desk-sound", on ? "1" : "0"); } catch (e) {} }
