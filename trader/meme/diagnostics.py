@@ -22,6 +22,17 @@ HINT_JUPITER = (
 HINT_DEX = "DexScreener svarer ikke. Prøv igen om lidt; deres API er gratis og uden nøgle."
 HINT_RUG = "RugCheck svarer ikke. Uden RugCheck køber botten intet, så det skal virke."
 HINT_RPC = "Sæt SOLANA_RPC_URL til en egen node, fx en gratis nøgle fra helius.dev."
+HINT_RPC_OWN = (
+    "Botten bruger allerede din egen RPC, så tjek, at adressen er hele adressen fra udbyderen (med ?api-key=...), "
+    "at nøglen ikke er udløbet, og at gratis-grænsen hos udbyderen ikke er brugt. Railway skal være genstartet efter ændringen."
+)
+
+
+def _rpc_host(url: str) -> str:
+    """Kun adressens vært (aldrig nøglen i adressen), så man kan se, hvilken RPC botten faktisk bruger."""
+    from urllib.parse import urlparse
+
+    return urlparse(url).hostname or "ukendt adresse"
 
 
 def _short(exc: Exception) -> str:
@@ -80,11 +91,15 @@ def run_checks(engine: Any) -> dict:
     def rpc() -> str:
         client = clients.rpc or SolanaRPC(settings.rpc_url)
         clients.rpc = clients.rpc or client
-        height = client.block_height()
+        host = _rpc_host(settings.rpc_url)
+        try:
+            height = client.block_height()
+        except Exception as exc:
+            raise type(exc)(f"{_short(exc)} [bruger {host}]") from exc
         note = " (offentlig, langsom og rate-limited)" if settings.rpc_url == DEFAULT_RPC else ""
-        return f"Blokhøjde {height:,}{note}".replace(",", ".")
+        return f"Blokhøjde {height:,} via {host}{note}".replace(",", ".")
 
-    check("rpc", "Solana RPC", rpc, HINT_RPC)
+    check("rpc", "Solana RPC", rpc, HINT_RPC if settings.rpc_url == DEFAULT_RPC else HINT_RPC_OWN)
 
     if settings.private_key:
 

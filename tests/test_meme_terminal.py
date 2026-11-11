@@ -127,3 +127,11 @@ def test_paper_keeps_buying_through_loss_stops_but_live_does_not():
     assert free.store.get_state("halt_dd:paper", "0") == "0"
     stops, *_ = make_engine(meme_fakes.settings(paper_loss_stops=True, max_losses_per_day=1))
     assert not stops._paper_runs_free()
+
+
+def test_the_rpc_check_names_the_host_but_never_the_key():
+    from trader.meme.diagnostics import _rpc_host, HINT_RPC_OWN
+
+    assert _rpc_host("https://mainnet.helius-rpc.com/?api-key=SECRET123") == "mainnet.helius-rpc.com"
+    assert "SECRET123" not in _rpc_host("https://mainnet.helius-rpc.com/?api-key=SECRET123")
+    assert "egen RPC" in HINT_RPC_OWN
