@@ -38,9 +38,18 @@ RETIRED_DEFAULTS: dict[str, object] = {
 }
 # Gamle standarder for én børs: nøgle → (indstilling, gammel værdi). Nøglen skal være ny for hver ændring.
 RETIRED_BY_MARKET: dict[str, dict[str, tuple[str, object]]] = {
-    "us": {"us_move_pct_2": ("move_pct", 2.0)},  # New York: 2 % blev til 1,5 %, så flere bevægelser kommer med
+    "us": {
+        "us_move_pct_2": ("move_pct", 2.0),  # New York: 2 % blev til 1,5 %, så flere bevægelser kommer med
+        # Flere aktier igennem: 1,5 % blev til 1 %, gaps fra 3 % til 2 %, og 8 markeringer om dagen til 10.
+        "us_move_pct_15": ("move_pct", 1.5),
+        "us_gap_pct_3": ("gap_pct", 3.0),
+        "us_flags_8": ("max_flags_per_day", 8),
+    },
     "dk": {
         "dk_move_pct_2": ("move_pct", 2.0),  # København: 2 % blev til 1,5 %
+        "dk_move_pct_15": ("move_pct", 1.5),  # og siden til 1 %
+        "dk_gap_pct_3": ("gap_pct", 3.0),
+        "dk_flags_8": ("max_flags_per_day", 8),
         "dk_scan_minutes_1": ("scan_minutes", 1),  # København: hvert minut blev til hvert 5. (skånsomt for Yahoo)
     },
 }
@@ -120,11 +129,11 @@ class DeskSettings:
     start_cash: float = 100_000.0  # kun den danske papirkonto (DKK)
     fee_pct: float = 0.1  # kurtage pr. handel på den danske papirkonto, i % af beløbet
     watchlist: tuple[str, ...] = DEFAULT_WATCHLIST
-    move_pct: float = 1.5
+    move_pct: float = 1.0
     volume_x: float = 2.0
-    max_flags_per_day: int = 8
+    max_flags_per_day: int = 10
     premarket: bool = True  # SCOUT og NEWS kigger på gaps før åbning (4:00-9:30 ET, 10:00-15:30 dansk tid)
-    gap_pct: float = 3.0  # så meget skal en aktie være steget siden i går for at tælle som gap
+    gap_pct: float = 2.0  # så meget skal en aktie være steget siden i går for at tælle som gap
     stop_max_pct: float = 2.0
     reward_risk: float = 2.0
     position_pct: float = 5.0
@@ -168,11 +177,11 @@ class DeskSettings:
         return cls(
             enabled=_flag(os.getenv("DESK_ENABLED"), True),
             watchlist=tuple(watch),
-            move_pct=min(20.0, max(0.5, _float(os.getenv("DESK_MOVE_PCT"), 1.5))),
+            move_pct=min(20.0, max(0.5, _float(os.getenv("DESK_MOVE_PCT"), 1.0))),
             volume_x=min(20.0, max(1.2, _float(os.getenv("DESK_VOLUME_X"), 2.0))),
-            max_flags_per_day=max(1, min(HARD_MAX_FLAGS, _int(os.getenv("DESK_MAX_FLAGS_PER_DAY"), 8))),
+            max_flags_per_day=max(1, min(HARD_MAX_FLAGS, _int(os.getenv("DESK_MAX_FLAGS_PER_DAY"), 10))),
             premarket=_flag(os.getenv("DESK_PREMARKET"), True),
-            gap_pct=min(20.0, max(1.0, _float(os.getenv("DESK_GAP_PCT"), 3.0))),
+            gap_pct=min(20.0, max(1.0, _float(os.getenv("DESK_GAP_PCT"), 2.0))),
             stop_max_pct=min(HARD_MAX_STOP_PCT, max(0.3, _float(os.getenv("DESK_STOP_MAX_PCT"), 2.0))),
             reward_risk=min(5.0, max(HARD_MIN_REWARD_RISK, _float(os.getenv("DESK_REWARD_RISK"), 2.0))),
             position_pct=min(HARD_MAX_POSITION_PCT, max(0.5, _float(os.getenv("DESK_POSITION_PCT"), 5.0))),
@@ -214,7 +223,7 @@ class DeskSettings:
             market="dk",
             watchlist=tuple(watch),
             # Store danske aktier flytter sig mindre end de livlige amerikanske, så grænsen er lavere.
-            move_pct=min(20.0, max(0.5, _float(os.getenv("DESK_DK_MOVE_PCT"), 1.5))),
+            move_pct=min(20.0, max(0.5, _float(os.getenv("DESK_DK_MOVE_PCT"), 1.0))),
             # Yahoo er gratis, men siger 429, hvis bordet spørger for tit. Hvert 5. minut er nok til bevægelser på en time.
             scan_minutes=max(1, min(30, _int(os.getenv("DESK_DK_SCAN_MINUTES"), 5))),
             start_cash=min(10_000_000.0, max(10_000.0, _float(os.getenv("DESK_DK_START_CASH"), 100_000.0))),

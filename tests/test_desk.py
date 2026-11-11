@@ -585,8 +585,8 @@ def test_new_limits_are_checked_on_the_page(tmp_path):
 def test_new_scout_defaults():
     from trader.desk.config import DEFAULT_WATCHLIST
 
-    assert DeskSettings().move_pct == 1.5 and DeskSettings().max_flags_per_day == 8
-    assert DeskSettings().premarket and DeskSettings().gap_pct == 3.0
+    assert DeskSettings().move_pct == 1.0 and DeskSettings().max_flags_per_day == 10
+    assert DeskSettings().premarket and DeskSettings().gap_pct == 2.0
     assert {"SMCI", "MSTR", "SOFI", "RIVN"} <= set(DEFAULT_WATCHLIST) and len(DEFAULT_WATCHLIST) == 16
 
 
@@ -599,12 +599,26 @@ def test_old_saved_defaults_give_way_to_the_new_ones(tmp_path):
     store.set_json("params", {"move_pct": 3.0, "max_flags_per_day": 5, "watchlist": list(RETIRED_DEFAULTS["watchlist"]), "position_pct": 3.0})
     desk, _ = make_desk(tmp_path, broker, watchlist=DEFAULT_WATCHLIST)
     assert desk.cfg.move_pct == desk.base.move_pct and desk.cfg.watchlist == DEFAULT_WATCHLIST and desk.cfg.position_pct == 3.0
-    assert desk.cfg.max_flags_per_day == 8
+    assert desk.cfg.max_flags_per_day == 10
     assert "SCOUT er opdateret" in desk.store.messages(limit=5)[-1]["text"]
     # Kun én gang: vælger man selv 3 % bagefter, bliver det ved med at gælde.
     desk.update_params({"move_pct": 3})
     again, _ = make_desk(tmp_path, broker, watchlist=DEFAULT_WATCHLIST)
     assert again.cfg.move_pct == 3.0
+
+
+def test_saved_15_percent_and_3_percent_gaps_give_way_once(tmp_path):
+    broker = FakeBroker({})
+    store = DeskStore(str(tmp_path / "desk.db"))
+    store.set_state("welcome", "1")
+    store.set_json("retired_defaults", ["move_pct", "max_flags_per_day", "watchlist", "us_move_pct_2"])  # de tidligere oprydninger er sket
+    store.set_json("params", {"move_pct": 1.5, "gap_pct": 3.0, "max_flags_per_day": 8, "position_pct": 3.0})
+    desk, _ = make_desk(tmp_path, broker)
+    assert (desk.cfg.move_pct, desk.cfg.gap_pct, desk.cfg.max_flags_per_day) == (1.0, 2.0, 10)
+    assert desk.cfg.position_pct == 3.0  # dine egne tal bliver stående
+    desk.update_params({"gap_pct": 3})
+    again, _ = make_desk(tmp_path, broker)
+    assert again.cfg.gap_pct == 3.0  # kun én gang
 
 
 def test_saving_the_defaults_does_not_pin_them(tmp_path):

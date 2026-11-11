@@ -8,7 +8,7 @@
 <link rel="icon" type="image/png" href="/icons/icon-192.png">
 <link rel="manifest" href="/manifest.webmanifest">
 <meta name="theme-color" content="#000000">
-<script>(function(){try{var d=document.documentElement,t=localStorage.getItem("meme-theme")||"dark",a=localStorage.getItem("meme-accent");if(a)d.dataset.accent=a;var l=t==="light"||(t==="auto"&&matchMedia("(prefers-color-scheme: light)").matches);d.dataset.theme=l?"light":"dark";if(t==="midnat")d.dataset.bg="midnat";}catch(e){}})();</script>
+<script>(function(){try{var d=document.documentElement,s=localStorage.getItem("look-theme")||localStorage.getItem("meme-theme"),t=s||"rod",a=localStorage.getItem("look-accent")||localStorage.getItem("meme-accent")||(s?"":"hvid");if(a&&a!=="lime")d.dataset.accent=a;var l=t==="light"||(t==="auto"&&matchMedia("(prefers-color-scheme: light)").matches);d.dataset.theme=l?"light":"dark";if(t==="midnat"||t==="rod")d.dataset.bg=t;}catch(e){}})();</script>
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -906,7 +906,7 @@
   .look-modes button { height: 54px; border-radius: 13px; border: 1.5px solid transparent; background: var(--surface-2); color: var(--text); font: 650 12.5px var(--font); cursor: pointer; display: grid; place-items: center; gap: 2px; padding: 6px 2px; }
   .look-modes button i { width: 22px; height: 14px; border-radius: 4px; border: 1px solid var(--border-strong); }
   .look-modes button[aria-pressed="true"] { border-color: var(--accent); }
-  .look-colors { display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 6px; }
+  .look-colors { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 5px; }
   .look-colors button { aspect-ratio: 1; max-width: 40px; width: 100%; justify-self: center; border-radius: 50%; border: 0; cursor: pointer; background: var(--sw); position: relative; }
   .look-colors button[aria-pressed="true"]::after { content: ""; position: absolute; inset: -4px; border-radius: 50%; border: 2px solid var(--sw); }
   .look-colors button[aria-pressed="true"]::before { content: ""; position: absolute; inset: 35%; border-radius: 50%; background: #fff; }
@@ -989,8 +989,187 @@
   .rl-goal .meta { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 13px; }
   @media (prefers-reduced-motion: reduce) { .rl-agent.on .rl-ico::after, .rl-pipe.busy .rl-run, .rl-count.pop, .rl-feed li.new { animation: none !important; } }
 </style>
+<style id="terminal">
+  /* ---------- Rød baggrund (Menu → Udseende → Rød). Kun mørk. ---------- */
+  :root[data-bg="rod"]:not([data-theme="light"]) {
+    --bg: #3a0609; --surface: rgba(16, 0, 2, 0.34); --surface-2: rgba(0, 0, 0, 0.22); --raised: rgba(255, 255, 255, 0.08); --raised-2: rgba(255, 255, 255, 0.15);
+    --border: rgba(255, 210, 210, 0.08); --border-strong: rgba(255, 210, 210, 0.16); --seg-on: rgba(255, 255, 255, 0.16);
+    --text: #fff6f5; --text-2: #f0cfcd; --muted: #cf9895; --faint: #9a5e5b;
+    --up: #4ade80; --up-soft: rgba(74, 222, 128, 0.16); --down: #ffa4a0; --down-soft: rgba(255, 164, 160, 0.16);
+    --glass: rgba(42, 5, 8, 0.9); --glass-nav: rgba(30, 3, 5, 0.9);
+  }
+  :root[data-bg="rod"]:not([data-theme="light"]) body {
+    background: linear-gradient(180deg, #9a1119 0, #6a0b11 420px, #430709 980px, #2a0406 100%) !important;
+    background-color: #2a0406 !important;
+  }
+  :root[data-bg="rod"]:not([data-theme="light"]) .sheet { background: #2c0609; }
+  :root[data-bg="rod"]:not([data-theme="light"]) .appbar,
+  :root[data-bg="rod"]:not([data-theme="light"]) .appnav { background: transparent; }
+  :root[data-accent="hvid"] { --accent: #fff3f2; --accent-soft: rgba(255, 243, 242, 0.14); --on-accent: #2a0406; --grad: #fff3f2; }
+  :root[data-theme="light"][data-accent="hvid"] { --accent: #1c1c1e; --accent-soft: rgba(28, 28, 30, 0.1); --on-accent: #ffffff; --grad: #1c1c1e; }
+  :root[data-accent="roed"] { --accent: #ff453a; --accent-soft: color-mix(in srgb, #ff453a 16%, transparent); --on-accent: #ffffff; --grad: #ff453a; }
+  :root[data-theme="light"][data-accent="roed"] { --accent: #d70015; --accent-soft: color-mix(in srgb, #d70015 11%, transparent); --on-accent: #ffffff; --grad: #d70015; }
+  .look-modes { grid-template-columns: repeat(5, minmax(0, 1fr)) !important; }
+  .look-colors { grid-template-columns: repeat(6, minmax(0, 1fr)) !important; row-gap: 10px !important; }
+
+  /* ---------- Terminal: egenkapital, fire agenter og aktivitet ----------
+     Store tal, en graf med handlerne sat på, og agenterne med det token, de arbejder med lige nu. */
+  #panel-terminal { --c-scout: #5aa9ff; --c-analyst: #c58bff; --c-buyer: #4ade80; --c-risk: #ffb547; }
+  .tm { display: grid; gap: 14px; }
+  @media (min-width: 1000px) { .tm { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; } .tm .tm-wide { grid-column: 1 / -1; } }
+  .tm-tape { overflow: hidden; margin: -4px -16px 0; padding: 2px 0; mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent); -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent); }
+  @media (min-width: 1000px) { .tm-tape { margin: 0; border-radius: 12px; } }
+  .tm-tape-in { display: inline-flex; gap: 18px; white-space: nowrap; padding-left: 16px; animation: tm-tape 40s linear infinite; will-change: transform; }
+  .tm-tape:hover .tm-tape-in, .tm-tape.still .tm-tape-in { animation-play-state: paused; }
+  @keyframes tm-tape { to { transform: translateX(-50%); } }
+  .tm-tape span { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 650; color: var(--text-2); }
+  .tm-tape span b { color: var(--text); font-weight: 700; }
+  .tm-tape .av { display: inline-grid; place-items: center; gap: 0; width: 18px; height: 18px; font-size: 9px; color: #fff; }
+  .tm-hero { padding: 6px 2px 0; }
+  .tm-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .tm-lbl { color: var(--muted); font-size: 13px; font-weight: 550; }
+  .tm-mult { display: inline-flex; align-items: center; height: 28px; padding: 0 10px; border-radius: 9px; font-weight: 750; font-size: 14px; color: #1a0203; background: #fff4f3; font-variant-numeric: tabular-nums; }
+  :root[data-theme="light"] .tm-mult { color: #fff; background: #1c1c1e; }
+  .tm-big { font-size: clamp(3.1rem, 16vw, 4.4rem); font-weight: 800; letter-spacing: -0.045em; line-height: 1; margin: 6px 0 10px; font-variant-numeric: tabular-nums; }
+  .tm-big small { font-size: 0.52em; font-weight: 750; letter-spacing: -0.02em; }
+  .tm-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .tm-pill { display: inline-flex; align-items: center; height: 28px; padding: 0 10px; border-radius: 8px; font-size: 13.5px; font-weight: 700; font-variant-numeric: tabular-nums; background: var(--up-soft); color: var(--up); }
+  .tm-pill.down { background: var(--down-soft); color: var(--down); }
+  .tm-dep { height: 36px; padding: 0 16px; border: 0; border-radius: 999px; background: var(--accent); color: var(--on-accent); font: 750 14px var(--font); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+  .tm-dep .i { width: 16px; height: 16px; }
+  .tm-chart { position: relative; margin: 14px -4px 0; height: 190px; }
+  .tm-chart svg { display: block; width: 100%; height: 100%; overflow: visible; }
+  .tm-chart .ln { fill: none; stroke: var(--text); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+  .tm-chart .ar { stroke: none; }
+  .tm-chart .base { stroke: var(--border-strong); stroke-dasharray: 3 4; }
+  .tm-chart .tmk line { stroke: var(--border-strong); }
+  .tm-chart .tmk circle { stroke: var(--bg); stroke-width: 2; }
+  .tm-chart .tmk text { font: 650 10.5px var(--font); fill: var(--text-2); }
+  .tm-chart .tmk text.up { fill: var(--up); } .tm-chart .tmk text.down { fill: var(--down); }
+  .tm-chart .end { fill: var(--text); }
+  .tm-chart .ping { fill: none; stroke: var(--text); stroke-width: 1.5; transform-box: fill-box; transform-origin: center; animation: tm-ping 2s ease-out infinite; }
+  @keyframes tm-ping { from { transform: scale(0.6); opacity: 0.8; } to { transform: scale(2.4); opacity: 0; } }
+  .tm-chart .note { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 13px; text-align: center; padding: 0 20px; }
+  .tm-ranges { display: flex; justify-content: space-between; gap: 4px; margin: 8px 0 2px; }
+  .tm-ranges button { flex: 1; height: 30px; border: 0; border-radius: 9px; background: none; color: var(--muted); font: 700 12px var(--font); letter-spacing: 0.04em; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 5px; }
+  .tm-ranges button[aria-pressed="true"] { background: var(--raised); color: var(--text); }
+  .tm-ranges .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--up); }
+  .tm-card { border-radius: 20px; background: var(--surface); border: 1px solid var(--border); padding: 14px 14px 10px; }
+  .tm-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 8px; }
+  .tm-head h2 { margin: 0; font-size: 19px; font-weight: 750; letter-spacing: -0.02em; }
+  .tm-head .on { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 650; color: var(--muted); }
+  .tm-head .on i { width: 7px; height: 7px; border-radius: 50%; background: var(--up); box-shadow: 0 0 0 3px var(--up-soft); }
+  .tm-head .on.off i { background: var(--warn); box-shadow: 0 0 0 3px var(--warn-soft); }
+  .tm-head button { border: 0; background: none; color: var(--muted); font: 650 13px var(--font); cursor: pointer; padding: 4px 0; }
+  .tm-ag { display: grid; grid-template-columns: 36px minmax(0, 7.2rem) minmax(0, 1fr) auto; gap: 10px; align-items: center; width: 100%; padding: 8px; margin: 0 -8px; border: 0; border-radius: 12px; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; position: relative; }
+  .tm-ag + .tm-ag { margin-top: 2px; }
+  .tm-ag.on { background: color-mix(in srgb, var(--c) 10%, transparent); }
+  .tm-ag .ic { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; color: var(--c); background: color-mix(in srgb, var(--c) 18%, transparent); position: relative; }
+  .tm-ag .ic .i { width: 17px; height: 17px; }
+  .tm-ag.on .ic::after { content: ""; position: absolute; inset: -3px; border-radius: 12px; border: 2px solid var(--c); animation: rl-ping 1.8s ease-out infinite; }
+  .tm-ag .nm b { display: block; font-size: 14.5px; font-weight: 700; }
+  .tm-ag .nm small { display: block; font-size: 11.5px; color: var(--muted); }
+  .tm-ag .tk { display: flex; align-items: center; gap: 7px; min-width: 0; font-size: 13.5px; font-weight: 650; }
+  .tm-ag .tk span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tm-ag .tk.none { color: var(--muted); font-weight: 500; }
+  .tm-ag .ch { padding: 4px 9px; border-radius: 8px; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; background: var(--raised); color: var(--text-2); white-space: nowrap; }
+  .tm-ag .ch.good { background: var(--up-soft); color: var(--up); } .tm-ag .ch.bad { background: var(--down-soft); color: var(--down); }
+  .av { position: relative; flex: none; width: 24px; height: 24px; border-radius: 50%; display: inline-grid; place-items: center; overflow: hidden; font-size: 10.5px; font-weight: 800; color: #fff; background: hsl(var(--h, 0) 55% 42%); }
+  .av img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+  .av.lg { width: 44px; height: 44px; font-size: 16px; }
+  .av.md { width: 34px; height: 34px; font-size: 13px; }
+  .tm-act { list-style: none; margin: 0; padding: 0; }
+  .tm-act li { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 8px; margin: 0 -8px; border-radius: 12px; cursor: pointer; }
+  .tm-act li:hover { background: var(--raised); }
+  .tm-act li.new { animation: rl-in 0.6s ease-out; }
+  .tm-act .t b { display: block; font-size: 14.5px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tm-act .t small { display: block; font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tm-act .v { text-align: right; font-variant-numeric: tabular-nums; }
+  .tm-act .v b { display: block; font-size: 14.5px; font-weight: 700; }
+  .tm-act .v small { display: block; font-size: 12px; color: var(--muted); }
+  .tm-act .v .up { color: var(--up); } .tm-act .v .down { color: var(--down); }
+  .tm-act .empty-row { display: block; cursor: default; color: var(--muted); font-size: 13.5px; padding: 6px 0 10px; }
+  .tm-act .empty-row:hover { background: none; }
+  @media (max-width: 560px) {
+    .tm-ag { grid-template-columns: 36px minmax(0, 1fr) auto; grid-template-areas: "i n c" "i t c"; row-gap: 1px; }
+    .tm-ag .ic { grid-area: i; } .tm-ag .nm { grid-area: n; } .tm-ag .tk { grid-area: t; font-size: 12.5px; } .tm-ag .ch { grid-area: c; }
+    .tm-ag .nm b, .tm-ag .nm small { display: inline; } .tm-ag .nm small { margin-left: 6px; }
+    .tm-ag .tk .av { width: 18px; height: 18px; font-size: 9px; }
+  }
+
+  /* Token-arket: kurs, graf, position og risiko */
+  .tk-sheet .sh-top { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .tk-sheet .sh-top h3 { margin: 0; font-size: 19px; }
+  .tk-sheet .sh-top small { display: block; color: var(--muted); font-size: 12.5px; }
+  .tk-sheet .sh-x { margin-left: auto; width: 34px; height: 34px; border-radius: 50%; border: 0; background: var(--raised); color: var(--text); cursor: pointer; display: grid; place-items: center; }
+  .tk-sheet .sh-x .i { width: 16px; height: 16px; }
+  .tk-big { font-size: clamp(2.4rem, 12vw, 3.2rem); font-weight: 800; letter-spacing: -0.04em; line-height: 1.05; font-variant-numeric: tabular-nums; }
+  .tk-since { font-size: 13.5px; font-weight: 650; margin: 2px 0 10px; }
+  .tk-since.up { color: var(--up); } .tk-since.down { color: var(--down); }
+  .tk-chart { height: 210px; margin: 6px -4px 10px; position: relative; }
+  .tk-chart svg { display: block; width: 100%; height: 100%; overflow: visible; }
+  .tk-chart .c-up { fill: var(--up); stroke: var(--up); } .tk-chart .c-down { fill: var(--down); stroke: var(--down); }
+  .tk-chart .tag rect { rx: 6; }
+  .tk-chart .tag text { font: 750 10.5px var(--font); }
+  .tk-chart .grid { stroke: var(--border); stroke-dasharray: 2 4; }
+  .tk-chart .note { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 13px; text-align: center; }
+  .tk-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 14px; margin: 4px 0 14px; }
+  .tk-stats small { display: block; color: var(--muted); font-size: 12px; }
+  .tk-stats b { font-size: 16px; font-weight: 750; font-variant-numeric: tabular-nums; }
+  .tk-box { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 12px; border-radius: 16px; background: var(--surface-2); border: 1px solid var(--border); margin-bottom: 10px; }
+  .tk-box .ic { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; color: var(--c, var(--accent)); background: color-mix(in srgb, var(--c, var(--accent)) 18%, transparent); }
+  .tk-box .ic .i { width: 16px; height: 16px; }
+  .tk-box b { display: block; font-size: 14.5px; } .tk-box small { display: block; color: var(--muted); font-size: 12.5px; }
+  .tk-box .v { text-align: right; font-variant-numeric: tabular-nums; } .tk-box .v b { font-size: 16px; }
+  .tk-box .v .up { color: var(--up); } .tk-box .v .down { color: var(--down); }
+  .tk-box.sold { background: var(--up-soft); border-color: transparent; }
+  .tk-box.lost { background: var(--down-soft); border-color: transparent; }
+  .tk-why { margin: 2px 0 12px; padding-left: 18px; color: var(--text-2); font-size: 13px; line-height: 1.5; }
+  .tk-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
+  .tk-actions .btn { flex: 1; min-width: 130px; justify-content: center; }
+
+  /* Indskud: beløb, faste knapper og tastatur */
+  .dp-amt { text-align: center; font-size: clamp(3rem, 16vw, 4rem); font-weight: 800; letter-spacing: -0.04em; margin: 6px 0 14px; font-variant-numeric: tabular-nums; }
+  .dp-amt.zero { color: var(--muted); }
+  .dp-pre { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-bottom: 12px; }
+  .dp-pre button { height: 38px; border-radius: 10px; border: 0; background: var(--raised); color: var(--text); font: 750 14px var(--font); cursor: pointer; font-variant-numeric: tabular-nums; }
+  .dp-keys { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2px; margin-bottom: 10px; }
+  .dp-keys button { height: 54px; border: 0; border-radius: 12px; background: none; color: var(--text); font: 600 26px var(--font); cursor: pointer; display: grid; place-items: center; }
+  .dp-keys button:active { background: var(--raised); }
+  .dp-keys .i { width: 22px; height: 22px; }
+  .dp-note { display: flex; gap: 8px; align-items: flex-start; color: var(--muted); font-size: 12.5px; line-height: 1.45; margin: 0 0 12px; }
+  .dp-note .i { width: 15px; height: 15px; flex: none; margin-top: 1px; }
+  .dp-go { width: 100%; height: 54px; border: 0; border-radius: 16px; background: var(--accent); color: var(--on-accent); font: 750 16px var(--font); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+  .dp-go:disabled { background: var(--raised); color: var(--muted); cursor: default; }
+  .dp-go .spin { width: 18px; height: 18px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: spin-ring 0.8s linear infinite; }
+
+  /* Opstart: logo, tre trin og en streg, der fylder op */
+  .boot { position: fixed; inset: 0; z-index: 120; display: grid; place-items: center; background: linear-gradient(180deg, #9a1119, #4a070b); color: #fff6f5; transition: opacity 0.45s ease; }
+  :root:not([data-bg="rod"]) .boot { background: var(--bg); color: var(--text); }
+  .boot.done { opacity: 0; pointer-events: none; }
+  .boot-in { display: grid; justify-items: center; gap: 6px; width: min(70vw, 260px); }
+  .boot-logo { width: 84px; height: 84px; border-radius: 24px; overflow: hidden; box-shadow: 0 18px 40px -12px rgba(0,0,0,0.6); margin-bottom: 10px; animation: boot-bob 2.2s ease-in-out infinite; }
+  .boot-logo img { width: 100%; height: 100%; display: block; }
+  @keyframes boot-bob { 50% { transform: translateY(-4px); } }
+  .boot h2 { margin: 0; font-size: 30px; font-weight: 800; letter-spacing: -0.03em; }
+  .boot small { font-size: 10.5px; font-weight: 700; letter-spacing: 0.18em; opacity: 0.7; }
+  .boot-step { margin-top: 44px; font-size: 14px; font-weight: 650; min-height: 20px; }
+  .boot-bar { width: 100%; height: 3px; border-radius: 3px; background: rgba(255,255,255,0.18); overflow: hidden; }
+  :root:not([data-bg="rod"]) .boot-bar { background: var(--raised); }
+  .boot-bar i { display: block; height: 100%; width: 100%; background: currentColor; transform-origin: left; transform: scaleX(0.08); transition: transform 0.6s ease; }
+  @media (prefers-reduced-motion: reduce) { .tm-tape-in, .tm-chart .ping, .tm-ag.on .ic::after, .boot-logo, .dp-go .spin { animation: none !important; } .boot { transition: none; } }
+</style>
 </head>
 <body>
+<div class="boot" id="boot" hidden aria-hidden="true">
+  <div class="boot-in">
+    <div class="boot-logo"><img src="/icons/icon-192.png" alt="" width="84" height="84"></div>
+    <h2>Memebot</h2>
+    <small>MEME-TERMINAL</small>
+    <div class="boot-step" id="boot-step">Forbinder til Solana</div>
+    <div class="boot-bar"><i id="boot-bar"></i></div>
+  </div>
+</div>
 <a class="skip" href="#main">Gå til indholdet</a>
 <nav class="appnav" aria-label="Skift side"><div class="appnav-in"><a href="/meme" aria-current="page">Memebot</a><a href="/desk">Handelsbordet</a></div></nav>
 
@@ -1023,7 +1202,28 @@
   <div class="segmented" id="seg" role="tablist" hidden></div>
   <div class="alerts" id="alerts"></div>
 
-  <section class="panel" id="panel-relae" role="tabpanel">
+  <section class="panel" id="panel-terminal" role="tabpanel" hidden>
+    <div class="tm">
+      <div class="tm-tape tm-wide" id="tm-tape" aria-hidden="true"></div>
+      <div class="tm-hero tm-wide">
+        <div class="tm-top"><span class="tm-lbl" id="tm-start">Egenkapital</span><span class="tm-mult" id="tm-mult">1,00×</span></div>
+        <div class="tm-big" id="tm-equity" role="img" aria-label="Egenkapital">—</div>
+        <div class="tm-row"><span class="tm-pill" id="tm-delta">—</span><button class="tm-dep" id="tm-deposit" type="button"></button></div>
+        <div class="tm-chart" id="tm-chart"></div>
+        <div class="tm-ranges" id="tm-ranges" role="group" aria-label="Tidsrum"></div>
+      </div>
+      <div class="tm-card">
+        <div class="tm-head"><h2>Agenter</h2><span class="on" id="tm-online"><i></i>4 online</span></div>
+        <div id="tm-agents"></div>
+      </div>
+      <div class="tm-card">
+        <div class="tm-head"><h2>Aktivitet</h2><button type="button" id="tm-all">Se alle</button></div>
+        <ul class="tm-act" id="tm-act"></ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" id="panel-relae" role="tabpanel" hidden>
     <div class="rl-grid">
       <div class="card rl-eq">
         <div class="row1"><span class="lbl" id="rl-start">Egenkapital</span><span class="rl-mult" id="rl-mult">1,00×</span></div>
@@ -1487,14 +1687,14 @@ function icon(name, cls) { return `<svg class="i${cls ? " " + cls : ""}" viewBox
 
 // Fem steder i bundmenuen. Har et sted to sider, vælges de med et segment øverst.
 const NAV = [
-  ["hjem", "Hjem", "home", ["relae", "oversigt"]],
+  ["hjem", "Hjem", "home", ["terminal", "relae", "oversigt"]],
   ["handler", "Handler", "trades", ["positioner", "journal"]],
   ["snipe", "Strategi", "target", ["almindelig", "sniper", "top", "radar"]],
   ["wallet", "Wallet", "wallet", ["wallets"]],
   ["mere", "Mere", "more", ["laering", "krav"]],
 ];
-const VIEWS = { relae: ["Relæ", "zap"], oversigt: ["Kontrolrum", "grid"], positioner: ["Åbne", "coins"], journal: ["Historik", "book"], almindelig: ["Almindelig", "activity"], sniper: ["Sniper", "target"], top: ["Top 10", "trophy"], radar: ["Radar", "radar"], wallets: ["Wallet", "wallet"], laering: ["Læring", "brain"], krav: ["Indstillinger", "shield"] };
-const VIEW_ORDER = ["relae", "oversigt", "positioner", "almindelig", "sniper", "journal", "laering", "wallets", "krav"];
+const VIEWS = { terminal: ["Terminal", "stocks"], relae: ["Relæ", "zap"], oversigt: ["Kontrolrum", "grid"], positioner: ["Åbne", "coins"], journal: ["Historik", "book"], almindelig: ["Almindelig", "activity"], sniper: ["Sniper", "target"], top: ["Top 10", "trophy"], radar: ["Radar", "radar"], wallets: ["Wallet", "wallet"], laering: ["Læring", "brain"], krav: ["Indstillinger", "shield"] };
+const VIEW_ORDER = ["terminal", "relae", "oversigt", "positioner", "almindelig", "sniper", "journal", "laering", "wallets", "krav"];
 const TITLES = { handler: "Handler", snipe: "Strategier", wallet: "Wallet", mere: "Mere" };
 const lastView = {};
 const STAGES = { "købt": "Købt", sniper: "Sniper-filter", marked: "Markedsfilter", rug: "Rug-tjek", score: "Score", rute: "Exit-rute", claude: "Claude", risiko: "Risiko", "køb": "Køb fejlede" };
@@ -1588,29 +1788,31 @@ function axiomLink(mint, pairUrl) {
 }
 
 /* ---------- Tema, farver og faner ---------- */
-const LOOK_MODES = [["dark", "Mørk", "#000000"], ["midnat", "Midnat", "#070b16"], ["light", "Lys", "#f2f2f7"], ["auto", "Telefon", "linear-gradient(135deg,#000 50%,#f2f2f7 50%)"]];
-const LOOK_COLORS = [["blaa", "Blå", "#0a84ff"], ["indigo", "Indigo", "#5e5ce6"], ["lilla", "Lilla", "#bf5af2"], ["pink", "Pink", "#ff375f"], ["orange", "Orange", "#ff9f0a"], ["guld", "Guld", "#ffd60a"], ["groen", "Grøn", "#30d158"], ["mint", "Mint", "#66d4cf"], ["solana", "Solana", "linear-gradient(135deg,#9945ff,#14f195)"]];
-let lookMode = "dark", lookColor = "blaa";
-function lookGet(key, fallback) { try { return localStorage.getItem(key) || fallback; } catch (e) { return fallback; } }
-function lookSet(key, value) { try { localStorage.setItem(key, value); } catch (e) {} }
+const LOOK_MODES = [["rod", "Rød", "linear-gradient(180deg,#9a1119,#3a0609)"], ["dark", "Mørk", "#000000"], ["midnat", "Midnat", "#070b16"], ["light", "Lys", "#f2f2f7"], ["auto", "Telefon", "linear-gradient(135deg,#000 50%,#f2f2f7 50%)"]];
+const LOOK_COLORS = [["hvid", "Hvid", "#fff3f2"], ["lime", "Lime", "#c6ff3d"], ["roed", "Rød", "#ff453a"], ["blaa", "Blå", "#0a84ff"], ["indigo", "Indigo", "#5e5ce6"], ["lilla", "Lilla", "#bf5af2"], ["pink", "Pink", "#ff375f"], ["orange", "Orange", "#ff9f0a"], ["guld", "Guld", "#ffd60a"], ["groen", "Grøn", "#30d158"], ["mint", "Mint", "#66d4cf"], ["solana", "Solana", "linear-gradient(135deg,#9945ff,#14f195)"]];
+let lookMode = "dark", lookColor = "lime";
+// Valget deles med Handelsbordet (look-*). Gamle valg fra før (meme-*) bruges, indtil man vælger igen.
+function lookGet(key, fallback) { try { return localStorage.getItem(key.replace("meme-", "look-")) || localStorage.getItem(key) || fallback; } catch (e) { return fallback; } }
+function lookSet(key, value) { try { localStorage.setItem(key.replace("meme-", "look-"), value); } catch (e) {} }
 function applyTheme(theme, save = true) {
-  // theme: dark, midnat, light eller auto (følg telefonen)
+  // theme: rod, dark, midnat, light eller auto (følg telefonen)
   lookMode = LOOK_MODES.some((m) => m[0] === theme) ? theme : "dark";
   const systemLight = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches;
   const light = lookMode === "light" || (lookMode === "auto" && systemLight);
   const root = document.documentElement;
   root.dataset.theme = light ? "light" : "dark";
-  if (lookMode === "midnat") root.dataset.bg = "midnat"; else delete root.dataset.bg;
+  if (lookMode === "midnat" || lookMode === "rod") root.dataset.bg = lookMode; else delete root.dataset.bg;
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute("content", light ? "#f2f2f7" : lookMode === "midnat" ? "#070b16" : "#000000");
+  if (meta) meta.setAttribute("content", light ? "#f2f2f7" : lookMode === "midnat" ? "#070b16" : lookMode === "rod" ? "#9a1119" : "#000000");
   if (save) lookSet("meme-theme", lookMode);
   renderLook();
   for (const k of Object.keys(cache)) delete cache[k];
   if (state) render(state);
 }
 function applyAccent(name, save = true) {
-  lookColor = LOOK_COLORS.some((c) => c[0] === name) ? name : "blaa";
-  document.documentElement.dataset.accent = lookColor;
+  lookColor = LOOK_COLORS.some((c) => c[0] === name) ? name : "lime";
+  if (lookColor === "lime") delete document.documentElement.dataset.accent;  // standardfarven fra designet
+  else document.documentElement.dataset.accent = lookColor;
   if (save) lookSet("meme-accent", lookColor);
   renderLook();
   for (const k of Object.keys(cache)) delete cache[k];
@@ -1651,6 +1853,7 @@ function setTab(name, push) {
   delete cache.nav;
   if (state) { delete cache.alerts; renderAlerts(state); }
   if (push && location.hash !== "#" + name) history.replaceState(null, "", "#" + name);
+  if (state) { renderTicker(state); if (name === "terminal") { delete cache["tm-chart-key"]; renderTerminal(state); } }
   if (changed) {
     window.scrollTo(0, 0);
     if (name === "oversigt" && state) { delete cache["equity-svg"]; renderHero(state); }
@@ -1819,7 +2022,7 @@ function renderHeader(data) {
 }
 function renderAlerts(data) {
   const scanErrors = ((data.engine.last_scan || {}).errors || []).slice(0, 2).map((t) => ({ level: "warning", text: "Datakilde: " + t }));
-  const home = active === "oversigt" || active === "relae";
+  const home = active === "oversigt" || active === "relae" || active === "terminal";
   const all = (data.alerts || []).concat(scanErrors).filter((a) => (a.level === "error" || !dismissed.has(a.text)) && (home || a.level !== "info"));
   const order = { error: 0, warning: 1, info: 2 };
   all.sort((a, b) => (order[a.level] ?? 3) - (order[b.level] ?? 3));
@@ -2575,6 +2778,399 @@ function renderRelay(data) {
     <span class="me" style="left:${me}%">${esc(fmtNum.format(Math.round(r.multiple * 100) / 100))}×</span>`);
 }
 
+/* ---------- Terminal (Hjem): egenkapital med handlerne på grafen, fire agenter og aktivitet ----------
+   Alt kommer fra /api/meme/status: egenkapitalkurven, åbne og lukkede handler, kandidaterne og relæet. */
+const TM_RANGES = [["live", "Live", 30 * 60e3, "24h"], ["1t", "1T", 3600e3, "24h"], ["4t", "4T", 4 * 3600e3, "24h"], ["1d", "1D", 86400e3, "24h"], ["1u", "1U", 7 * 86400e3, "7d"], ["alt", "Alt", 0, "all"]];
+const TM_AGENTS = [["scout", "Spejder", "finder puljer", "search"], ["analyst", "Analytiker", "indgangstjek", "shield"], ["buyer", "Køber", "markedsordre", "zap"], ["risk", "Risiko", "exitregler", "bars"]];
+let tmRange = (() => { try { const v = localStorage.getItem("meme-tm-range"); return TM_RANGES.some((r) => r[0] === v) ? v : "1d"; } catch (e) { return "1d"; } })();
+let tmAllOpen = false;
+let tmSeen = null;
+let tmToken = null;
+let tmSheetHtml = "";
+const fmt1 = new Intl.NumberFormat("da-DK", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+const fmt2d = new Intl.NumberFormat("da-DK", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+function tmHue(s) { let h = 0; for (const c of String(s || "")) h = (h * 31 + c.charCodeAt(0)) % 360; return h; }
+function tmAv(sym, img, cls) {
+  const letter = esc(String(sym || "?").replace(/^\$/, "").slice(0, 1).toUpperCase() || "?");
+  const pic = img && /^https:\/\//.test(img) ? `<img src="${esc(img)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : "";
+  return `<span class="av${cls ? " " + cls : ""}" style="--h:${tmHue(sym)}">${letter}${pic}</span>`;
+}
+function tmCompact(v) {
+  if (!isNum(v)) return "—";
+  const n = Number(v), a = Math.abs(n);
+  if (a >= 1e9) return `${fmt2d.format(n / 1e9)}B $`;
+  if (a >= 1e6) return `${fmt2d.format(n / 1e6)}M $`;
+  if (a >= 1e3) return `${fmt1.format(n / 1e3)}K $`;
+  return money(n);
+}
+function tmTime(v) {
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return "";
+  const today = new Date().toDateString() === d.toDateString();
+  return today ? `${pad2(d.getHours())}:${pad2(d.getMinutes())}` : stamp(v);
+}
+const tmStrategy = (p) => ({ sniper: "sniper", toptrader: "Top 10" }[p.strategy] || "almindelig");
+const tmAll = (data) => [...(data.positions || []), ...(data.trades || [])];
+
+function renderTerminal(data) {
+  if (!data || !data.kpis) return;
+  const k = data.kpis, r = data.relay || { agents: [], start: k.bankroll, multiple: 1 };
+  const all = tmAll(data);
+  const imgOf = (mint) => (all.find((p) => p.mint === mint && p.image) || {}).image || "";
+
+  // Båndet øverst: åbne positioner og de seneste lukkede handler
+  const seen = new Set(), tape = [];
+  for (const p of data.positions || []) { seen.add(p.symbol); tape.push([p.symbol, p.image, p.change_pct]); }
+  for (const t of (data.trades || []).slice(0, 24)) if (!seen.has(t.symbol)) { seen.add(t.symbol); tape.push([t.symbol, t.image, t.pnl_pct]); }
+  const tapeEl = document.getElementById("tm-tape");
+  tapeEl.hidden = !tape.length;
+  const one = tape.map(([s, img, ch]) => `<span>${tmAv(s, img)}<b>${esc(s)}</b><span class="${tone(ch)}">${esc(spct(ch))}</span></span>`).join("");
+  put("tm-tape", `<div class="tm-tape-in" style="animation-duration:${Math.max(18, tape.length * 5)}s">${one}${one}</div>`);
+
+  // Egenkapital
+  const eq = Number(k.equity) || 0;
+  const whole = Math.trunc(eq), cents = Math.round(Math.abs(eq - whole) * 100).toString().padStart(2, "0");
+  put("tm-equity", `${eq < 0 ? "-" : ""}${esc(fmtInt.format(Math.abs(whole)))}<small>,${cents} $</small>`);
+  document.getElementById("tm-equity").setAttribute("aria-label", `Egenkapital ${money(eq)}`);
+  document.getElementById("tm-start").textContent = `Egenkapital · startede med ${money(r.start || k.bankroll)}`;
+  document.getElementById("tm-mult").textContent = `${fmt2d.format(Math.round((r.multiple || 1) * 100) / 100)}×`;
+  const delta = document.getElementById("tm-delta");
+  delta.textContent = `${signed(k.total_pnl)} (${spct(k.return_pct)})`;
+  delta.className = "tm-pill" + ((k.total_pnl || 0) < 0 ? " down" : "");
+  put("tm-deposit", icon("plus") + (data.mode === "live" ? "Indskud" : "Startbeløb"));
+  put("tm-ranges", TM_RANGES.map(([id, label]) => `<button type="button" data-tm-range="${id}" aria-pressed="${id === tmRange}">${id === "live" ? '<i class="dot"></i>' : ""}${esc(label)}</button>`).join(""));
+  tmChart(data);
+
+  // Agenterne: hvem arbejder med hvilket token lige nu
+  const ra = Object.fromEntries((r.agents || []).map((a) => [a.id, a]));
+  const cand = (data.candidates || [])[0];
+  const newest = all.slice().sort((a, b) => String(b.opened_at).localeCompare(String(a.opened_at)))[0];
+  const open = data.positions || [];
+  const mover = open.length ? open.reduce((m, p) => (Math.abs(Number(p.change_pct) || 0) > Math.abs(Number(m.change_pct) || 0) ? p : m), open[0]) : null;
+  const rows = {
+    scout: { sym: cand && cand.symbol, img: cand && imgOf(cand.mint), chip: `${fmtInt.format((ra.scout || {}).count || 0)} puljer`, go: "radar", empty: "kigger efter tokens" },
+    analyst: { sym: cand && cand.symbol, img: cand && imgOf(cand.mint), chip: cand ? (isNum(cand.score) ? `${Math.round(cand.score * 100)} score` : (STAGES[cand.stage] || cand.stage)) : "—",
+      cls: cand ? (cand.passed ? " good" : " bad") : "", go: "radar", empty: "venter på Spejder" },
+    buyer: { sym: newest && newest.symbol, img: newest && newest.image, chip: newest ? money(newest.cost_usd) : "—", pos: newest && newest.id, empty: "ingen køb endnu" },
+    risk: { sym: mover && mover.symbol, img: mover && mover.image, pos: mover && mover.id, empty: "ingen åbne positioner",
+      chip: mover ? (isNum(mover.trail_pct) ? `trail ${spct(mover.trail_pct)}` : isNum(mover.stop_pct) ? `${spct(mover.stop_pct)} stop` : "ingen stop") : "—",
+      cls: mover ? (" " + (Number(mover.change_pct) >= 0 ? "good" : "bad")) : "", extra: mover ? spct(mover.change_pct) : "" },
+  };
+  const stopped = data.kill_switch || data.paused;
+  const online = document.getElementById("tm-online");
+  online.className = "on" + (stopped ? " off" : "");
+  online.lastChild.textContent = stopped ? (data.kill_switch ? "nødstop" : "pauset") : "4 online";
+  put("tm-agents", TM_AGENTS.map(([id, name, role, ic]) => {
+    const x = rows[id], a = ra[id] || {};
+    const target = x.pos != null && x.sym ? ` data-tm-pos="${esc(x.pos)}"` : x.go ? ` data-tm-go="${x.go}"` : "";
+    const tok = x.sym ? `<span class="tk">${tmAv(x.sym, x.img)}<span>${esc(x.sym)}${x.extra ? ` <small class="${x.cls.trim() === "good" ? "up" : "down"}">${esc(x.extra)}</small>` : ""}</span></span>` : `<span class="tk none"><span>${esc(x.empty)}</span></span>`;
+    return `<button type="button" class="tm-ag${a.active ? " on" : ""}" style="--c:var(--c-${id})"${target}>
+      <span class="ic">${icon(ic)}</span><span class="nm"><b>${esc(name)}</b><small>${esc(role)}</small></span>${tok}<span class="ch${x.cls || ""}">${esc(x.chip)}</span></button>`;
+  }).join(""));
+
+  // Aktivitet: køb og salg, nyeste først
+  const ev = [];
+  for (const p of all) {
+    ev.push({ ts: p.opened_at, buy: true, p });
+    if (p.status === "closed" && p.closed_at) ev.push({ ts: p.closed_at, buy: false, p });
+  }
+  ev.sort((a, b) => (new Date(b.ts).getTime() || 0) - (new Date(a.ts).getTime() || 0));
+  const first = tmSeen === null, known = tmSeen || new Set();
+  tmSeen = new Set(ev.map((e) => `${e.p.id}${e.buy ? "b" : "s"}`));
+  const shown = ev.slice(0, tmAllOpen ? 40 : 6);
+  const btn = document.getElementById("tm-all");
+  btn.hidden = ev.length <= 6;
+  btn.textContent = tmAllOpen ? "Vis færre" : "Se alle";
+  put("tm-act", shown.length ? shown.map((e) => {
+    const p = e.p, key = `${p.id}${e.buy ? "b" : "s"}`;
+    const fresh = !first && !known.has(key) ? ' class="new"' : "";
+    if (e.buy) {
+      return `<li${fresh} data-tm-pos="${esc(p.id)}">${tmAv(p.symbol, p.image, "md")}<span class="t"><b>Købt ${esc(p.symbol)}</b><small>Køber · ${esc(tmTime(e.ts))} · ${esc(tmStrategy(p))}${p.trial ? " · prøvekøb" : ""}</small></span>
+        <span class="v"><b>${esc(money(p.cost_usd))}</b><small>${data.mode === "live" ? "live" : "på papir"}</small></span></li>`;
+    }
+    const pnl = Number(p.pnl_usd) || 0;
+    const verb = pnl < 0 && /stop/i.test(p.exit_reason || "") ? "Stoppet" : "Solgt";
+    return `<li${fresh} data-tm-pos="${esc(p.id)}">${tmAv(p.symbol, p.image, "md")}<span class="t"><b>${verb} ${esc(p.symbol)}</b><small>Risiko · ${esc(p.exit_reason || "solgt")} · ${esc(tmTime(e.ts))}</small></span>
+      <span class="v"><b class="${tone(pnl)}">${esc(signed(pnl))}</b><small class="${tone(p.pnl_pct)}">${esc(spct(p.pnl_pct))}</small></span></li>`;
+  }).join("") : `<li class="empty-row">Ingen handler endnu. Agenterne leder efter det første køb.</li>`);
+
+  if (tmToken != null) tmRenderSheet(false);
+}
+
+function tmChart(data) {
+  const box = document.getElementById("tm-chart");
+  const k = data.kpis;
+  const rg = TM_RANGES.find((x) => x[0] === tmRange) || TM_RANGES[3];
+  const src = ((data.equity || {})[rg[3]] || []).map((p) => ({ t: new Date(p.ts).getTime(), v: Number(p.equity) })).filter((p) => Number.isFinite(p.t) && Number.isFinite(p.v));
+  const now = Date.now();
+  const t0 = rg[2] ? now - rg[2] : (src.length ? Math.min(src[0].t, now - 60e3) : now - 3600e3);
+  let pts = src.filter((p) => p.t >= t0);
+  if (!pts.length || pts[pts.length - 1].t < now - 1000) pts.push({ t: now, v: Number(k.equity) || 0 });
+  const before = src.filter((p) => p.t < t0).pop();
+  if (pts[0].t > t0) pts.unshift({ t: t0, v: before ? before.v : pts[0].v });
+  const w = Math.max(280, box.clientWidth || 360), h = 190, pl = 4, pr = 8, pt = 44, pb = 8;
+  const key = [tmRange, w, pts.length, pts[pts.length - 1].v.toFixed(4), (data.trades || []).length, (data.positions || []).length, Math.floor(now / 60e3)].join("|");
+  if (cache["tm-chart-key"] === key) return;
+  cache["tm-chart-key"] = key;
+  const vals = pts.map((p) => p.v);
+  let min = Math.min(...vals), max = Math.max(...vals);
+  if (max - min < Math.max(0.02, Math.abs(max) * 0.002)) { const mid = (max + min) / 2, d = Math.max(0.5, Math.abs(mid) * 0.01); min = mid - d; max = mid + d; }
+  const iw = w - pl - pr, ih = h - pt - pb, span = Math.max(1, now - t0);
+  const x = (t) => pl + ((t - t0) / span) * iw;
+  const y = (v) => pt + ((max - v) / (max - min)) * ih;
+  const line = pts.map((p, i) => `${i ? "L" : "M"}${x(p.t).toFixed(1)},${y(p.v).toFixed(1)}`).join(" ");
+  const area = `${line} L${x(now).toFixed(1)},${h} L${x(pts[0].t).toFixed(1)},${h} Z`;
+  const at = (t) => { let best = pts[0]; for (const p of pts) if (p.t <= t) best = p; return best.v; };
+  // Handlerne på grafen: de seneste fire køb og salg i tidsrummet
+  const marks = [];
+  for (const p of tmAll(data)) {
+    const o = new Date(p.opened_at).getTime(), c = p.closed_at ? new Date(p.closed_at).getTime() : NaN;
+    if (o >= t0) marks.push({ t: o, text: `Købt ${p.symbol}`, cls: "", fill: "var(--text-2)" });
+    if (c >= t0) { const pnl = Number(p.pnl_usd) || 0; marks.push({ t: c, text: signed(pnl), cls: pnl >= 0 ? "up" : "down", fill: pnl >= 0 ? "var(--up)" : "var(--down)" }); }
+  }
+  marks.sort((a, b) => a.t - b.t);
+  const lastMarks = marks.slice(-4);
+  // Mærkerne må ikke ligge oven i hinanden: et mærke, der rammer et andet, flyttes en linje op.
+  const placed = [];
+  const mk = lastMarks.map((m) => {
+    const mx = x(m.t), my = y(at(m.t));
+    const tw = m.text.length * 5.9 + 8;
+    const lx = Math.max(tw / 2 + 2, Math.min(w - tw / 2 - 2, mx));
+    let ly = Math.max(11, Math.min(my - 12, pt - 4));
+    while (placed.some((b) => Math.abs(b.x - lx) < (b.w + tw) / 2 + 4 && Math.abs(b.y - ly) < 13)) ly -= 13;
+    const label = ly >= 9;
+    if (label) placed.push({ x: lx, y: ly, w: tw });
+    return `<g class="tmk">${label ? `<line x1="${mx.toFixed(1)}" x2="${mx.toFixed(1)}" y1="${(ly + 3).toFixed(1)}" y2="${(my - 4).toFixed(1)}"/>` : ""}<circle cx="${mx.toFixed(1)}" cy="${my.toFixed(1)}" r="4" style="fill:${m.fill}"/>${label ? `<text class="${m.cls}" x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="middle">${esc(m.text)}</text>` : ""}</g>`;
+  }).join("");
+  const ex = x(now).toFixed(1), ey = y(pts[pts.length - 1].v).toFixed(1);
+  const bank = Number(k.bankroll);
+  const base = bank >= min && bank <= max ? `<line class="base" x1="${pl}" x2="${w - pr}" y1="${y(bank).toFixed(1)}" y2="${y(bank).toFixed(1)}"/>` : "";
+  const flat = Math.max(...vals) - Math.min(...vals) < 0.005;
+  box.innerHTML = `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="Egenkapital over tid">
+    <defs><linearGradient id="tm-g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--text);stop-opacity:0.2"/><stop offset="1" style="stop-color:var(--text);stop-opacity:0"/></linearGradient></defs>
+    ${base}<path class="ar" d="${area}" fill="url(#tm-g)"/><path class="ln" d="${line}"/>${mk}
+    <circle class="ping" cx="${ex}" cy="${ey}" r="5"/><circle class="end" cx="${ex}" cy="${ey}" r="3.5"/></svg>${flat && !(data.trades || []).length && !(data.positions || []).length ? '<div class="note">Kurven bevæger sig, når botten køber sit første token.</div>' : ""}`;
+}
+
+/* Token-arket: kurs i lys, position og hvad Risiko gør */
+function tmCandles(p, w) {
+  const vals = (p.path || []).map(Number).filter((v) => Number.isFinite(v) && v > 0);
+  if (vals.length < 3) return `<div class="note">Grafen kommer, når botten har fulgt kursen et par minutter.</div>`;
+  const open = p.status === "open";
+  const endText = open ? spct(Number(p.change_pct)) : `Solgt ${signed(p.pnl_usd)}`;
+  const h = 210, pt = 24, pb = 16, pl = 4, pr = Math.max(52, endText.length * 6.3 + 20);
+  const n = Math.min(28, Math.max(4, Math.floor(vals.length / 2)));
+  const size = (vals.length - 1) / n;
+  const cs = [];
+  for (let i = 0; i < n; i++) {
+    const a = Math.floor(i * size), b = Math.max(a + 1, Math.floor((i + 1) * size));
+    const seg = vals.slice(a, b + 1);
+    cs.push({ o: seg[0], c: seg[seg.length - 1], hi: Math.max(...seg), lo: Math.min(...seg) });
+  }
+  const stop = open && isNum(p.stop_pct) ? 1 + Number(p.stop_pct) : null;
+  let min = Math.min(...vals), max = Math.max(...vals);
+  const pad = Math.max((max - min) * 0.08, 0.01); min -= pad; max += pad;
+  const iw = w - pl - pr, ih = h - pt - pb, cw = iw / n;
+  const y = (v) => pt + ((max - v) / (max - min)) * ih;
+  const bars = cs.map((c, i) => {
+    const cx = pl + cw * (i + 0.5), bw = Math.max(3, cw * 0.62), up = c.c >= c.o;
+    const top = y(Math.max(c.o, c.c)), bh = Math.max(1.5, Math.abs(y(c.o) - y(c.c)));
+    return `<g class="${up ? "c-up" : "c-down"}"><line x1="${cx.toFixed(1)}" x2="${cx.toFixed(1)}" y1="${y(c.hi).toFixed(1)}" y2="${y(c.lo).toFixed(1)}" stroke-width="1.2"/><rect x="${(cx - bw / 2).toFixed(1)}" y="${top.toFixed(1)}" width="${bw.toFixed(1)}" height="${bh.toFixed(1)}" rx="1"/></g>`;
+  }).join("");
+  const tag = (tx, ty, text, bg, fg, anchor) => {
+    const tw = text.length * 6.3 + 12, rx = anchor === "end" ? tx - tw : anchor === "middle" ? tx - tw / 2 : tx;
+    return `<g class="tag"><rect x="${rx.toFixed(1)}" y="${(ty - 9).toFixed(1)}" width="${tw.toFixed(1)}" height="18" style="fill:${bg}"/><text x="${(rx + tw / 2).toFixed(1)}" y="${(ty + 3.5).toFixed(1)}" text-anchor="middle" style="fill:${fg}">${esc(text)}</text></g>`;
+  };
+  const entryY = y(vals[0]);
+  const grid = `<line class="grid" x1="${pl}" x2="${w - pr}" y1="${entryY.toFixed(1)}" y2="${entryY.toFixed(1)}"/>`;
+  const stopLine = stop && stop > min && stop < max ? `<line x1="${pl}" x2="${w - pr}" y1="${y(stop).toFixed(1)}" y2="${y(stop).toFixed(1)}" style="stroke:var(--down)" stroke-dasharray="4 4" opacity="0.7"/>${tag(w - pr + 4, y(stop), "Stop", "var(--down-soft)", "var(--down)", "start")}` : "";
+  const bought = tag(pl + cw * 0.5, Math.min(h - 10, entryY + 18), "Købt", "var(--raised-2)", "var(--text)", "start");
+  const last = cs[cs.length - 1], ly = y(last.c);
+  const change = vals[vals.length - 1] / vals[0] - 1;
+  const good = open ? Number(p.change_pct) >= 0 : Number(p.pnl_usd) >= 0;
+  const end = tag(w - pr + 4, ly, endText, good ? "var(--up)" : "var(--down)", "#1a0203", "start");
+  return `<svg viewBox="0 0 ${w} ${h}" role="img" aria-label="Kursen siden købet: ${esc(spct(change))}">${grid}${stopLine}${bars}${bought}${end}</svg>`;
+}
+function tmTokenHtml(p) {
+  const open = p.status === "open";
+  const path = (p.path || []).map(Number).filter((v) => v > 0);
+  const ratio = open ? 1 + (Number(p.change_pct) || 0) : (path.length ? path[path.length - 1] : 1 + (Number(p.pnl_pct) || 0));
+  const mcap = isNum(p.mcap_entry) ? Number(p.mcap_entry) * ratio : null;
+  const w = Math.min(window.innerWidth || 400, 680) - 44;
+  const mode = state && state.mode === "live" ? "live" : "papir";
+  const pnl = open ? Number(p.unrealized_usd) || 0 : Number(p.pnl_usd) || 0;
+  const value = (Number(p.cost_usd) || 0) + pnl;
+  const riskBits = [isNum(p.stop_pct) ? `stop ${pct(Math.abs(p.stop_pct))} under indgang` : "", isNum(p.tp_pct) ? `mål ${spct(p.tp_pct)}` : "", isNum(p.trail_pct) ? `trailing fra ${spct(p.trail_pct)}` : ""].filter(Boolean);
+  const why = !open && (p.why || []).length ? `<ul class="tk-why">${p.why.slice(0, 3).map((t) => `<li>${esc(t)}</li>`).join("")}</ul>` : "";
+  const note = open && (p.ai_summary || p.reasoning) ? `<p class="muted small-txt" style="margin:0 0 12px">${esc(String(p.ai_summary || p.reasoning).slice(0, 240))}</p>` : "";
+  return `<div class="sh-top">${tmAv(p.symbol, p.image, "lg")}<div><h3 id="tk-title">${esc(p.name || p.symbol)}</h3><small>${esc(p.symbol)} · ${esc(tmStrategy(p))}${p.trial ? " · prøvekøb" : ""} · ${esc(p.source || "")}</small></div><button class="sh-x" type="button" data-tkx aria-label="Luk">${icon("x")}</button></div>
+    <div class="tk-big">${esc(mcap != null ? tmCompact(mcap) : spct(ratio - 1))}</div>
+    <div class="tk-since ${ratio >= 1 ? "up" : "down"}">${ratio >= 1 ? "▲" : "▼"} ${esc(pct(Math.abs(ratio - 1)))} ${open ? "siden Memebot købte" : "fra køb til salg"}${mcap != null ? " · markedsværdi" : ""}</div>
+    <div class="tk-chart">${tmCandles(p, w)}</div>
+    <div class="tk-stats">
+      <div><small>Markedsværdi ved køb</small><b>${esc(tmCompact(p.mcap_entry))}</b></div>
+      <div><small>Volumen 1 t ved køb</small><b>${esc(tmCompact(p.volume_h1))}</b></div>
+      <div><small>Likviditet</small><b>${esc(tmCompact(p.liquidity_usd))}</b></div>
+      <div><small>${open ? "Holdt i" : "Holdt"}</small><b>${esc(minutes(open ? p.minutes : p.hold_minutes))}</b></div>
+    </div>
+    <div class="tk-box" style="--c:var(--accent)"><span class="ic">${icon("coins")}</span><span><b>Position</b><small>${esc(money(p.cost_usd))} inde · ${mode}</small></span><span class="v"><b>${esc(money(value))}</b><small class="${tone(pnl)}">${esc(signed(pnl))}</small></span></div>
+    ${open
+      ? `<div class="tk-box" style="--c:#ffb547"><span class="ic">${icon("shield")}</span><span><b>Risiko holder øje</b><small>${esc(riskBits.join(" · ") || "følger kursen")}</small></span><span class="v"><small>${p.watching ? "dev og topholdere overvåges" : ""}</small></span></div>`
+      : `<div class="tk-box ${pnl >= 0 ? "sold" : "lost"}" style="--c:${pnl >= 0 ? "var(--up)" : "var(--down)"}"><span class="ic">${icon(pnl >= 0 ? "check" : "shield")}</span><span><b>Risiko solgte ${esc(p.symbol)}</b><small>${esc(p.exit_reason || "solgt")} · ${esc(tmTime(p.closed_at))}</small></span><span class="v"><b class="${tone(p.pnl_pct)}">${esc(spct(p.pnl_pct))}</b></span></div>`}
+    ${why}${note}
+    <div class="tk-actions">${p.pair_url ? `<a class="btn" href="${esc(p.pair_url)}" target="_blank" rel="noopener noreferrer">${icon("ext", "sm")}DexScreener</a>` : ""}${open ? `<button class="btn danger" type="button" data-sell="${esc(p.id)}" data-symbol="${esc(p.symbol)}">${icon("minus", "sm")}Sælg nu</button>` : ""}</div>`;
+}
+function tmSheetOpen(cls, label, inner, onClose) {
+  const root = document.getElementById("sheet-root");
+  sheetSeq++;
+  root.innerHTML = `<div class="sheet-bg" data-tkx></div><div class="sheet ${cls}" role="dialog" aria-modal="true" aria-labelledby="${label}"><div class="grab"></div>${inner}</div>`;
+  root.hidden = false;
+  requestAnimationFrame(() => requestAnimationFrame(() => root.classList.add("open")));
+  const seq = sheetSeq;
+  const close = () => {
+    root.classList.remove("open");
+    document.removeEventListener("keydown", onKey, true);
+    if (onClose) onClose();
+    setTimeout(() => { if (seq === sheetSeq) { root.hidden = true; root.innerHTML = ""; } }, 300);
+  };
+  const onKey = (e) => { if (e.key === "Escape") { e.preventDefault(); close(); } };
+  document.addEventListener("keydown", onKey, true);
+  root.addEventListener("click", function handler(ev) {
+    if (seq !== sheetSeq) { root.removeEventListener("click", handler); return; }
+    if (ev.target.closest("[data-tkx]")) { root.removeEventListener("click", handler); close(); }
+  });
+  return { root, close, onKey };
+}
+let tmSheet = null;
+function tmRenderSheet(first) {
+  if (tmToken == null || !state) return;
+  const p = tmAll(state).find((x) => x.id === tmToken);
+  if (!p) return;
+  const html = tmTokenHtml(p);
+  if (first) {
+    tmSheetHtml = html;
+    tmSheet = tmSheetOpen("tk-sheet", "tk-title", `<div id="tk-body">${html}</div>`, () => { tmToken = null; tmSheet = null; });
+    return;
+  }
+  const body = document.getElementById("tk-body");
+  if (!body) { tmToken = null; return; }  // arket er lukket eller erstattet af et andet
+  if (html !== tmSheetHtml) { tmSheetHtml = html; body.innerHTML = html; }
+}
+
+/* Startbeløb (papir) eller indskud (rigtige penge): beløb, faste knapper og et tastatur */
+let dpAmt = "", dpConfirm = false, dpBusy = false;
+function dpValue() { const v = parseFloat(dpAmt.replace(",", ".")); return Number.isFinite(v) ? v : 0; }
+function dpRender() {
+  const amt = document.getElementById("dp-amt");
+  if (!amt) return;
+  const [i, d] = dpAmt.split(",");
+  amt.textContent = dpAmt ? `${fmtInt.format(Number(i || 0))}${d !== undefined ? "," + d : ""} $` : "0 $";
+  amt.classList.toggle("zero", !dpAmt);
+  const go = document.getElementById("dp-go"), v = dpValue();
+  if (dpBusy) return;
+  go.disabled = v < 5;
+  go.textContent = v < 5 ? "Skriv et beløb (mindst 5 $)" : dpConfirm ? `Bekræft: start forfra med ${money(v)}` : `Start med ${money(v)}`;
+}
+function openDeposit() {
+  const live = state && state.mode === "live";
+  dpAmt = ""; dpConfirm = false; dpBusy = false;
+  if (live) {
+    tmSheetOpen("dp-sheet", "dp-title", `<h3 id="dp-title">Indskud</h3><p>Med rigtige penge bestemmer din wallet beløbet. Send SOL til bottens adresse fra Phantom. Adressen og saldoen står under Wallet.</p>
+      <button class="dp-go" type="button" data-tkx data-dp-wallet>${icon("wallet")}Gå til Wallet</button>`);
+    return;
+  }
+  const keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", ",", "0", "del"];
+  tmSheetOpen("dp-sheet", "dp-title", `<h3 id="dp-title">Startbeløb på papir</h3>
+    <div class="dp-amt num zero" id="dp-amt">0 $</div>
+    <div class="dp-pre">${[20, 100, 250, 500].map((v) => `<button type="button" data-dp-pre="${v}">${v} $</button>`).join("")}</div>
+    <div class="dp-keys">${keys.map((key) => `<button type="button" data-dp-key="${key}" aria-label="${key === "del" ? "Slet" : key}">${key === "del" ? icon("x") : key}</button>`).join("")}</div>
+    <p class="dp-note">${icon("info")}<span>Papirpenge: kontoen startes forfra med beløbet. De gamle handler gemmes i et arkiv, og læringen beholdes. Rigtige penge kræver stadig alle live-kravene.</span></p>
+    <button class="dp-go" type="button" id="dp-go" disabled>Skriv et beløb (mindst 5 $)</button>`, () => { dpBusy = false; });
+  dpRender();
+}
+function dpKey(key) {
+  if (dpBusy) return;
+  dpConfirm = false;
+  if (key === "del") dpAmt = dpAmt.slice(0, -1);
+  else if (key === ",") { if (!dpAmt.includes(",")) dpAmt = (dpAmt || "0") + ","; }
+  else {
+    const next = dpAmt === "0" ? key : dpAmt + key;
+    const [i, d] = next.split(",");
+    if ((d || "").length <= 2 && Number(i) <= 100000) dpAmt = next;
+  }
+  dpRender();
+}
+async function dpGo() {
+  const v = dpValue();
+  if (dpBusy || v < 5) return;
+  if (!dpConfirm) { dpConfirm = true; dpRender(); return; }
+  const go = document.getElementById("dp-go");
+  dpBusy = true;
+  go.disabled = true;
+  go.innerHTML = '<span class="spin"></span>Starter…';
+  try {
+    const b = await post("/api/meme/paper/restart", { amount: Math.round(v * 100) / 100 });
+    go.innerHTML = icon("check") + "Færdig";
+    if (b.status) render(b.status);
+    toast("up", "Papirkontoen er startet forfra", b.message || "");
+    setTimeout(() => { const x = document.querySelector(".dp-sheet [data-tkx]") || document.querySelector("#sheet-root .sheet-bg"); if (x) x.click(); }, 900);
+  } catch (err) {
+    dpBusy = false; dpConfirm = false;
+    toast("down", "Det gik ikke", err.message);
+    dpRender();
+  }
+}
+document.getElementById("sheet-root").addEventListener("click", (ev) => {
+  const pre = ev.target.closest("[data-dp-pre]"), key = ev.target.closest("[data-dp-key]");
+  if (pre) { if (!dpBusy) { dpAmt = pre.dataset.dpPre; dpConfirm = false; dpRender(); } }
+  else if (key) dpKey(key.dataset.dpKey);
+  else if (ev.target.closest("#dp-go")) dpGo();
+  else if (ev.target.closest("[data-dp-wallet]")) setTab("wallets", true);
+});
+document.addEventListener("keydown", (ev) => {
+  if (!document.getElementById("dp-amt") || ev.metaKey || ev.ctrlKey) return;
+  if (/^[0-9]$/.test(ev.key)) dpKey(ev.key);
+  else if (ev.key === "," || ev.key === ".") dpKey(",");
+  else if (ev.key === "Backspace") dpKey("del");
+  else if (ev.key === "Enter") dpGo();
+  else return;
+  ev.preventDefault();
+});
+document.getElementById("tm-deposit").addEventListener("click", openDeposit);
+document.getElementById("tm-all").addEventListener("click", () => { tmAllOpen = !tmAllOpen; if (state) renderTerminal(state); });
+document.getElementById("panel-terminal").addEventListener("click", (ev) => {
+  const rg = ev.target.closest("[data-tm-range]"), pos = ev.target.closest("[data-tm-pos]"), go = ev.target.closest("[data-tm-go]");
+  if (rg) { tmRange = rg.dataset.tmRange; try { localStorage.setItem("meme-tm-range", tmRange); } catch (e) {} if (state) renderTerminal(state); }
+  else if (pos) { tmToken = Number(pos.dataset.tmPos); tmRenderSheet(true); }
+  else if (go) setTab(go.dataset.tmGo, true);
+});
+window.addEventListener("resize", () => { if (state && active === "terminal") tmChart(state); });
+
+/* Opstart: logo og tre trin første gang i en session. Følger de rigtige trin: forbind, hent, vis. */
+const boot = (() => {
+  const el = document.getElementById("boot");
+  let show = false;
+  try { show = !sessionStorage.getItem("meme-boot") && ["", "terminal"].includes(location.hash.slice(1)) && !(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches); } catch (e) {}
+  if (!show) { el.remove(); return { step() {}, done() {} }; }
+  el.hidden = false;
+  const bar = document.getElementById("boot-bar"), txt = document.getElementById("boot-step");
+  let over = false;
+  const finish = () => {
+    if (over) return;
+    over = true;
+    try { sessionStorage.setItem("meme-boot", "1"); } catch (e) {}
+    el.classList.add("done");
+    setTimeout(() => el.remove(), 500);
+  };
+  const fail = setTimeout(finish, 5000);
+  requestAnimationFrame(() => requestAnimationFrame(() => { bar.style.transform = "scaleX(0.35)"; }));
+  return {
+    step(text, f) { if (over) return; txt.textContent = text; bar.style.transform = `scaleX(${f})`; },
+    done() { if (over) return; this.step("Agenterne er online", 1); clearTimeout(fail); setTimeout(finish, 650); },
+  };
+})();
+
 /* ---------- Antal handler og prøvekøb ---------- */
 let tlKey = "";
 function renderTradeLimits(data) {
@@ -2786,6 +3382,7 @@ function render(data) {
   renderAnalysis(data);
   renderChanges(data);
   renderRelay(data);
+  renderTerminal(data);
   renderMomentum(data);
   renderTradeLimits(data);
   renderOptimizer(data);
@@ -2807,7 +3404,9 @@ async function refresh() {
     countdownBase = Date.now();
     if (data.engine.clock) serverSkew = data.engine.clock.now - Date.now() / 1000;
     detectChanges(data);
+    if (!state) boot.step("Henter handelsfeed", 0.75);
     render(data);
+    boot.done();
   } catch (err) {
     pollFailed = true;
     if (state) renderHeader(state);
@@ -3021,11 +3620,13 @@ document.getElementById("menu-app").innerHTML = icon("phone") + "Læg på hjemme
 document.getElementById("menu-settings").innerHTML = icon("plug") + "Forbindelser og indstillinger";
 if (csrfToken()) document.getElementById("logout").hidden = false;
 const queryTheme = new URLSearchParams(location.search).get("theme");
-applyAccent(lookGet("meme-accent", "blaa"), false);
-applyTheme(queryTheme || lookGet("meme-theme", "dark"), false);
+// Uden et gemt valg ser Memebot ud som terminalen: rød baggrund og hvid farve.
+const savedLook = lookGet("meme-theme", "");
+applyAccent(lookGet("meme-accent", savedLook ? "lime" : "hvid"), false);
+applyTheme(queryTheme || savedLook || "rod", false);
 renderBell();
 renderTabs({ positions: [], kpis: { trades: 0 }, copy_wallets: [], sniper: null });
-setTab(location.hash.slice(1) || "relae", false);
+setTab(location.hash.slice(1) || "terminal", false);
 bindEquityHover();
 bindDailyHover();
 (() => {
@@ -3779,7 +4380,7 @@ function renderTicker(data) {
     ...(data.events || []).filter((ev) => ev.level === "trade").slice(0, 3).map((ev) => `<span class="tick"><span class="sep">//</span> ${esc(String(ev.message).slice(0, 56))}</span>`),
   ].filter(Boolean);
   const items = pos.concat(extra);
-  document.getElementById("ticker").hidden = !items.length;
+  document.getElementById("ticker").hidden = !items.length || active === "terminal";  // Terminalen har sit eget bånd
   const one = items.join("");
   put("ticker-track", one + one);  // to gange, så rullen er sømløs
 }
