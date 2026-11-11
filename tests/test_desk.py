@@ -1124,7 +1124,7 @@ def test_no_credit_rests_claude_for_a_while_and_the_rules_take_over(tmp_path):
     headlines = [{"headline": "NVDA lands a big new contract", "created_at": datetime.now(ET).isoformat(), "url": "https://example.com"}]
     first = brain.news({"symbol": "NVDA"}, headlines)
     assert claude.calls == 1 and first["source"] == "rules" and first["has_reason"]
-    assert brain.resting and "ingen kredit" in brain.last_error and 14 <= brain.rest_minutes() <= 15
+    assert brain.resting and "ingen kredit" in brain.last_error and 1 <= brain.rest_minutes() <= 2
     # Under pausen kaldes Claude slet ikke: reglerne svarer med det samme.
     assert brain.news({"symbol": "NVDA"}, headlines)["source"] == "rules"
     assert brain.skeptic({"symbol": "NVDA"}, {"has_reason": True}, {}, {}) is None
@@ -1151,9 +1151,9 @@ def test_status_says_the_desk_trades_on_without_claude(tmp_path):
     desk.brain.api_key = "sk-ant-test"
     desk.brain._failed(_ClaudeError(400, "Your credit balance is too low"))
     status = desk.status()
-    assert status["ai"]["resting"] and status["ai"]["retry_minutes"] >= 14
-    claude = [a for a in status["alerts"] if a["text"].startswith("Claude:")]
-    assert claude and claude[0]["level"] == "warning" and "bordet handler videre" in claude[0]["text"]
+    assert status["ai"]["resting"] and 1 <= status["ai"]["retry_minutes"] <= 2
+    claude = [a for a in status["alerts"] if a["text"].startswith("Claude holder pause")]
+    assert claude and claude[0]["level"] == "warning" and "Bordet handler videre" in claude[0]["text"]
 
 
 def test_without_claude_a_headline_from_last_night_still_counts():

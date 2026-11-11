@@ -1606,7 +1606,7 @@ class DeskEngine:
             alerts.append(
                 {
                     "level": "warning",
-                    "text": f"Claude: {self.brain.last_error} NEWS og SKEPTIC bruger faste regler imens, så bordet handler videre.",
+                    "text": f"Claude holder pause: {self.brain.last_error} Bordet handler videre på faste regler og prøver Claude igen om et par minutter.",
                 }
             )
         if record["too_soft"]:

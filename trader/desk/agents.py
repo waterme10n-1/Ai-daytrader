@@ -185,7 +185,7 @@ def et_day() -> str:
 
 
 RULES_NEWS_HOURS = 18  # uden Claude: så gammel må en overskrift være for at tælle som grund
-CLAUDE_REST_SECONDS = 900  # pause efter en fejl, der ikke går over af sig selv (ingen kredit, forkert nøgle)
+CLAUDE_REST_SECONDS = 120  # pause efter en fejl, der ikke går over af sig selv (ingen kredit, forkert nøgle)
 
 
 def lasting_error(exc: Exception) -> bool:
