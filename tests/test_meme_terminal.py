@@ -96,3 +96,14 @@ def test_the_regular_scan_runs_every_10_seconds_by_default(monkeypatch):
     assert MemeSettings.from_env().scan_seconds == 10  # aldrig hurtigere end hvert 10. sekund
     monkeypatch.setenv("MEME_SCAN_SECONDS", "60")
     assert MemeSettings.from_env().scan_seconds == 60
+
+
+def test_the_no_buys_note_names_the_real_reason():
+    engine, dex, rug, _jup, _notes = make_engine()
+    engine.paused = True
+    engine.tick(force_scan=True)
+    assert "pause" in engine.last_scan["note"].lower() and "Genoptag" in engine.last_scan["note"]
+    engine.paused = False
+    engine.kill_switch = True
+    engine.tick(force_scan=True)
+    assert "Nødstop" in engine.last_scan["note"]

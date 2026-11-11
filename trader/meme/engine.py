@@ -1130,6 +1130,22 @@ class MemeEngine:
             return f"Der er lukket {losses} handler med tab i dag (grænsen er {self.settings.max_losses_per_day}). Botten køber ikke flere nye tokens i dag."
         return ""
 
+    def _why_no_entries(self, halted_day: bool, halted_dd: bool, entry_halt: str) -> str:
+        """Den præcise grund til, at der ikke købes nye tokens, så siden ikke kun siger "pause, nødstop eller tabsgrænse"."""
+        if self.kill_switch:
+            return "Nødstop er slået til. Tryk Genoptag for at købe igen."
+        if self.paused:
+            return "Botten er sat på pause. Tryk Genoptag for at købe igen."
+        if halted_dd:
+            return f"Samlet tab har ramt grænsen på {self.settings.max_drawdown_pct * 100:.0f} % af bankroll. Tryk Genoptag, når du vil købe igen."
+        if halted_day:
+            return f"Dagens tab har ramt grænsen på {self.settings.daily_loss_pct * 100:.0f} % af bankroll. Ingen nye køb før i morgen (UTC)."
+        return entry_halt
+
+    def _no_entries_note(self) -> str:
+        reason = getattr(self, "_block_reason", "")
+        return f"Ingen nye køb: {reason}" if reason else "Ingen nye køb (pause, nødstop eller tabsgrænse)."
+
     def _note_entry_halt(self, day: str, why: str) -> None:
         """Én besked om stoppet, højst hvert halve time, så loggen ikke fyldes op."""
         key = f"entry_halt_note:{self.mode}:{day}"
@@ -1183,6 +1199,7 @@ class MemeEngine:
                 if entry_halt:
                     self._note_entry_halt(day, entry_halt)
                 entries_allowed = not (self.kill_switch or self.paused or halted_day or halted_dd or entry_halt)
+                self._block_reason = self._why_no_entries(halted_day, halted_dd, entry_halt)
                 # Top 10 har ingen daglig tabsgrænse, medmindre du slår den til. Nødstop, pause og samlet tabsgrænse gælder altid.
                 top_entries_allowed = not (
                     self.kill_switch or self.paused or halted_dd or entry_halt or (halted_day and self.top_cfg.daily_loss_stop)
@@ -2049,7 +2066,7 @@ class MemeEngine:
             self.store.add_event("info", f"Fulgt wallet {signal.wallet[:4]}…{signal.wallet[-4:]} købte {signal.mint[:6]}… for {signal.sol:.2f} SOL.")
 
         if not entries_allowed:
-            summary["note"] = "Ingen nye køb (pause, nødstop eller tabsgrænse)."
+            summary["note"] = self._no_entries_note()
             return
 
         found, errors = self._discover(copy_buys)
@@ -2193,7 +2210,7 @@ class MemeEngine:
         summary: dict[str, Any] = {"checked": 0, "new": 0, "young": 0, "passed": 0, "bought": 0, "errors": [], "at": now_iso()}
         self.last_snipe = summary
         if not entries_allowed:
-            summary["note"] = "Ingen nye køb (pause, nødstop eller tabsgrænse)."
+            summary["note"] = self._no_entries_note()
             return
         now = time.time()
         seen = {mint: stamp for mint, stamp in (self.store.get_json("sniper_seen", {}) or {}).items() if now - float(stamp) < SNIPER_SEEN_HOURS * 3600}
