@@ -238,7 +238,7 @@ class DeskBrain:
 
     @property
     def configured(self) -> bool:
-        return bool(self.api_key)
+        return bool(self.api_key) and getattr(self.settings, "use_claude", True)
 
     @property
     def limited(self) -> bool:
@@ -255,6 +255,8 @@ class DeskBrain:
 
     def why_unavailable(self) -> str:
         """Hvorfor Claude ikke blev brugt, på dansk. Tom streng, hvis Claude kan bruges."""
+        if self.api_key and not getattr(self.settings, "use_claude", True):
+            return "Claude er slået fra på siden (Bots → Indstillinger)."
         if not self.configured:
             return "ANTHROPIC_API_KEY mangler i Railway, så Claude er slået fra."
         if self.limited and self.budget_left() < CHAT_COST:

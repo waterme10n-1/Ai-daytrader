@@ -177,7 +177,7 @@ class DeskEngine:
         for name in ("max_open", "max_flags_per_day", "scan_minutes", "time_stop_min", "max_losses_per_day"):
             if isinstance(params.get(name), int):
                 values[name] = int(params[name])
-        for name in ("auto_approve", "premarket", "trial_buys"):
+        for name in ("auto_approve", "premarket", "trial_buys", "use_claude"):
             if isinstance(params.get(name), bool):
                 values[name] = params[name]
         return dataclasses.replace(self.base, **values) if values else self.base
@@ -211,6 +211,11 @@ class DeskEngine:
             trial = body["trial_buys"] in (True, "true", "1", 1, "on")
             params["trial_buys"] = trial
             changes.append("prøvekøb " + ("til: siger SKEPTIC WAIT med en klar grund, køber bordet halv størrelse" if trial else "fra"))
+        if "use_claude" in body and body["use_claude"] is not None:
+            on = body["use_claude"] in (True, "true", "1", 1, "on")
+            params["use_claude"] = on
+            self.brain.settings = dataclasses.replace(self.brain.settings, use_claude=on)
+            changes.append("Claude " + ("til: NEWS og SKEPTIC bruger Claude igen" if on else "fra: NEWS og SKEPTIC kører på faste regler"))
         if "auto_approve" in body and body["auto_approve"] is not None:
             auto = body["auto_approve"] in (True, "true", "1", 1, "on")
             params["auto_approve"] = auto
@@ -1598,7 +1603,9 @@ class DeskEngine:
         problem = key_problem(self.keys()[0]) if not self._injected_broker and not self.own_ledger else ""
         if problem:
             alerts.append({"level": "error", "text": problem})
-        if not self.brain.configured:
+        if self.brain.configured is False and self.brain.api_key and not getattr(self.brain.settings, "use_claude", True):
+            alerts.append({"level": "info", "text": "Claude er slået fra. NEWS og SKEPTIC kører på faste regler, og SKEPTIC er strengere end normalt."})
+        elif not self.brain.configured:
             alerts.append({"level": "info", "text": "Ingen Claude-nøgle. NEWS og SKEPTIC kører på faste regler, og SKEPTIC er strengere end normalt."})
         elif self.brain.limited and self.brain.budget_left() < 0.15:
             alerts.append({"level": "info", "text": "Dagens AI-budget er brugt. Reglerne tager over til i morgen."})
@@ -1669,6 +1676,7 @@ class DeskEngine:
                 "approval_minutes": cfg.approval_minutes,
                 "scan_minutes": cfg.scan_minutes,
                 "auto_approve": cfg.auto_approve,
+                "use_claude": cfg.use_claude,
                 "trial_buys": cfg.trial_buys,
                 "premarket": cfg.premarket,
                 "gap_pct": cfg.gap_pct,

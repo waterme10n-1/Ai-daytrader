@@ -1165,3 +1165,17 @@ def test_without_claude_a_headline_from_last_night_still_counts():
     old = [{"headline": "NVDA old story", "created_at": (now - timedelta(hours=20)).isoformat(), "url": "https://example.com"}]
     news = DeskBrain.rules_news(old)
     assert not news["has_reason"] and "18 timer" in news["reason"]
+
+
+def test_claude_can_be_switched_off_from_the_page(tmp_path):
+    desk, _ = make_desk(tmp_path, FakeBroker({}))
+    desk.brain.api_key = "sk-ant-test"
+    assert desk.brain.configured and desk.status()["params"]["use_claude"] is True
+    desk.update_params({"use_claude": False})
+    status = desk.status()
+    assert status["params"]["use_claude"] is False and status["ai"]["configured"] is False
+    assert "slået fra på siden" in status["ai"]["reason"]
+    assert any(a["level"] == "info" and a["text"].startswith("Claude er slået fra") for a in status["alerts"])
+    assert not desk.brain.available(0.0)
+    desk.update_params({"use_claude": True})
+    assert desk.brain.configured and desk.status()["params"]["use_claude"] is True
