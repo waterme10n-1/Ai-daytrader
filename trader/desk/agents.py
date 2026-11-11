@@ -76,10 +76,12 @@ BOTS: dict[str, dict[str, str]] = {
         "tag": "NEJ'ET",
         "engine": "Claude",
         "rules": (
-            "Du er SKEPTIC på et handelsbord med seks bots. Din opgave er at argumentere imod hver handel, CHART "
-            "foreslår. For hver handel skriver du de tre stærkeste grunde til, at den vil fejle, og afgør så BUY, WAIT "
-            "eller SKIP. Alt uden en klar grund fra NEWS er SKIP. Du bliver målt på det, du med rette afviser. En dag, "
-            "hvor du godkender alt, er en dårlig dag."
+            "Du er SKEPTIC på et handelsbord med seks bots. For hver handel, CHART foreslår, skriver du de tre største "
+            "risici, men du er ikke imod alt. Sig BUY, når NEWS har en klar grund, CHART har en ren opstilling, og ingen af "
+            "risiciene er et konkret stopsignal. Stopsignaler er fx regnskab inden for to dage, vigtige makrotal inden for "
+            "den næste time, eller at nyheden var kendt i går, og kursen allerede har taget hele bevægelsen. Sig kun WAIT "
+            "ved sådan et stopsignal, og SKIP kun uden en klar grund fra NEWS. Almindelige risici, som at en bevægelse kan "
+            "fade, er ikke nok til at sige nej. Det er papirpenge, og bordet lærer mest af rigtige handler."
         ),
     },
     "sizer": {
@@ -446,8 +448,9 @@ class DeskBrain:
         prompt = (
             "CHART foreslår dette køb. Søg efter det, der kan vælte det: regnskab inden for få dage, makrotal i dag, om "
             "nyheden allerede var kendt i går, og hvor meget af bevægelsen der er sket. Giv præcis tre grunde og afgør "
-            "BUY, WAIT eller SKIP. your_record indeholder lessons og learned_rules fra bordets tidligere fejl: brug dem, og "
-            "sig WAIT eller SKIP, hvis handlen ligner noget, der har tabt før.\n" + json.dumps(payload, ensure_ascii=False, default=str)
+            "BUY, WAIT eller SKIP. Hælder du til BUY, når grunden er klar, og intet konkret taler imod. your_record indeholder "
+            "lessons og learned_rules fra bordets tidligere fejl: sig kun WAIT, hvis handlen tydeligt ligner noget, der har "
+            "tabt flere gange før.\n" + json.dumps(payload, ensure_ascii=False, default=str)
         )
         try:
             result = self._parse("skeptic", self._system("skeptic"), prompt, SkepticOut, search=True)

@@ -385,7 +385,7 @@ def rules_skeptic(
     if not news.get("has_reason"):
         ruling = "SKIP"
         summary = "Ingen klar grund fra NEWS. SKIP."
-    elif not flag.get("by_move") or vs_vwap > stop_max_pct or (now.hour, now.minute) >= late_from:
+    elif not flag.get("by_move") or vs_vwap > stop_max_pct * 1.5 or (now.hour, now.minute) >= late_from:
         ruling = "WAIT"
         summary = "Grunden er der, men opstillingen er ikke god nok. WAIT."
     else:
