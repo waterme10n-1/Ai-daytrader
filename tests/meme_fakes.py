@@ -179,6 +179,7 @@ def settings(**overrides) -> MemeSettings:
         daily_loss_pct=0.25,
         max_drawdown_pct=0.5,
         daily_loss_limit=True,
+        paper_loss_stops=True,  # testene af tabsstop kører på papir; produktionens standard er slået fra
         drawdown_limit=True,
         db_path=":memory:",
         paper_fail_rate=0.0,

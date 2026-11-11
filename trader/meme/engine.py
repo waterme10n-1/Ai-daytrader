@@ -1117,8 +1117,15 @@ class MemeEngine:
         self._sol_hist.append((now, fresh))
         return fresh
 
+    def _paper_runs_free(self) -> bool:
+        """Papir stopper ikke af sig selv (tabsstop og SOL-filter), medmindre MEME_PAPER_LOSS_STOPS er slået til."""
+        return self.mode == "paper" and not self.settings.paper_loss_stops
+
     def _entry_halt(self, day: str) -> str:
-        """Hvorfor botten ikke køber nye tokens lige nu. Tom streng, hvis den må købe. Salg berøres aldrig."""
+        """Hvorfor botten ikke køber nye tokens lige nu. Tom streng, hvis den må købe. Salg berøres aldrig.
+        På papir køber botten hele tiden: tabsstop og SOL-filteret er for rigtige penge, og papir skal lære af sine tab."""
+        if self._paper_runs_free():
+            return ""
         drop = sol_drop_pct(self._sol_hist, time.time())
         if sol_halt(drop, self.settings):
             return (
@@ -1251,7 +1258,7 @@ class MemeEngine:
             positions = self.store.open_positions(self.mode)
             if not positions:
                 return
-        if self.kill_switch or (self.loss_limits["drawdown"] and self.store.get_state(f"halt_dd:{self.mode}", "0") == "1"):
+        if self.kill_switch or (not self._paper_runs_free() and self.loss_limits["drawdown"] and self.store.get_state(f"halt_dd:{self.mode}", "0") == "1"):
             # Et salg kan fejle under nødstop. Bliv ved med at prøve, indtil alt er solgt eller skrevet af.
             for pos in positions:
                 self._sell(pos, 1.0, "kill", "Nødstop: prøver at sælge igen.", wallet, sol_usd)
@@ -1574,6 +1581,12 @@ class MemeEngine:
         mode = self.mode
         day_key = f"halt_day:{mode}:{day}"
         dd_key = f"halt_dd:{mode}"
+        if self._paper_runs_free():
+            # Papir stopper aldrig af sig selv: gamle stop fra før ryddes, så botten kører videre.
+            for key in (day_key, dd_key):
+                if self.store.get_state(key, "0") == "1":
+                    self.store.set_state(key, "0")
+            return False, False
         halted_day = self.loss_limits["daily"] and self.store.get_state(day_key, "0") == "1"
         halted_dd = self.loss_limits["drawdown"] and self.store.get_state(dd_key, "0") == "1"
         if self.loss_limits["daily"] and not halted_day and daily_loss_hit(totals["today_pnl"], self.settings):
@@ -3647,8 +3660,8 @@ class MemeEngine:
             "mode": mode,
             "kill_switch": self.kill_switch,
             "paused": self.paused,
-            "halted_day": self.loss_limits["daily"] and self.store.get_state(f"halt_day:{mode}:{today}", "0") == "1",
-            "halted_drawdown": self.loss_limits["drawdown"] and self.store.get_state(f"halt_dd:{mode}", "0") == "1",
+            "halted_day": not self._paper_runs_free() and self.loss_limits["daily"] and self.store.get_state(f"halt_day:{mode}:{today}", "0") == "1",
+            "halted_drawdown": not self._paper_runs_free() and self.loss_limits["drawdown"] and self.store.get_state(f"halt_dd:{mode}", "0") == "1",
             "loss_limits": {
                 **self.loss_limits,
                 "daily_usd": round(self.settings.daily_loss_pct * self.settings.bankroll_usd, 2),
