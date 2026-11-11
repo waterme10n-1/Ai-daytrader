@@ -168,7 +168,7 @@ def test_skips_old_small_unknown_and_unsafe_buys():
     rpc.buy(A, "risky", mint=risky)
     _poll(engine)
     assert engine.store.open_positions("paper") == []
-    assert engine.status()["toptraders"]["signals"][0]["detail"].startswith("Rug-tjek")
+    assert engine.status()["toptraders"]["signals"][0]["detail"].startswith("Analytiker")
 
 
 def test_pause_and_limits_apply_to_copies():
