@@ -2260,8 +2260,9 @@ class MemeEngine:
             if reasons:
                 self._record(cand, "rug", False, "; ".join(reasons[:3]))
                 continue
-            features = build_features(cand["pair"], report=report, token=cand["token"], now_ms=now_ms)
-            cand.update({"report": report, "buzz": None, "features": features, "score": self.model.score(features)})
+            buzz = self._x_buzz(cand["mint"], cand["pair"].symbol)  # omtale på X, inden for det daglige X-budget
+            features = build_features(cand["pair"], report=report, token=cand["token"], buzz=buzz, now_ms=now_ms)
+            cand.update({"report": report, "buzz": buzz, "features": features, "score": self.model.score(features)})
             summary["passed"] += 1
             if self._try_buy(cand, wallet, sol_usd, day, strategy="sniper"):
                 summary["bought"] += 1
@@ -2811,13 +2812,26 @@ class MemeEngine:
             return False
         except SourceError:
             report = None
-        reasons = rug_rejections(report, None, self.params)
+        # Samme analytiker som de andre strategier: RugCheck, Jupiters audit (mistænkelig, serie-udvikler), insidere og X.
+        token: TokenInfo | None = None
+        try:
+            token = self.clients.jup.token_infos([mint]).get(mint)
+        except SourceError as exc:  # også RateLimited: RugCheck er stadig påkrævet, Jupiter-tjekket springes over
+            logger.info("Jupiter token-info til Top 10 sprunget over: %s", exc)
+        cand["token"] = token
+        cand["report"] = report
+        reasons = (
+            rug_rejections(report, token, self.params)
+            + token_quality_rejections(token, min_organic=self.sniper.min_organic_score, max_dev_mints=self.params.max_dev_mints)
+            + insider_rejections(report, self.params.max_insiders)
+        )
         if reasons:
             self._record(cand, "rug", False, "; ".join(reasons[:3]))
-            self._note_top(signal, "sprunget over", "Rug-tjek: " + "; ".join(reasons[:2]), pair.symbol)
+            self._note_top(signal, "sprunget over", "Analytiker: " + "; ".join(reasons[:2]), pair.symbol)
             return False
-        features = build_features(pair, report=report, copy_signal=True, now_ms=int(time.time() * 1000))
-        cand.update({"report": report, "buzz": None, "features": features, "score": self.model.score(features)})
+        buzz = self._x_buzz(mint, pair.symbol)
+        features = build_features(pair, report=report, token=token, buzz=buzz, copy_signal=True, now_ms=int(time.time() * 1000))
+        cand.update({"buzz": buzz, "features": features, "score": self.model.score(features)})
         if self._try_buy(cand, wallet, sol_usd, day, strategy="toptrader"):
             self._note_top(signal, "købt", f"Købt {pair.symbol} for {_dk(cfg.position_usd)} USD, {age:.0f} s efter traderen.", pair.symbol)
             return True
@@ -3509,6 +3523,7 @@ class MemeEngine:
         mode = self.mode
         totals = self._totals(mode)
         closed = self.store.closed_positions(mode)
+        candidate_rows = self.store.recent_candidates(mode, 300)
         pnl = [float(row["pnl_usd"]) for row in closed]
         wins = [value for value in pnl if value > 0]
         losses = [value for value in pnl if value < 0]
@@ -3640,7 +3655,8 @@ class MemeEngine:
             },
             "positions": [self._position_view(row) for row in self.store.open_positions(mode)],
             "trades": [self._position_view(row, why_from=why_from) for row in self.store.list_positions(mode, 200) if row["status"] == "closed"],
-            "candidates": [self._candidate_view(row) for row in self.store.recent_candidates(mode, 300)],
+            "candidates": [self._candidate_view(row) for row in candidate_rows],
+            "relay": self._relay_view(mode, closed, candidate_rows, totals),
             "lessons": self.store.recent_lessons(60),
             "model": {
                 "bias": self.model.bias,
@@ -3903,6 +3919,117 @@ class MemeEngine:
         except Exception as exc:  # en forklaring må aldrig vælte siden
             logger.info("Forklaring fejlede for %s: %s", row.get("id"), exc)
             return []
+
+    # ------------------------------------------------------------------ relæet: fem agenter
+    def _relay_view(self, mode: str, closed: list[dict], candidates: list[dict], totals: dict) -> dict:
+        """Bottens arbejde som et relæ: Spejder → Analytiker → Køber → Risiko → Kasserer.
+
+        Alle tre strategier (almindelig, sniper, Top 10) går gennem de samme fem trin. Intet her er pyntet:
+        hvert tal kommer fra kandidater, positioner og handler i databasen."""
+        now = datetime.now(timezone.utc)
+
+        def age(iso: str | None) -> float:
+            return (now.timestamp() - _iso_seconds(iso, 0.0)) if iso else 1e9
+
+        def strategy_name(row: dict) -> str:
+            return {"sniper": "sniper", "toptrader": "Top 10"}.get(row.get("strategy") or "momentum", "almindelig")
+
+        open_rows = self.store.open_positions(mode)
+        recent_buys = [row for row in self.store.list_positions(mode, 60)]
+        passed_stages = {"score", "rute", "claude", "risiko", "købt", "køb"}
+        window = candidates[:200]
+        passed = [row for row in window if row["stage"] in passed_stages]
+        last = candidates[0] if candidates else None
+        last_ok = passed[0] if passed else None
+        scanning = any(job["running"] for job in self._jobs.values())
+
+        # Spejder
+        seen = self.store.count_candidates(mode)
+        scout_text = "kigger efter nye tokens"
+        if last and age(last["ts"]) < 120:
+            scout_text = f"${last['symbol']} · {source_label(str(last['source']))}"
+        # Analytiker
+        analyst_text = "venter på Spejder"
+        if last and age(last["ts"]) < 120:
+            if last["stage"] in passed_stages:
+                analyst_text = f"${last['symbol']} bestod rug, holdere og X"
+            else:
+                analyst_text = f"${last['symbol']} afvist: {str(last['reason']).split(';')[0][:70]}"
+        # Køber
+        newest_buy = recent_buys[0] if recent_buys else None
+        buy_text = f"klar · {self.store.trades_opened_on(mode, utc_day())} køb i dag"
+        if newest_buy and age(newest_buy["opened_at"]) < 180:
+            buy_text = f"${newest_buy['symbol']} købt for {_dk(float(newest_buy['cost_usd']))} $ ({strategy_name(newest_buy)})"
+        # Risiko
+        risk_text = "ingen åbne positioner"
+        mover = None
+        if open_rows:
+            mover = max(open_rows, key=lambda row: abs(float(row["last_ratio"] or 1.0) - 1.0))
+            change = (float(mover["last_ratio"] or 1.0) - 1.0) * 100
+            risk_text = f"${mover['symbol']} {'+' if change >= 0 else ''}{_dk(change, 0)} % · følger {len(open_rows)}"
+        # Kasserer
+        realized = sum(float(row["pnl_usd"] or 0.0) for row in closed)
+        last_exit = max(closed, key=lambda row: str(row.get("closed_at") or "")) if closed else None
+        bank_text = "ingen salg endnu"
+        if last_exit:
+            change = float(last_exit["pnl_pct"] or 0.0) * 100
+            verb = "solgte" if age(last_exit["closed_at"]) < 180 else "sidst"
+            bank_text = f"{verb} ${last_exit['symbol']} {'+' if change >= 0 else ''}{_dk(change, 0)} % · {'+' if float(last_exit['pnl_usd']) >= 0 else ''}{_dk(float(last_exit['pnl_usd']))} $"
+
+        agents = [
+            {"id": "scout", "name": "Spejder", "role": "finder nye tokens", "text": scout_text, "count": seen, "unit": "set",
+             "active": scanning or (last is not None and age(last["ts"]) < 20)},
+            {"id": "analyst", "name": "Analytiker", "role": "rug, holdere, X og socials", "text": analyst_text,
+             "count": round(len(passed) / len(window) * 100) if window else None, "unit": "% bestået",
+             "active": last is not None and age(last["ts"]) < 20, "ok": bool(last_ok and last and last_ok["id"] == last["id"])},
+            {"id": "buyer", "name": "Køber", "role": "almindelig, sniper og Top 10", "text": buy_text,
+             "count": len(closed) + len(open_rows), "unit": "køb", "active": newest_buy is not None and age(newest_buy["opened_at"]) < 30},
+            {"id": "risk", "name": "Risiko", "role": "stop, trailing og rug-alarm", "text": risk_text, "count": len(open_rows), "unit": "åbne",
+             "active": bool(open_rows), "change": ((float(mover["last_ratio"] or 1.0) - 1.0) if mover else None)},
+            {"id": "banker", "name": "Kasserer", "role": "sælger og hjemtager", "text": bank_text, "count": realized, "unit": "usd",
+             "active": last_exit is not None and age(last_exit["closed_at"]) < 30},
+        ]
+
+        # Aktivitet: hvem gjorde hvad, nyeste først
+        activity = []
+        for row in candidates[:40]:
+            activity.append({"ts": row["ts"], "agent": "scout", "text": f"fandt ${row['symbol']} · {source_label(str(row['source']))}"})
+            if row["stage"] == "købt":
+                continue
+            if row["stage"] in passed_stages:
+                activity.append({"ts": row["ts"], "agent": "analyst", "text": f"godkendte ${row['symbol']} · rug, holdere og X ✓"})
+            else:
+                activity.append({"ts": row["ts"], "agent": "analyst", "text": f"afviste ${row['symbol']}: {str(row['reason']).split(';')[0][:80]}", "bad": True})
+        for row in recent_buys[:20]:
+            trial = " (prøvekøb)" if self._is_trial(row) else ""
+            activity.append({"ts": row["opened_at"], "agent": "buyer", "text": f"købte ${row['symbol']} for {_dk(float(row['cost_usd']))} $ · {strategy_name(row)}{trial}"})
+            if row["status"] == "closed" and row.get("closed_at"):
+                pnl = float(row["pnl_usd"] or 0.0)
+                change = float(row["pnl_pct"] or 0.0) * 100
+                reason = str(row.get("exit_reason") or "")
+                who = "risk" if reason in {"stop_loss", "trailing", "rug_liquidity", "rug_no_route", "rug_dev", "time", "stale"} else "banker"
+                activity.append({"ts": row["closed_at"], "agent": who, "pnl": pnl,
+                                 "text": f"{EXIT_LABELS.get(reason, reason) or 'solgt'} på ${row['symbol']} {'+' if change >= 0 else ''}{_dk(change, 0)} % · {'+' if pnl >= 0 else ''}{_dk(pnl)} $"})
+        order = {"scout": 0, "analyst": 1, "buyer": 2, "risk": 3, "banker": 3}
+        activity.sort(key=lambda item: (str(item["ts"]), order[item["agent"]]), reverse=True)
+
+        start = float(totals.get("bankroll") or 0.0)
+        equity = float(totals.get("equity") or 0.0)
+        multiple = equity / start if start > 0 else 1.0
+        ladder = [1.25, 1.5, 2.0, 3.0, 5.0, 10.0]
+        next_step = next((step for step in ladder if step > multiple + 1e-9), None)
+        return {
+            "agents": agents,
+            "activity": activity[:30],
+            "start": start,
+            "multiple": multiple,
+            "ladder": ladder,
+            "goal": ladder[-1],
+            "next": next_step,
+            "to_next": (next_step * start - equity) if next_step else 0.0,
+            "wins": sum(1 for row in closed if float(row["pnl_usd"] or 0) > 0),
+            "losses": sum(1 for row in closed if float(row["pnl_usd"] or 0) <= 0),
+        }
 
     def _candidate_view(self, row: dict) -> dict:
         return {
