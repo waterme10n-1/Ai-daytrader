@@ -18,17 +18,17 @@
   /* ---------- Farver og mål ---------- */
   :root {
     color-scheme: dark;
-    --bg: #000; --surface: #141416; --surface-2: #1c1c1f; --raised: #232327; --raised-2: #2c2c31;
-    --border: rgba(255,255,255,0.08); --border-strong: rgba(255,255,255,0.16);
-    --text: #f5f5f7; --text-2: #c7c7cc; --muted: #8e8e93; --faint: #5a5a60;
-    --accent: #0a84ff; --accent-soft: rgba(10,132,255,0.16); --on-accent: #ffffff;
-    --up: #30d158; --up-soft: rgba(48,209,88,0.16);
-    --down: #ff453a; --down-soft: rgba(255,69,58,0.16);
-    --warn: #ff9f0a; --warn-soft: rgba(255,159,10,0.16);
-    --info: #64d2ff; --info-soft: rgba(100,210,255,0.16);
-    --grad: #0a84ff;
+    --bg: #08080a; --surface: #121214; --surface-2: #18181b; --raised: #202024; --raised-2: #2a2a2f;
+    --border: rgba(255, 255, 255, 0.07); --border-strong: rgba(255,255,255,0.14);
+    --text: #f4f4f2; --text-2: #b8b8b4; --muted: #7d7d79; --faint: #55554f;
+    --accent: #c6ff3d; --accent-soft: rgba(198, 255, 61, 0.13); --on-accent: #0a0a0b;
+    --up: #3fe08a; --up-soft: rgba(63, 224, 138, 0.14);
+    --down: #ff5a52; --down-soft: rgba(255, 90, 82, 0.14);
+    --warn: #ffb547; --warn-soft: rgba(255, 181, 71, 0.14);
+    --info: #7cc4ff; --info-soft: rgba(100,210,255,0.16);
+    --grad: #c6ff3d;
     --shadow: none;
-    --glass: rgba(20,20,22,0.78); --glass-nav: rgba(20,20,22,0.86); --seg-on: #2c2c31;
+    --glass: rgba(10,10,12,0.86); --glass-nav: rgba(14,14,16,0.92); --seg-on: #2a2a2f;
     --r-xl: 22px; --r-lg: 16px; --r-md: 12px; --r-ctl: 12px; --r-card: 22px; --r-tile: 14px;
     --nav-h: 64px; --side-w: 0px;
     --safe-t: env(safe-area-inset-top, 0px); --safe-b: env(safe-area-inset-bottom, 0px);
@@ -39,17 +39,17 @@
   }
   :root[data-theme="light"] {
     color-scheme: light;
-    --bg: #f2f2f7; --surface: #ffffff; --surface-2: #f6f6f9; --raised: #ececf1; --raised-2: #e2e2e8;
-    --border: rgba(60,60,67,0.12); --border-strong: rgba(60,60,67,0.22);
-    --text: #1c1c1e; --text-2: #3a3a3c; --muted: #6e6e73; --faint: #aeaeb2;
-    --accent: #007aff; --accent-soft: rgba(0,122,255,0.1);
-    --up: #1f9d48; --up-soft: rgba(52,199,89,0.14);
-    --down: #e0352b; --down-soft: rgba(255,59,48,0.12);
-    --warn: #c76b00; --warn-soft: rgba(255,149,0,0.14);
+    --bg: #eeeee9; --surface: #ffffff; --surface-2: #f6f6f2; --raised: #e6e6e0; --raised-2: #dcdcd5;
+    --border: rgba(18, 18, 20, 0.09); --border-strong: rgba(18,18,20,0.18);
+    --text: #121214; --text-2: #3a3a37; --muted: #6b6b66; --faint: #aeaeb2;
+    --accent: #4b7a00; --accent-soft: rgba(75, 122, 0, 0.12);
+    --up: #12893e; --up-soft: rgba(18, 137, 62, 0.12);
+    --down: #d1352c; --down-soft: rgba(209, 53, 44, 0.11);
+    --warn: #b56a00; --warn-soft: rgba(181, 106, 0, 0.12);
     --info: #0a7ea4; --info-soft: rgba(10,126,164,0.12);
-    --grad: #007aff;
+    --grad: #4b7a00;
     --shadow: 0 1px 2px rgba(0,0,0,0.04), 0 10px 30px rgba(0,0,0,0.06);
-    --glass: rgba(249,249,251,0.82); --glass-nav: rgba(249,249,251,0.9); --seg-on: #ffffff;
+    --glass: rgba(238,238,233,0.88); --glass-nav: rgba(246,246,242,0.94); --seg-on: #ffffff;
   }
 
   /* ---------- Grundlag ---------- */
@@ -826,6 +826,48 @@
   }
   #panel-almindelig .field .row input[type="number"] { width: 150px; }
   @media (max-width: 560px) { .savebar .dirty:not([hidden]) { flex: 1 1 100%; } }
+</style>
+<style id="bento">
+  /* ---------- Bento-terminal: samme lag på Memebot og Handelsbordet ----------
+     Sort og grafit, én limegrøn accent, store tal og kort med skarpe hårfine kanter.
+     Ingen sløring, ingen glød og ingen farvede gradienter, så telefonen ikke skal arbejde mere. */
+  :root { --r-bento: 20px; --on-accent: #0a0a0b; }
+  :root[data-theme="light"] { --on-accent: #ffffff; }
+  body { background: var(--bg) !important; }
+  body::before, body::after { display: none !important; }
+
+  /* Kort: flade felter med en hårfin kant, samlet i et bento-gitter */
+  .card { background: var(--card, var(--surface)) !important; border: 1px solid var(--sep, var(--border)) !important; border-radius: var(--r-bento) !important; box-shadow: none !important; }
+  .hero::before, .ring::before, .chart .glow { display: none !important; }
+  .grid, .cols, .stack { gap: 12px; }
+  .stat, .kpi, .tile { background: var(--card-2, var(--surface-2)) !important; border: 1px solid var(--sep, var(--border)); border-radius: 14px !important; box-shadow: none !important; }
+
+  /* Store tal: tætte, tabulære og uden gradient */
+  #equity, .equity { background: none !important; -webkit-text-fill-color: currentColor; color: var(--text) !important; font-weight: 650 !important; letter-spacing: -0.055em !important; font-variant-numeric: tabular-nums; line-height: 0.95; }
+  #equity { font-size: clamp(54px, 12vw, 88px) !important; }
+  .stat .v, .kpi .v { font-weight: 650; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; }
+  .title .name { background: none !important; -webkit-text-fill-color: var(--text) !important; color: var(--text) !important; letter-spacing: -0.03em; }
+  /* Logo og ringe i samme accent i stedet for blå og lilla gradienter */
+  #logo-g stop { stop-color: var(--accent); }
+  .title .logo svg path, .title .logo svg polyline { stroke: var(--on-accent); } .title .logo svg circle { fill: var(--on-accent); }
+  #rg-open stop:first-child { stop-color: var(--accent); } #rg-open stop:last-child { stop-color: var(--up); }
+  #rg-closed stop:first-child { stop-color: var(--text-2); } #rg-closed stop:last-child { stop-color: var(--muted); }
+  .title .logo, .logo { box-shadow: none !important; }
+  .cap, .label, .stat .k, .kpi .k, .hero .lbl { color: var(--muted); font-weight: 500; letter-spacing: 0; }
+  .card-h h2, .card-head h2 { font-weight: 600; letter-spacing: -0.02em; }
+
+  /* Accent: primærknapper og den side, du står på, er limegrønne med mørk tekst */
+  .btn.primary, .qa.primary .qa-ic { background: var(--accent) !important; color: var(--on-accent) !important; box-shadow: none !important; }
+  .appnav a[aria-current="page"] { background: var(--accent) !important; color: var(--on-accent) !important; box-shadow: none !important; }
+  .segmented button[aria-selected="true"], .seg button[aria-pressed="true"] { background: var(--text) !important; color: var(--bg) !important; box-shadow: none !important; }
+  @media (min-width: 761px) {
+    .tabs .seg button[aria-selected="true"], .nav-item[aria-current="page"] { background: var(--accent) !important; color: var(--on-accent) !important; box-shadow: none !important; }
+    .nav-item[aria-current="page"] .i { color: var(--on-accent) !important; }
+  }
+  @media (max-width: 760px) {
+    nav.tabs .seg button[aria-selected="true"] svg, .nav-item[aria-current="page"] .i { color: var(--accent) !important; }
+  }
+  :focus-visible { outline-color: var(--accent); }
 </style>
 </head>
 <body>
