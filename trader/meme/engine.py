@@ -3913,8 +3913,11 @@ class MemeEngine:
             })
         diagnostics = self.store.get_json("diagnostics", None)
         if diagnostics and not diagnostics.get("required_ok"):
-            failed = [item["label"] for item in diagnostics.get("checks", []) if not item["ok"] and not item.get("optional")]
-            alerts.append({"level": "warning", "text": f"Forbindelsestest: {', '.join(failed)} svarer ikke. Se Indstillinger → Forbindelser."})
+            bad = [item for item in diagnostics.get("checks", []) if not item["ok"] and not item.get("optional")]
+            failed = [item["label"] for item in bad]
+            # Selve fejlen (kort) med i beskeden, så man ikke skal lede efter den.
+            why = f" Fejl: {str(bad[0].get('detail') or '')[:160]}" if bad else ""
+            alerts.append({"level": "warning", "text": f"Forbindelsestest: {', '.join(failed)} svarer ikke.{why} Se Indstillinger → Forbindelser."})
         if self.last_error:
             alerts.append({"level": "error", "text": f"Seneste fejl: {self.last_error}"})
         return alerts

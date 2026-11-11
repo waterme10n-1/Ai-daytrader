@@ -158,7 +158,7 @@ class MemeSettings:
             enabled=_flag(os.getenv("MEME_ENABLED"), True),
             allow_live=_flag(os.getenv("MEME_ALLOW_LIVE"), False),
             private_key=os.getenv("SOLANA_PRIVATE_KEY", "").strip(),
-            rpc_url=os.getenv("SOLANA_RPC_URL", "").strip() or DEFAULT_RPC,
+            rpc_url=os.getenv("SOLANA_RPC_URL", "").strip().strip("\"'").strip() or DEFAULT_RPC,
             jupiter_url=(os.getenv("JUPITER_API_URL", "").strip() or (KEYED_JUPITER if jupiter_key else DEFAULT_JUPITER)).rstrip("/"),
             jupiter_api_key=jupiter_key,
             jupiter_rpm=min(6000, max(5, _int(os.getenv("JUPITER_RPM"), jupiter_default_rpm))),
