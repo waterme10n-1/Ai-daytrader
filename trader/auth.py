@@ -331,10 +331,10 @@ _LOGIN_HTML = """<!DOCTYPE html>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="dark light">
 <title>Log ind · Memebot</title>
-<link rel="icon" type="image/png" href="/icons/icon-192.png?v=2">
+<link rel="icon" type="image/png" href="/icons/icon-192.png?v=3">
 <link rel="manifest" href="/manifest.webmanifest">
 <meta name="theme-color" content="#9a1119">
-<link rel="apple-touch-icon" href="/apple-touch-icon.png?v=2">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png?v=3">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -400,7 +400,7 @@ _LOGIN_HTML = """<!DOCTYPE html>
 <body>
 <main>
   <div class="brand">
-    <img src="/icons/icon-192.png?v=2" alt="">
+    <img src="/icons/icon-192.png?v=3" alt="">
     <h1>Memebot</h1>
     <p>Log ind for at følge din bot</p>
   </div>

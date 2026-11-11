@@ -62,9 +62,9 @@ MANIFEST = {
     "background_color": "#2a0406",
     "theme_color": "#9a1119",
     "icons": [
-        {"src": "/icons/icon-192.png?v=2", "sizes": "192x192", "type": "image/png", "purpose": "any"},
-        {"src": "/icons/icon-512.png?v=2", "sizes": "512x512", "type": "image/png", "purpose": "any"},
-        {"src": "/icons/icon-maskable-512.png?v=2", "sizes": "512x512", "type": "image/png", "purpose": "maskable"},
+        {"src": "/icons/icon-192.png?v=3", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+        {"src": "/icons/icon-512.png?v=3", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+        {"src": "/icons/icon-maskable-512.png?v=3", "sizes": "512x512", "type": "image/png", "purpose": "maskable"},
     ],
 }
 

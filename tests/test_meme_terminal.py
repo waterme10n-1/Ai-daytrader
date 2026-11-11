@@ -66,16 +66,16 @@ def test_new_red_app_icon_and_red_manifest(tmp_path):
     from trader.config import Settings
 
     assert MANIFEST["theme_color"] == "#9a1119"
-    assert all(icon["src"].endswith("?v=2") for icon in MANIFEST["icons"])
+    assert all(icon["src"].endswith("?v=3") for icon in MANIFEST["icons"])
     engine, *_ = make_engine()
     engine.start = lambda: None
     engine.stop = lambda: None
     settings = dataclasses.replace(Settings.from_env(), db_path=str(tmp_path / "t.db"), host="127.0.0.1", app_username="",
                                    app_password="", app_password_hash="", session_secret="")
     with TestClient(create_app(settings=settings, meme_engine=engine)) as client:
-        icon = client.get("/icons/icon-192.png?v=2")
+        icon = client.get("/icons/icon-192.png?v=3")
         assert icon.status_code == 200 and icon.content[:8] == b"\x89PNG\r\n\x1a\n"
-        assert client.get("/apple-touch-icon.png?v=2").status_code == 200
+        assert client.get("/apple-touch-icon.png?v=3").status_code == 200
 
 
 def test_every_colour_has_a_brand_tint_for_the_fade_and_the_logo():
