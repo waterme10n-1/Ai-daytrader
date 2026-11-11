@@ -582,6 +582,16 @@ def test_new_limits_are_checked_on_the_page(tmp_path):
     assert make_desk(tmp_path / "d", FakeBroker({}), watchlist=("NVDA",))[0].cfg.time_stop_min == 90
 
 
+def test_skeptic_rules_say_buy_a_bit_above_vwap_and_wait_only_when_far_above():
+    news = {"has_reason": True}
+    flag = {"by_move": True, "move_pct": 2.0, "vs_vwap_pct": 2.5}
+    verdict = rules.rules_skeptic(flag, news, {}, at(11, 30), stop_max_pct=2)
+    assert verdict["ruling"] == "BUY"  # 2,5 % over VWAP var WAIT før; nu først over 3 %
+    far = rules.rules_skeptic({**flag, "vs_vwap_pct": 3.2}, news, {}, at(11, 30), stop_max_pct=2)
+    assert far["ruling"] == "WAIT"
+    assert rules.rules_skeptic(flag, {"has_reason": False}, {}, at(11, 30), stop_max_pct=2)["ruling"] == "SKIP"
+
+
 def test_new_scout_defaults():
     from trader.desk.config import DEFAULT_WATCHLIST
 
