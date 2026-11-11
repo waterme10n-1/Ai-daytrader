@@ -142,6 +142,7 @@ class DeskSettings:
     approval_minutes: int = 10
     scan_minutes: int = 1
     auto_approve: bool = True
+    use_claude: bool = True  # kontakt på siden: slå Claude fra, så NEWS og SKEPTIC kører på faste regler
     # Prøvekøb: siger SKEPTIC WAIT til en handel med en klar grund og en ren opstilling, køber bordet halv størrelse
     # alligevel. Så kommer der flere handler på papir, og bordet lærer af rigtige resultater i stedet for kun skygger.
     trial_buys: bool = True
@@ -190,6 +191,7 @@ class DeskSettings:
             approval_minutes=max(2, min(60, _int(os.getenv("DESK_APPROVAL_MINUTES"), 10))),
             scan_minutes=max(1, min(30, _int(os.getenv("DESK_SCAN_MINUTES"), 1))),
             auto_approve=_flag(os.getenv("DESK_AUTO_APPROVE"), True),
+            use_claude=_flag(os.getenv("DESK_USE_CLAUDE"), True),
             trial_buys=_flag(os.getenv("DESK_TRIAL_BUYS"), True),
             market_filter_pct=min(5.0, max(0.0, _float(os.getenv("DESK_MARKET_FILTER_PCT"), 1.0))),
             time_stop_min=max(0, min(390, _int(os.getenv("DESK_TIME_STOP_MIN"), 90))),

@@ -127,3 +127,22 @@ def test_paper_keeps_buying_through_loss_stops_but_live_does_not():
     assert free.store.get_state("halt_dd:paper", "0") == "0"
     stops, *_ = make_engine(meme_fakes.settings(paper_loss_stops=True, max_losses_per_day=1))
     assert not stops._paper_runs_free()
+
+
+def test_the_rpc_check_names_the_host_but_never_the_key():
+    from trader.meme.diagnostics import _rpc_host, HINT_RPC_OWN
+
+    assert _rpc_host("https://mainnet.helius-rpc.com/?api-key=SECRET123") == "mainnet.helius-rpc.com"
+    assert "SECRET123" not in _rpc_host("https://mainnet.helius-rpc.com/?api-key=SECRET123")
+    assert "egen RPC" in HINT_RPC_OWN
+
+
+def test_rpc_url_survives_quotes_around_it_and_the_alert_shows_the_error(monkeypatch):
+    from trader.meme.config import MemeSettings
+
+    monkeypatch.setenv("SOLANA_RPC_URL", '  "https://mainnet.helius-rpc.com/?api-key=abc"  ')
+    assert MemeSettings.from_env().rpc_url == "https://mainnet.helius-rpc.com/?api-key=abc"
+    engine, *_ = make_engine()
+    engine.store.set_json("diagnostics", {"required_ok": False, "checks": [{"label": "Solana RPC", "ok": False, "detail": "RPC getBlockHeight: HTTP 401 [bruger mainnet.helius-rpc.com]"}]})
+    text = [a["text"] for a in engine._alerts() if a["text"].startswith("Forbindelsestest")][0]
+    assert "HTTP 401" in text and "mainnet.helius-rpc.com" in text

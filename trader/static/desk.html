@@ -753,6 +753,7 @@
     <article class="card">
       <div class="card-h"><h2>Indstillinger</h2></div>
       <form class="form" id="params">
+        <label class="wide toggle"><span class="tx">Claude<span>NEWS og SKEPTIC bruger Claude. Slå fra, hvis kontoen ingen kredit har: så kører de på faste regler, og bordet handler videre.</span></span><input autocomplete="off" name="use_claude" type="checkbox"></label>
         <label class="wide toggle"><span class="tx">Autopilot<span>Bordet køber selv på papir, når SKEPTIC siger BUY.</span></span><input autocomplete="off" name="auto_approve" type="checkbox"></label>
         <label class="wide toggle"><span class="tx">Prøvekøb<span>Siger SKEPTIC WAIT, eller finder NEWS ingen grund, til en kursbevægelse med en ren opstilling, køber bordet halv størrelse alligevel. Flere handler på papir. Taber køb uden grund, lærer bordet det og stopper dem selv.</span></span><input autocomplete="off" name="trial_buys" type="checkbox"></label>
         <label class="wide toggle"><span class="tx"><span id="pre-lbl" style="display:inline;font:inherit;color:inherit">Før åbning</span><span id="pre-sub">SCOUT og NEWS kigger på gaps fra kl. 10 dansk tid, og et gap, der holder, kan købes ved åbningen.</span></span><input autocomplete="off" name="premarket" type="checkbox"></label>
@@ -1435,6 +1436,7 @@ function renderBots(d) {
   form.watchlist.value = p.watchlist.join(", ");
   ["move_pct", "volume_x", "max_flags_per_day", "scan_minutes", "gap_pct", "stop_max_pct", "reward_risk", "position_pct", "max_open", "market_filter_pct", "time_stop_min", "max_losses_per_day"].forEach((k) => { form[k].value = p[k]; });
   form.auto_approve.checked = !!p.auto_approve;
+  form.use_claude.checked = p.use_claude !== false;
   form.trial_buys.checked = !!p.trial_buys;
   form.premarket.checked = !!p.premarket;
   form.max_flags_per_day.max = p.hard.max_flags_per_day; form.position_pct.max = p.hard.position_pct; form.max_open.max = p.hard.max_open; form.stop_max_pct.max = p.hard.stop_max_pct;
@@ -1533,11 +1535,12 @@ $("log-btn").onclick = () => action("/api/desk/log", () => "Dagsloggen er skreve
 $("close-btn").onclick = () => { if (confirm("Luk alle bordets positioner nu?")) action("/api/desk/close-all", (r) => `${r.closed} position(er) lukket.`); };
 $("params").onsubmit = async (e) => {
   e.preventDefault();
-  const f = e.target, body = { watchlist: f.watchlist.value, auto_approve: f.auto_approve.checked, trial_buys: f.trial_buys.checked, premarket: f.premarket.checked };
+  const f = e.target, body = { watchlist: f.watchlist.value, use_claude: f.use_claude.checked, auto_approve: f.auto_approve.checked, trial_buys: f.trial_buys.checked, premarket: f.premarket.checked };
   ["move_pct", "volume_x", "max_flags_per_day", "scan_minutes", "gap_pct", "stop_max_pct", "reward_risk", "position_pct", "max_open", "market_filter_pct", "time_stop_min", "max_losses_per_day"].forEach((k) => { body[k] = f[k].value; });
   try { await post("/api/desk/params", body); paramsFilled = false; toast("Gemt."); refresh(); } catch (err) { toast(err.message); }
 };
 $("params").trial_buys.onchange = async (e) => { try { await post("/api/desk/params", { trial_buys: e.target.checked }); toast(e.target.checked ? "Prøvekøb er slået til: WAIT med en grund købes til halv størrelse." : "Prøvekøb er slået fra."); refresh(); } catch (err) { toast(err.message); } };
+$("params").use_claude.onchange = async (e) => { try { await post("/api/desk/params", { use_claude: e.target.checked }); toast(e.target.checked ? "Claude er slået til." : "Claude er slået fra. Bordet kører på faste regler."); refresh(); } catch (err) { toast(err.message); } };
 $("params").auto_approve.onchange = async (e) => { try { await post("/api/desk/params", { auto_approve: e.target.checked }); toast(e.target.checked ? "Autopilot er slået til." : "Du godkender nu hver ordre."); refresh(); } catch (err) { toast(err.message); } };
 $("params").premarket.onchange = async (e) => { try { await post("/api/desk/params", { premarket: e.target.checked }); toast(e.target.checked ? "SCOUT og NEWS kigger nu også før åbning." : "Bordet kigger kun i åbningstiden."); refresh(); } catch (err) { toast(err.message); } };
 $("reset-params").onclick = async () => { try { await post("/api/desk/params", { reset: true }); paramsFilled = false; toast("Tilbage til standard."); refresh(); } catch (err) { toast(err.message); } };
