@@ -96,3 +96,34 @@ def test_the_regular_scan_runs_every_10_seconds_by_default(monkeypatch):
     assert MemeSettings.from_env().scan_seconds == 10  # aldrig hurtigere end hvert 10. sekund
     monkeypatch.setenv("MEME_SCAN_SECONDS", "60")
     assert MemeSettings.from_env().scan_seconds == 60
+
+
+def test_the_no_buys_note_names_the_real_reason():
+    engine, dex, rug, _jup, _notes = make_engine()
+    engine.paused = True
+    engine.tick(force_scan=True)
+    assert "pause" in engine.last_scan["note"].lower() and "Genoptag" in engine.last_scan["note"]
+    engine.paused = False
+    engine.kill_switch = True
+    engine.tick(force_scan=True)
+    assert "Nødstop" in engine.last_scan["note"]
+
+
+def test_paper_keeps_buying_through_loss_stops_but_live_does_not():
+    import meme_fakes
+    from test_meme_guard import _closed
+
+    free, dex, rug, _jup, _notes = make_engine(meme_fakes.settings(paper_loss_stops=False, max_losses_per_day=1))
+    for n in range(4):
+        _closed(free, "momentum", [-0.5])
+    free.store.set_state("halt_dd:paper", "1")
+    free.store.set_state(f"halt_day:paper:{__import__('trader.meme.store', fromlist=['utc_day']).utc_day()}", "1")
+    dex.pairs[MINT] = raw_pair(MINT)
+    dex.boosts.append(MINT)
+    rug.reports[MINT] = safe_report()
+    free.tick(force_scan=True)
+    assert free._entry_halt("2026-01-01") == ""
+    assert free.status()["halted_day"] is False and free.status()["halted_drawdown"] is False
+    assert free.store.get_state("halt_dd:paper", "0") == "0"
+    stops, *_ = make_engine(meme_fakes.settings(paper_loss_stops=True, max_losses_per_day=1))
+    assert not stops._paper_runs_free()

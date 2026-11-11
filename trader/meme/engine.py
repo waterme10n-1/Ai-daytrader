@@ -1117,8 +1117,15 @@ class MemeEngine:
         self._sol_hist.append((now, fresh))
         return fresh
 
+    def _paper_runs_free(self) -> bool:
+        """Papir stopper ikke af sig selv (tabsstop og SOL-filter), medmindre MEME_PAPER_LOSS_STOPS er slået til."""
+        return self.mode == "paper" and not self.settings.paper_loss_stops
+
     def _entry_halt(self, day: str) -> str:
-        """Hvorfor botten ikke køber nye tokens lige nu. Tom streng, hvis den må købe. Salg berøres aldrig."""
+        """Hvorfor botten ikke køber nye tokens lige nu. Tom streng, hvis den må købe. Salg berøres aldrig.
+        På papir køber botten hele tiden: tabsstop og SOL-filteret er for rigtige penge, og papir skal lære af sine tab."""
+        if self._paper_runs_free():
+            return ""
         drop = sol_drop_pct(self._sol_hist, time.time())
         if sol_halt(drop, self.settings):
             return (
@@ -1129,6 +1136,22 @@ class MemeEngine:
         if losses_halt(losses, self.settings):
             return f"Der er lukket {losses} handler med tab i dag (grænsen er {self.settings.max_losses_per_day}). Botten køber ikke flere nye tokens i dag."
         return ""
+
+    def _why_no_entries(self, halted_day: bool, halted_dd: bool, entry_halt: str) -> str:
+        """Den præcise grund til, at der ikke købes nye tokens, så siden ikke kun siger "pause, nødstop eller tabsgrænse"."""
+        if self.kill_switch:
+            return "Nødstop er slået til. Tryk Genoptag for at købe igen."
+        if self.paused:
+            return "Botten er sat på pause. Tryk Genoptag for at købe igen."
+        if halted_dd:
+            return f"Samlet tab har ramt grænsen på {self.settings.max_drawdown_pct * 100:.0f} % af bankroll. Tryk Genoptag, når du vil købe igen."
+        if halted_day:
+            return f"Dagens tab har ramt grænsen på {self.settings.daily_loss_pct * 100:.0f} % af bankroll. Ingen nye køb før i morgen (UTC)."
+        return entry_halt
+
+    def _no_entries_note(self) -> str:
+        reason = getattr(self, "_block_reason", "")
+        return f"Ingen nye køb: {reason}" if reason else "Ingen nye køb (pause, nødstop eller tabsgrænse)."
 
     def _note_entry_halt(self, day: str, why: str) -> None:
         """Én besked om stoppet, højst hvert halve time, så loggen ikke fyldes op."""
@@ -1183,6 +1206,7 @@ class MemeEngine:
                 if entry_halt:
                     self._note_entry_halt(day, entry_halt)
                 entries_allowed = not (self.kill_switch or self.paused or halted_day or halted_dd or entry_halt)
+                self._block_reason = self._why_no_entries(halted_day, halted_dd, entry_halt)
                 # Top 10 har ingen daglig tabsgrænse, medmindre du slår den til. Nødstop, pause og samlet tabsgrænse gælder altid.
                 top_entries_allowed = not (
                     self.kill_switch or self.paused or halted_dd or entry_halt or (halted_day and self.top_cfg.daily_loss_stop)
@@ -1234,7 +1258,7 @@ class MemeEngine:
             positions = self.store.open_positions(self.mode)
             if not positions:
                 return
-        if self.kill_switch or (self.loss_limits["drawdown"] and self.store.get_state(f"halt_dd:{self.mode}", "0") == "1"):
+        if self.kill_switch or (not self._paper_runs_free() and self.loss_limits["drawdown"] and self.store.get_state(f"halt_dd:{self.mode}", "0") == "1"):
             # Et salg kan fejle under nødstop. Bliv ved med at prøve, indtil alt er solgt eller skrevet af.
             for pos in positions:
                 self._sell(pos, 1.0, "kill", "Nødstop: prøver at sælge igen.", wallet, sol_usd)
@@ -1557,6 +1581,12 @@ class MemeEngine:
         mode = self.mode
         day_key = f"halt_day:{mode}:{day}"
         dd_key = f"halt_dd:{mode}"
+        if self._paper_runs_free():
+            # Papir stopper aldrig af sig selv: gamle stop fra før ryddes, så botten kører videre.
+            for key in (day_key, dd_key):
+                if self.store.get_state(key, "0") == "1":
+                    self.store.set_state(key, "0")
+            return False, False
         halted_day = self.loss_limits["daily"] and self.store.get_state(day_key, "0") == "1"
         halted_dd = self.loss_limits["drawdown"] and self.store.get_state(dd_key, "0") == "1"
         if self.loss_limits["daily"] and not halted_day and daily_loss_hit(totals["today_pnl"], self.settings):
@@ -2049,7 +2079,7 @@ class MemeEngine:
             self.store.add_event("info", f"Fulgt wallet {signal.wallet[:4]}…{signal.wallet[-4:]} købte {signal.mint[:6]}… for {signal.sol:.2f} SOL.")
 
         if not entries_allowed:
-            summary["note"] = "Ingen nye køb (pause, nødstop eller tabsgrænse)."
+            summary["note"] = self._no_entries_note()
             return
 
         found, errors = self._discover(copy_buys)
@@ -2193,7 +2223,7 @@ class MemeEngine:
         summary: dict[str, Any] = {"checked": 0, "new": 0, "young": 0, "passed": 0, "bought": 0, "errors": [], "at": now_iso()}
         self.last_snipe = summary
         if not entries_allowed:
-            summary["note"] = "Ingen nye køb (pause, nødstop eller tabsgrænse)."
+            summary["note"] = self._no_entries_note()
             return
         now = time.time()
         seen = {mint: stamp for mint, stamp in (self.store.get_json("sniper_seen", {}) or {}).items() if now - float(stamp) < SNIPER_SEEN_HOURS * 3600}
@@ -3630,8 +3660,8 @@ class MemeEngine:
             "mode": mode,
             "kill_switch": self.kill_switch,
             "paused": self.paused,
-            "halted_day": self.loss_limits["daily"] and self.store.get_state(f"halt_day:{mode}:{today}", "0") == "1",
-            "halted_drawdown": self.loss_limits["drawdown"] and self.store.get_state(f"halt_dd:{mode}", "0") == "1",
+            "halted_day": not self._paper_runs_free() and self.loss_limits["daily"] and self.store.get_state(f"halt_day:{mode}:{today}", "0") == "1",
+            "halted_drawdown": not self._paper_runs_free() and self.loss_limits["drawdown"] and self.store.get_state(f"halt_dd:{mode}", "0") == "1",
             "loss_limits": {
                 **self.loss_limits,
                 "daily_usd": round(self.settings.daily_loss_pct * self.settings.bankroll_usd, 2),
