@@ -148,3 +148,25 @@ def test_running_bots_get_more_trades_once_and_new_bots_use_the_new_defaults():
     engine.update_trade_limits({"max_open": 2})
     engine._maybe_upgrade_v3()  # kun én gang: dit eget valg står ved magt
     assert engine.settings.max_open == 2
+
+
+def test_running_bots_let_more_coins_through_once_but_keep_your_own_numbers():
+    engine, *_ = make_engine()
+    engine.params.min_liquidity_usd = 25_000.0
+    engine.params.min_organic_score = 30.0
+    engine.params.min_score = 0.6
+    engine.update_params({"min_score": 0.7})  # din egen: låst
+    engine.sniper.min_holders = 25
+    engine.store.set_json("params", engine.params.to_dict())
+    engine.store.set_state("upgrade_v4", "")
+    engine._maybe_upgrade_v4()
+    assert engine.params.min_liquidity_usd == 15_000 and engine.params.min_organic_score == 20
+    assert engine.params.min_score == 0.7
+    assert engine.sniper.min_holders == 15
+    assert engine.store.get_json("params")["min_liquidity_usd"] == 15_000
+    log = engine.store.get_json("auto_changes")
+    assert {item["param"] for entry in log for item in entry["changes"]} >= {"min_liquidity_usd", "min_organic_score", "min_holders"}
+    assert "Rug-" in engine.store.recent_lessons(1)[0]["text"]
+    engine.params.min_liquidity_usd = 30_000
+    engine._maybe_upgrade_v4()  # kun én gang
+    assert engine.params.min_liquidity_usd == 30_000

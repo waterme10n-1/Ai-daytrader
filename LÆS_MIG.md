@@ -72,6 +72,8 @@ python tests/meme_soak.py 50 250 hard
 
 ## Dashboardet
 
+**Udseende.** Under **Menu → Udseende** vælger du baggrund (Mørk, Midnat, Lys eller Telefon, som følger telefonens indstilling) og en af ni farver (blå, indigo, lilla, pink, orange, guld, grøn, mint og Solana). Valget huskes på enheden.
+
 Efter login lander du på `/meme`. Siden er bygget til mobilen først og opdaterer sig selv hvert 8. sekund. Memebot og Handelsbordet har nu samme udseende: de samme farver, skrifter og kort. Du skifter mellem lys og mørk tilstand i **Menu**, og valget huskes på telefonen. Navigationen ligger i bunden på telefonen og øverst på en computer, ligesom på handelsbordet.
 
 - **Hjem → Relæ** (det første, du ser) viser botten som fem agenter, der giver stafetten videre:
@@ -146,7 +148,7 @@ Hvert minut:
 6. **Claude** (hvis nøglen er sat) søger på X, nyheder og fora efter røde flag: falske konti, koordineret shill, kopier af kendte tokens, rug-historik. Claude kan kun sige nej. Claude kan aldrig tvinge et køb igennem eller ændre risikogrænserne.
 7. **Risiko**: højst `MEME_POSITION_USD` pr. handel, aldrig mere end `MEME_BANKROLL_USD` i alt, højst `MEME_MAX_OPEN` åbne (standard 4) og `MEME_MAX_TRADES_PER_DAY` køb om dagen (standard 15). På papir kan antallet ændres under **Strategi → Almindelig → Antal handler**.
 
-**Prøvekøb** (kun papir): et token, hvis score er højst 0,10 under grænsen, købes for en tredjedel af beløbet (mindst 1 USD). Det samme gælder tokens fra en strategi, som strategi-vagten har sat på pause. Så får botten flere rigtige handler at lære af uden at risikere det fulde beløb. Højst 8 om dagen (kan ændres, 0 slår dem fra) og 3 åbne ad gangen. De har egne grænser, så de tager ikke pladsen fra almindelige køb, de står med mærket "prøve", og de tæller ikke med i kravene før rigtige penge. Botten tjekker nu op til 8 tokens grundigt pr. runde og køber op til 3.
+**Prøvekøb** (kun papir): et token, hvis score er højst 0,15 under grænsen, købes for en tredjedel af beløbet (mindst 1 USD). Det samme gælder tokens fra en strategi, som strategi-vagten har sat på pause. Så får botten flere rigtige handler at lære af uden at risikere det fulde beløb. Højst 8 om dagen (kan ændres, 0 slår dem fra) og 3 åbne ad gangen. De har egne grænser, så de tager ikke pladsen fra almindelige køb, de står med mærket "prøve", og de tæller ikke med i kravene før rigtige penge. Botten tjekker nu op til 8 tokens grundigt pr. runde og køber op til 3.
 
 Hvert 15. sekund overvåges åbne positioner: stop-loss (-25 %), halvdelen sælges ved +60 %, trailing stop 25 % fra toppen, salg hvis likviditeten trækkes (rug-alarm), hvis intet sker, eller hvis den fulgte trader sælger. Tomme token-konti lukkes, så rent-depositummet kommer tilbage.
 
@@ -213,6 +215,8 @@ For hvert token, botten følger (købt eller afvist), gemmes de rå tal: likvidi
 - **Den automatiske strammer** (følger **Det bedste mål automatisk**, `MEME_AUTO_TARGETS`): viser data, at en strammere grænse ville have sorteret mindst 25 tokens fra, som i snit tabte mindst 5 %, mens resten klarede sig tydeligt bedre, strammes grænsen. Kun strammere, aldrig løsere, højst ét filter pr. strategi i døgnet, og altid inden for de faste grænser. Hver stramning står som en lektion med tallene bag. Den almindelige strategi kan strammes på bottens score (min. score for køb, regnet med de vægte botten bruger nu), organisk score, likviditet, markedsværdi, alder, stigning sidste time, top-10, insidere og rug-risiko. Sniperen på ventetid, likviditet, holdere, top-10 og organisk score.
 - **Automatiske ændringer** (Læring) samler alt, læringen selv har flyttet: mål og stop, strammede filtre og justeringer efter rugs og stop-loss, med tallene før og efter og grunden. **Fortryd** sætter tallene tilbage, og læringen rører dem så ikke i 7 dage. Er et tal ændret igen siden, står der "ændret siden", og du retter det direkte under Strategi.
 - **Hent data (JSON)** på samme kort giver én fil med alle handler, skyggehandler med fakta, indstillinger, modelvægte og lektioner. Der er ingen nøgler eller adgangskoder i den. Send den videre, hvis du vil have en grundig analyse af, hvor botten taber.
+
+**Flere coins igennem (nov. 2026).** Markedsfiltrene er løsnet: likviditet 15.000 $ (før 25.000), volumen 5.000 $ den seneste time, 40 handler, alder 15 min., markedsværdi 40.000 $, stigning op til 300 % på en time, 45 % køb, score 0,50 og organisk score 20. Sniperen: 6.000 $ likviditet, 15 holdere og top-10 op til 35 %. Rug-, mint/freeze-, honeypot-, insider- og mistænkelig-tjekkene er uændrede. En bot, der allerede kører, får de løsere tal én gang, men tal, du selv har sat, røres ikke, og ændringen kan fortrydes under Læring → Automatiske ændringer.
 
 ## Sådan lærer den
 

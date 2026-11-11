@@ -186,7 +186,7 @@ PARAM_LOCK_DAYS = 7
 CHANGE_LOG_KEPT = 60
 # Prøvekøb (kun papir): en tredjedel af beløbet på tokens, der næsten bestod, og på strategier, vagten har sat på pause.
 TRIAL_FRACTION = 1 / 3
-TRIAL_SCORE_MARGIN = 0.10
+TRIAL_SCORE_MARGIN = 0.15
 TRIAL_MAX_OPEN = 3
 TRIAL_PER_DAY_DEFAULT = 8
 # Antal handler kan sættes fra siden (gælder papir; med rigtige penge gælder MEME_MAX_* fra miljøet).
@@ -207,6 +207,15 @@ TRADE_LIMIT_LABELS = {
 # Én gang: flere handler for en bot, der allerede kører.
 UPGRADE_V3 = "flere-handler-nov-2026"
 UPGRADE_V3_LIMITS = {"max_trades_per_day": 15, "max_open": 4, "sniper_max_per_day": 15, "sniper_max_open": 3}
+# Én gang: flere coins igennem. Kun løsere filtre, aldrig de hårde rug-, mint/freeze- og honeypot-tjek.
+UPGRADE_V4 = "flere-coins-nov-2026"
+LOOSER_PARAMS = {
+    "min_liquidity_usd": 15_000.0, "min_volume_h1_usd": 5_000.0, "min_txns_h1": 40, "min_age_minutes": 15.0,
+    "min_mcap_usd": 40_000.0, "max_change_h1_pct": 300.0, "min_buy_ratio_h1": 0.45, "min_score": 0.5, "min_organic_score": 20.0,
+}
+LOOSER_SNIPER = {"min_liquidity_usd": 6_000.0, "min_holders": 15, "max_top10_pct": 35.0}
+LOWER_IS_LOOSER = {"min_liquidity_usd", "min_volume_h1_usd", "min_txns_h1", "min_age_minutes", "min_mcap_usd", "min_buy_ratio_h1",
+                   "min_score", "min_organic_score", "min_holders"}
 PAPER_MIN_USD, PAPER_MAX_USD = 5.0, 100_000.0
 AUTO_TARGET_MIN_PATHS = 40
 AUTO_TARGET_GAIN = 0.02
@@ -419,6 +428,7 @@ class MemeEngine:
         self._maybe_research_upgrade()
         self._maybe_upgrade_v2()
         self._maybe_upgrade_v3()
+        self._maybe_upgrade_v4()
         self._maybe_restart_once()
 
     # ------------------------------------------------------------------ livscyklus
@@ -612,6 +622,35 @@ class MemeEngine:
             f"{stored['sniper_max_per_day']} snipes ({stored['sniper_max_open']} åbne) og op til {self._trial_per_day()} prøvekøb "
             "for en tredjedel af beløbet. Kan ændres under Strategi → Almindelig."
         )
+        self.store.add_lesson("parameter", text)
+        self.store.add_event("info", text)
+
+    def _maybe_upgrade_v4(self) -> None:
+        """Én gang: løsere filtre, så flere coins kommer igennem. Tal, du selv har sat, røres ikke,
+        og hver ændring kan fortrydes under Læring → Automatiske ændringer."""
+        if self.store.get_state("upgrade_v4") == UPGRADE_V4:
+            return
+        self.store.set_state("upgrade_v4", UPGRADE_V4)
+        if self.store.get_json("params") is None:
+            return  # ny bot: standarderne er allerede de løsere
+        for strategy, target, wanted in (("momentum", self.params, LOOSER_PARAMS), ("sniper", self.sniper, LOOSER_SNIPER)):
+            locked = self._locked(strategy)
+            moved = []
+            for name, value in wanted.items():
+                old = float(getattr(target, name))
+                looser = value < old if name in LOWER_IS_LOOSER else value > old
+                if name in locked or not looser:
+                    continue
+                setattr(target, name, int(value) if isinstance(getattr(target, name), int) and not isinstance(getattr(target, name), bool) else value)
+                moved.append((name, old, value))
+            if moved:
+                if strategy == "sniper":
+                    self._save_sniper()
+                else:
+                    self._save_learning()
+                self._log_change(strategy, moved, "Flere coins igennem: løsere markedsfiltre. De hårde rug-tjek er uændrede.", "opgradering")
+        text = ("Flere coins igennem: løsere filtre for likviditet, volumen, alder, markedsværdi, score og organisk score, "
+                "og prøvekøb op til 0,15 under scoregrænsen. Rug-, mint/freeze-, honeypot- og insider-tjek er uændrede.")
         self.store.add_lesson("parameter", text)
         self.store.add_event("info", text)
 

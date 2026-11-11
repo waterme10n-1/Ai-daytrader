@@ -8,6 +8,7 @@
 <link rel="icon" type="image/png" href="/icons/icon-192.png">
 <link rel="manifest" href="/manifest.webmanifest">
 <meta name="theme-color" content="#000000">
+<script>(function(){try{var d=document.documentElement,t=localStorage.getItem("meme-theme")||"dark",a=localStorage.getItem("meme-accent");if(a)d.dataset.accent=a;var l=t==="light"||(t==="auto"&&matchMedia("(prefers-color-scheme: light)").matches);d.dataset.theme=l?"light":"dark";if(t==="midnat")d.dataset.bg="midnat";}catch(e){}})();</script>
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -871,6 +872,45 @@
 </style>
 
 <style id="relay">
+
+  /* ---------- Udseende: baggrund og accentfarve (Menu → Udseende) ---------- */
+  :root[data-accent="blaa"] { --accent: #0a84ff; --accent-soft: color-mix(in srgb, #0a84ff 16%, transparent); --on-accent: #ffffff; --grad: #0a84ff; --glow-2: #30d158; }
+  :root[data-theme="light"][data-accent="blaa"] { --accent: #007aff; --accent-soft: color-mix(in srgb, #007aff 11%, transparent); --on-accent: #ffffff; --grad: #007aff; }
+  :root[data-accent="indigo"] { --accent: #5e5ce6; --accent-soft: color-mix(in srgb, #5e5ce6 16%, transparent); --on-accent: #ffffff; --grad: #5e5ce6; --glow-2: #64d2ff; }
+  :root[data-theme="light"][data-accent="indigo"] { --accent: #4b49d1; --accent-soft: color-mix(in srgb, #4b49d1 11%, transparent); --on-accent: #ffffff; --grad: #4b49d1; }
+  :root[data-accent="lilla"] { --accent: #bf5af2; --accent-soft: color-mix(in srgb, #bf5af2 16%, transparent); --on-accent: #ffffff; --grad: #bf5af2; --glow-2: #ff375f; }
+  :root[data-theme="light"][data-accent="lilla"] { --accent: #9b3fd6; --accent-soft: color-mix(in srgb, #9b3fd6 11%, transparent); --on-accent: #ffffff; --grad: #9b3fd6; }
+  :root[data-accent="pink"] { --accent: #ff375f; --accent-soft: color-mix(in srgb, #ff375f 16%, transparent); --on-accent: #ffffff; --grad: #ff375f; --glow-2: #bf5af2; }
+  :root[data-theme="light"][data-accent="pink"] { --accent: #d6244c; --accent-soft: color-mix(in srgb, #d6244c 11%, transparent); --on-accent: #ffffff; --grad: #d6244c; }
+  :root[data-accent="orange"] { --accent: #ff9f0a; --accent-soft: color-mix(in srgb, #ff9f0a 16%, transparent); --on-accent: #1c1c1e; --grad: #ff9f0a; --glow-2: #ff375f; }
+  :root[data-theme="light"][data-accent="orange"] { --accent: #c76b00; --accent-soft: color-mix(in srgb, #c76b00 11%, transparent); --on-accent: #ffffff; --grad: #c76b00; }
+  :root[data-accent="guld"] { --accent: #ffd60a; --accent-soft: color-mix(in srgb, #ffd60a 16%, transparent); --on-accent: #1c1c1e; --grad: #ffd60a; --glow-2: #ff9f0a; }
+  :root[data-theme="light"][data-accent="guld"] { --accent: #9a7a00; --accent-soft: color-mix(in srgb, #9a7a00 11%, transparent); --on-accent: #ffffff; --grad: #9a7a00; }
+  :root[data-accent="groen"] { --accent: #30d158; --accent-soft: color-mix(in srgb, #30d158 16%, transparent); --on-accent: #0b1a10; --grad: #30d158; --glow-2: #64d2ff; }
+  :root[data-theme="light"][data-accent="groen"] { --accent: #1f9d48; --accent-soft: color-mix(in srgb, #1f9d48 11%, transparent); --on-accent: #ffffff; --grad: #1f9d48; }
+  :root[data-accent="mint"] { --accent: #66d4cf; --accent-soft: color-mix(in srgb, #66d4cf 16%, transparent); --on-accent: #062321; --grad: #66d4cf; --glow-2: #5e5ce6; }
+  :root[data-theme="light"][data-accent="mint"] { --accent: #0a8f89; --accent-soft: color-mix(in srgb, #0a8f89 11%, transparent); --on-accent: #ffffff; --grad: #0a8f89; }
+  :root[data-accent="solana"] { --accent: #9945ff; --accent-soft: color-mix(in srgb, #9945ff 16%, transparent); --on-accent: #ffffff; --grad: #9945ff; --glow-2: #14f195; }
+  :root[data-theme="light"][data-accent="solana"] { --accent: #7a2fe0; --accent-soft: color-mix(in srgb, #7a2fe0 11%, transparent); --on-accent: #ffffff; --grad: #7a2fe0; }
+  :root[data-accent] body::before { background:
+      radial-gradient(50% 50% at 22% 8%, color-mix(in srgb, var(--accent) 26%, transparent), transparent 72%),
+      radial-gradient(42% 42% at 88% 14%, color-mix(in srgb, var(--glow-2, var(--accent)) 14%, transparent), transparent 72%); }
+  :root[data-bg="midnat"]:not([data-theme="light"]) {
+    --bg: #070b16; --surface: #0f1526; --surface-2: #141b2f; --raised: #1a2238; --raised-2: #222b45;
+    --border: rgba(160,180,255,0.09); --border-strong: rgba(160,180,255,0.18); --seg-on: #222b45;
+    --glass: rgba(15,21,38,0.8); --glass-nav: rgba(15,21,38,0.88);
+  }
+  .look { margin: 4px 0 14px; }
+  .look .label { margin: 0 2px 8px; color: var(--muted); font-size: 12.5px; font-weight: 600; }
+  .look-modes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-bottom: 12px; }
+  .look-modes button { height: 54px; border-radius: 13px; border: 1.5px solid transparent; background: var(--surface-2); color: var(--text); font: 650 12.5px var(--font); cursor: pointer; display: grid; place-items: center; gap: 2px; padding: 6px 2px; }
+  .look-modes button i { width: 22px; height: 14px; border-radius: 4px; border: 1px solid var(--border-strong); }
+  .look-modes button[aria-pressed="true"] { border-color: var(--accent); }
+  .look-colors { display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 6px; }
+  .look-colors button { aspect-ratio: 1; max-width: 40px; width: 100%; justify-self: center; border-radius: 50%; border: 0; cursor: pointer; background: var(--sw); position: relative; }
+  .look-colors button[aria-pressed="true"]::after { content: ""; position: absolute; inset: -4px; border-radius: 50%; border: 2px solid var(--sw); }
+  .look-colors button[aria-pressed="true"]::before { content: ""; position: absolute; inset: 35%; border-radius: 50%; background: #fff; }
+
   /* ---------- Relæ: fem agenter, der giver hinanden stafetten ----------
      Hver agent har sin farve. Kun transform og opacity animeres, så telefonen ikke skal arbejde. */
   #panel-relae { --c-scout: #0a84ff; --c-analyst: #bf5af2; --c-buyer: #ff9f0a; --c-risk: #ff375f; --c-banker: #30d158; }
@@ -1375,6 +1415,7 @@
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="menu-title">
     <div class="grab"></div>
     <h3 id="menu-title" style="margin-bottom:14px">Menu</h3>
+    <div class="look" id="look"></div>
     <button class="menu-item" id="theme" type="button" hidden></button>
     <button class="menu-item" id="notify" type="button" aria-pressed="false"></button>
     <button class="menu-item" id="menu-app" type="button"></button>
@@ -1546,15 +1587,53 @@ function axiomLink(mint, pairUrl) {
   return `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer" title="Åbn i Axiom">AX</a>`;
 }
 
-/* ---------- Tema og faner ---------- */
+/* ---------- Tema, farver og faner ---------- */
+const LOOK_MODES = [["dark", "Mørk", "#000000"], ["midnat", "Midnat", "#070b16"], ["light", "Lys", "#f2f2f7"], ["auto", "Telefon", "linear-gradient(135deg,#000 50%,#f2f2f7 50%)"]];
+const LOOK_COLORS = [["blaa", "Blå", "#0a84ff"], ["indigo", "Indigo", "#5e5ce6"], ["lilla", "Lilla", "#bf5af2"], ["pink", "Pink", "#ff375f"], ["orange", "Orange", "#ff9f0a"], ["guld", "Guld", "#ffd60a"], ["groen", "Grøn", "#30d158"], ["mint", "Mint", "#66d4cf"], ["solana", "Solana", "linear-gradient(135deg,#9945ff,#14f195)"]];
+let lookMode = "dark", lookColor = "blaa";
+function lookGet(key, fallback) { try { return localStorage.getItem(key) || fallback; } catch (e) { return fallback; } }
+function lookSet(key, value) { try { localStorage.setItem(key, value); } catch (e) {} }
 function applyTheme(theme, save = true) {
-  const dark = theme !== "light";
-  document.documentElement.dataset.theme = dark ? "dark" : "light";
+  // theme: dark, midnat, light eller auto (følg telefonen)
+  lookMode = LOOK_MODES.some((m) => m[0] === theme) ? theme : "dark";
+  const systemLight = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches;
+  const light = lookMode === "light" || (lookMode === "auto" && systemLight);
+  const root = document.documentElement;
+  root.dataset.theme = light ? "light" : "dark";
+  if (lookMode === "midnat") root.dataset.bg = "midnat"; else delete root.dataset.bg;
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute("content", dark ? "#000000" : "#f2f2f7");
-  if (save) { try { localStorage.setItem("meme-theme", dark ? "dark" : "light"); } catch (e) {} }
+  if (meta) meta.setAttribute("content", light ? "#f2f2f7" : lookMode === "midnat" ? "#070b16" : "#000000");
+  if (save) lookSet("meme-theme", lookMode);
+  renderLook();
   for (const k of Object.keys(cache)) delete cache[k];
   if (state) render(state);
+}
+function applyAccent(name, save = true) {
+  lookColor = LOOK_COLORS.some((c) => c[0] === name) ? name : "blaa";
+  document.documentElement.dataset.accent = lookColor;
+  if (save) lookSet("meme-accent", lookColor);
+  renderLook();
+  for (const k of Object.keys(cache)) delete cache[k];
+  if (state) render(state);
+}
+function renderLook() {
+  const box = document.getElementById("look");
+  if (!box) return;
+  box.innerHTML = `<div class="label">Udseende</div>
+    <div class="look-modes" role="group" aria-label="Baggrund">${LOOK_MODES.map(([id, label, bg]) => `<button type="button" data-look-mode="${id}" aria-pressed="${id === lookMode}"><i style="background:${bg}"></i>${esc(label)}</button>`).join("")}</div>
+    <div class="label">Farve</div>
+    <div class="look-colors" role="group" aria-label="Farve">${LOOK_COLORS.map(([id, label, sw]) => `<button type="button" data-look-color="${id}" aria-pressed="${id === lookColor}" aria-label="${esc(label)}" title="${esc(label)}" style="--sw:${sw}"></button>`).join("")}</div>`;
+}
+document.getElementById("look").addEventListener("click", (ev) => {
+  const mode = ev.target.closest("[data-look-mode]");
+  const color = ev.target.closest("[data-look-color]");
+  if (mode) applyTheme(mode.dataset.lookMode);
+  else if (color) applyAccent(color.dataset.lookColor);
+});
+if (window.matchMedia) {
+  const mq = window.matchMedia("(prefers-color-scheme: light)");
+  const follow = () => { if (lookMode === "auto") applyTheme("auto", false); };
+  if (mq.addEventListener) mq.addEventListener("change", follow);
 }
 function navOf(view) { return NAV.find((n) => n[3].includes(view)) || NAV[0]; }
 function setTab(name, push) {
@@ -2941,10 +3020,9 @@ document.getElementById("menu-btn").innerHTML = icon("menu");
 document.getElementById("menu-app").innerHTML = icon("phone") + "Læg på hjemmeskærmen";
 document.getElementById("menu-settings").innerHTML = icon("plug") + "Forbindelser og indstillinger";
 if (csrfToken()) document.getElementById("logout").hidden = false;
-let storedTheme = null;
-try { storedTheme = localStorage.getItem("meme-theme"); } catch (e) {}
 const queryTheme = new URLSearchParams(location.search).get("theme");
-applyTheme(storedTheme === "light" || queryTheme === "light" ? "light" : "dark", false);
+applyAccent(lookGet("meme-accent", "blaa"), false);
+applyTheme(queryTheme || lookGet("meme-theme", "dark"), false);
 renderBell();
 renderTabs({ positions: [], kpis: { trades: 0 }, copy_wallets: [], sniper: null });
 setTab(location.hash.slice(1) || "relae", false);

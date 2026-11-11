@@ -230,19 +230,19 @@ class MemeSettings:
 class StrategyParams:
     """Filtre og exits. Læringen må flytte dem, men kun inden for PARAM_BOUNDS."""
 
-    min_liquidity_usd: float = 25_000.0
-    min_volume_h1_usd: float = 10_000.0
-    min_txns_h1: int = 60
-    min_age_minutes: float = 30.0
+    min_liquidity_usd: float = 15_000.0
+    min_volume_h1_usd: float = 5_000.0
+    min_txns_h1: int = 40
+    min_age_minutes: float = 15.0
     max_age_hours: float = 168.0
-    min_mcap_usd: float = 60_000.0
+    min_mcap_usd: float = 40_000.0
     max_mcap_usd: float = 30_000_000.0
-    max_change_h1_pct: float = 250.0
-    min_buy_ratio_h1: float = 0.48
+    max_change_h1_pct: float = 300.0
+    min_buy_ratio_h1: float = 0.45
     max_top10_pct: float = 35.0
     max_rug_score: float = 0.55
     max_roundtrip_loss_pct: float = 8.0
-    min_score: float = 0.55
+    min_score: float = 0.5
     stop_loss_pct: float = 0.25
     take_profit_pct: float = 0.6
     partial_fraction: float = 0.5
@@ -251,7 +251,7 @@ class StrategyParams:
     max_hold_minutes: float = 360.0
     stale_minutes: float = 75.0
     # Jupiters organiske score (0-100): hvor meget af handlen der kommer fra rigtige wallets og ikke bots.
-    min_organic_score: float = 30.0
+    min_organic_score: float = 20.0
     # RugCheck: wallets i samme "insider-netværk" (fundet via overførsler mellem dem).
     max_insiders: float = 50.0
     # Jupiter: hvor mange tokens udvikleren har lavet. Serie-udviklere står bag mange rug pulls.
@@ -367,9 +367,9 @@ class SniperSettings:
     # Forskning: de første 5 minutters handel afslører de fleste rug pulls. Køb først derefter.
     min_age_seconds: float = 300.0
     max_age_minutes: float = 30.0
-    min_liquidity_usd: float = 8_000.0
-    min_holders: int = 25
-    max_top10_pct: float = 30.0
+    min_liquidity_usd: float = 6_000.0
+    min_holders: int = 15
+    max_top10_pct: float = 35.0
     # 0 = fra. Nye tokens har sjældent en høj score endnu; læringen strammer den, hvis data viser det.
     min_organic_score: float = 0.0
     max_dev_mints: int = 20
