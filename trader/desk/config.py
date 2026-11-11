@@ -210,7 +210,7 @@ class DeskSettings:
         watch = parse_watchlist(os.getenv("DESK_DK_WATCHLIST"), "dk") or list(DK_WATCHLIST)
         return replace(
             base,
-            enabled=_flag(os.getenv("DESK_DK_ENABLED"), True),
+            enabled=_flag(os.getenv("DESK_DK_ENABLED"), False),  # fra, indtil Yahoo-kurserne virker stabilt
             market="dk",
             watchlist=tuple(watch),
             # Store danske aktier flytter sig mindre end de livlige amerikanske, så grænsen er lavere.

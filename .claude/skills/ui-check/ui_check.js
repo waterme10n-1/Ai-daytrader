@@ -96,7 +96,7 @@ async function main() {
     "ALPACA_API_KEY", "ALPACA_SECRET_KEY", "DESK_ALPACA_API_KEY", "DESK_ALPACA_SECRET_KEY", "X_BEARER_TOKEN",
     "APP_USERNAME", "APP_PASSWORD", "APP_PASSWORD_HASH", "APP_TOTP_SECRET", "SESSION_SECRET",
   ];
-  const env = { ...process.env, HOST: "127.0.0.1", PORT: String(port), MEME_ALLOW_LIVE: "false",
+  const env = { ...process.env, HOST: "127.0.0.1", PORT: String(port), MEME_ALLOW_LIVE: "false", DESK_DK_ENABLED: "true",
     DB_PATH: path.join(work, "trader.db"), MEME_DB_PATH: path.join(work, "meme.db"),
     DESK_DB_PATH: path.join(work, "desk.db"), DESK_DK_DB_PATH: path.join(work, "desk_dk.db") };
   for (const key of blank) env[key] = "";

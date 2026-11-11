@@ -18,16 +18,16 @@
 <style>
   :root {
     color-scheme: dark;
-    --bg: #000; --card: #141416; --card-2: #1c1c1f; --raise: #232327;
-    --fill: rgba(118, 118, 128, 0.18); --fill-2: rgba(118, 118, 128, 0.28); --sep: rgba(255, 255, 255, 0.08);
-    --text: #f5f5f7; --text-2: #c7c7cc; --muted: #8e8e93;
-    --accent: #0a84ff; --accent-bg: rgba(10, 132, 255, 0.16);
-    --up: #30d158; --up-bg: rgba(48, 209, 88, 0.16);
-    --down: #ff453a; --down-bg: rgba(255, 69, 58, 0.16);
-    --warn: #ff9f0a; --warn-bg: rgba(255, 159, 10, 0.16);
+    --bg: #08080a; --card: #121214; --card-2: #18181b; --raise: #202024;
+    --fill: rgba(255, 255, 255, 0.06); --fill-2: rgba(255, 255, 255, 0.1); --sep: rgba(255, 255, 255, 0.07);
+    --text: #f4f4f2; --text-2: #b8b8b4; --muted: #7d7d79;
+    --accent: #c6ff3d; --accent-bg: rgba(198, 255, 61, 0.13);
+    --up: #3fe08a; --up-bg: rgba(63, 224, 138, 0.14);
+    --down: #ff5a52; --down-bg: rgba(255, 90, 82, 0.14);
+    --warn: #ffb547; --warn-bg: rgba(255, 181, 71, 0.14);
     --scout: #ff9f0a; --news: #0a84ff; --chart: #40c8e0; --skeptic: #ff375f; --sizer: #bf5af2; --executor: #30d158;
     --shadow: none;
-    --bar: rgba(20, 20, 22, 0.78);
+    --bar: rgba(10, 10, 12, 0.86);
     --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", system-ui, sans-serif;
     --display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", system-ui, sans-serif;
     --r-card: 22px; --r: 14px; --r-s: 10px;
@@ -36,16 +36,16 @@
   }
   :root[data-theme="light"] {
     color-scheme: light;
-    --bg: #f2f2f7; --card: #ffffff; --card-2: #f6f6f9; --raise: #ececf1;
-    --fill: rgba(118, 118, 128, 0.12); --fill-2: rgba(118, 118, 128, 0.2); --sep: rgba(60, 60, 67, 0.12);
-    --text: #1c1c1e; --text-2: #3a3a3c; --muted: #6e6e73;
-    --accent: #007aff; --accent-bg: rgba(0, 122, 255, 0.1);
-    --up: #1f9d48; --up-bg: rgba(52, 199, 89, 0.14);
-    --down: #e0352b; --down-bg: rgba(255, 59, 48, 0.12);
-    --warn: #c76b00; --warn-bg: rgba(255, 149, 0, 0.14);
+    --bg: #eeeee9; --card: #ffffff; --card-2: #f6f6f2; --raise: #e6e6e0;
+    --fill: rgba(18, 18, 20, 0.06); --fill-2: rgba(18, 18, 20, 0.1); --sep: rgba(18, 18, 20, 0.09);
+    --text: #121214; --text-2: #3a3a37; --muted: #6b6b66;
+    --accent: #4b7a00; --accent-bg: rgba(75, 122, 0, 0.12);
+    --up: #12893e; --up-bg: rgba(18, 137, 62, 0.12);
+    --down: #d1352c; --down-bg: rgba(209, 53, 44, 0.11);
+    --warn: #b56a00; --warn-bg: rgba(181, 106, 0, 0.12);
     --scout: #ff9500; --news: #007aff; --chart: #32ade6; --skeptic: #ff2d55; --sizer: #af52de; --executor: #34c759;
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 10px 30px rgba(0, 0, 0, 0.06);
-    --bar: rgba(249, 249, 251, 0.82);
+    --bar: rgba(238, 238, 233, 0.9);
   }
   * { box-sizing: border-box; }
   html { -webkit-text-size-adjust: 100%; }
@@ -496,6 +496,48 @@
     .title .logo { width: 30px; height: 30px; border-radius: 9px; }
   }
 </style>
+<style id="bento">
+  /* ---------- Bento-terminal: samme lag på Memebot og Handelsbordet ----------
+     Sort og grafit, én limegrøn accent, store tal og kort med skarpe hårfine kanter.
+     Ingen sløring, ingen glød og ingen farvede gradienter, så telefonen ikke skal arbejde mere. */
+  :root { --r-bento: 20px; --on-accent: #0a0a0b; }
+  :root[data-theme="light"] { --on-accent: #ffffff; }
+  body { background: var(--bg) !important; }
+  body::before, body::after { display: none !important; }
+
+  /* Kort: flade felter med en hårfin kant, samlet i et bento-gitter */
+  .card { background: var(--card, var(--surface)) !important; border: 1px solid var(--sep, var(--border)) !important; border-radius: var(--r-bento) !important; box-shadow: none !important; }
+  .hero::before, .ring::before, .chart .glow { display: none !important; }
+  .grid, .cols, .stack { gap: 12px; }
+  .stat, .kpi, .tile { background: var(--card-2, var(--surface-2)) !important; border: 1px solid var(--sep, var(--border)); border-radius: 14px !important; box-shadow: none !important; }
+
+  /* Store tal: tætte, tabulære og uden gradient */
+  #equity, .equity { background: none !important; -webkit-text-fill-color: currentColor; color: var(--text) !important; font-weight: 650 !important; letter-spacing: -0.055em !important; font-variant-numeric: tabular-nums; line-height: 0.95; }
+  #equity { font-size: clamp(54px, 12vw, 88px) !important; }
+  .stat .v, .kpi .v { font-weight: 650; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; }
+  .title .name { background: none !important; -webkit-text-fill-color: var(--text) !important; color: var(--text) !important; letter-spacing: -0.03em; }
+  /* Logo og ringe i samme accent i stedet for blå og lilla gradienter */
+  #logo-g stop { stop-color: var(--accent); }
+  .title .logo svg path, .title .logo svg polyline { stroke: var(--on-accent); } .title .logo svg circle { fill: var(--on-accent); }
+  #rg-open stop:first-child { stop-color: var(--accent); } #rg-open stop:last-child { stop-color: var(--up); }
+  #rg-closed stop:first-child { stop-color: var(--text-2); } #rg-closed stop:last-child { stop-color: var(--muted); }
+  .title .logo, .logo { box-shadow: none !important; }
+  .cap, .label, .stat .k, .kpi .k, .hero .lbl { color: var(--muted); font-weight: 500; letter-spacing: 0; }
+  .card-h h2, .card-head h2 { font-weight: 600; letter-spacing: -0.02em; }
+
+  /* Accent: primærknapper og den side, du står på, er limegrønne med mørk tekst */
+  .btn.primary, .qa.primary .qa-ic { background: var(--accent) !important; color: var(--on-accent) !important; box-shadow: none !important; }
+  .appnav a[aria-current="page"] { background: var(--accent) !important; color: var(--on-accent) !important; box-shadow: none !important; }
+  .segmented button[aria-selected="true"], .seg button[aria-pressed="true"] { background: var(--text) !important; color: var(--bg) !important; box-shadow: none !important; }
+  @media (min-width: 761px) {
+    .tabs .seg button[aria-selected="true"], .nav-item[aria-current="page"] { background: var(--accent) !important; color: var(--on-accent) !important; box-shadow: none !important; }
+    .nav-item[aria-current="page"] .i { color: var(--on-accent) !important; }
+  }
+  @media (max-width: 760px) {
+    nav.tabs .seg button[aria-selected="true"] svg, .nav-item[aria-current="page"] .i { color: var(--accent) !important; }
+  }
+  :focus-visible { outline-color: var(--accent); }
+</style>
 </head>
 <body>
 <a class="skip" href="#main">Gå til indholdet</a>
@@ -505,7 +547,7 @@
   <linearGradient id="mg-up" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#30d158" stop-opacity="0.28"/><stop offset="1" stop-color="#30d158" stop-opacity="0"/></linearGradient>
   <linearGradient id="mg-dn" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff453a" stop-opacity="0.26"/><stop offset="1" stop-color="#ff453a" stop-opacity="0"/></linearGradient>
 </defs></svg>
-<nav class="appnav" aria-label="Skift side"><div class="appnav-in"><a href="/meme">Memebot</a><a href="/desk?m=us" data-m="us" aria-label="Handelsbordet i USA" aria-current="page">USA<i class="ldot" hidden></i></a><a href="/desk?m=dk" data-m="dk" id="nav-dk" aria-label="Handelsbordet i Danmark">Danmark<i class="ldot" hidden></i></a></div></nav>
+<nav class="appnav" aria-label="Skift side"><div class="appnav-in"><a href="/meme">Memebot</a><a href="/desk?m=us" data-m="us" aria-label="Handelsbordet i USA" aria-current="page">USA<i class="ldot" hidden></i></a><a href="/desk?m=dk" data-m="dk" id="nav-dk" aria-label="Handelsbordet i Danmark" hidden>Danmark<i class="ldot" hidden></i></a></div></nav>
 
 <header class="top">
   <div class="wrap bar">
@@ -722,7 +764,8 @@ const api = (url) => (DK ? url + (url.includes("?") ? "&" : "?") + "market=dk" :
     const list = d.markets || [], keys = list.map((m) => m.key);
     if (first) {
       first = false;
-      if (!keys.includes("dk")) { document.getElementById("nav-dk").hidden = true; if (DK) location.replace("/desk?m=us"); }
+      document.getElementById("nav-dk").hidden = !keys.includes("dk");
+      if (!keys.includes("dk")) { if (DK) location.replace("/desk?m=us"); }
       else if (!keys.includes("us") && !DK) location.replace("/desk?m=dk");
     }
     list.forEach((m) => {
