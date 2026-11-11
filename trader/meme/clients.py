@@ -234,6 +234,7 @@ class PairInfo:
     websites: list[str] = field(default_factory=list)
     socials: dict[str, str] = field(default_factory=dict)
     boosts_active: int = 0
+    image_url: str = ""
 
     def age_minutes(self, now_ms: int | None = None) -> float | None:
         if not self.created_at_ms:
@@ -290,7 +291,14 @@ def parse_pair(raw: dict) -> PairInfo | None:
         websites=websites,
         socials=socials,
         boosts_active=_int((raw.get("boosts") or {}).get("active")),
+        image_url=_image_url(info.get("imageUrl")),
     )
+
+
+def _image_url(value: object) -> str:
+    """Tokenets logo fra DexScreener. Kun https, så siden aldrig henter noget usikkert."""
+    url = str(value or "").strip()
+    return url[:300] if url.startswith("https://") else ""
 
 
 def best_pairs(raw_pairs: list[dict]) -> dict[str, PairInfo]:

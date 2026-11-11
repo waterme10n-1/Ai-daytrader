@@ -7,7 +7,7 @@
 <title>Handelsbordet</title>
 <link rel="manifest" href="/manifest.webmanifest">
 <meta name="theme-color" content="#000000">
-<script>(function(){try{var d=document.documentElement,t=localStorage.getItem("look-theme")||localStorage.getItem("desk-theme")||"dark",a=localStorage.getItem("look-accent");if(a&&a!=="lime")d.dataset.accent=a;var l=t==="light"||(t==="auto"&&matchMedia("(prefers-color-scheme: light)").matches);d.dataset.theme=l?"light":"dark";if(t==="midnat")d.dataset.bg="midnat";}catch(e){}})();</script>
+<script>(function(){try{var d=document.documentElement,t=localStorage.getItem("look-theme")||localStorage.getItem("desk-theme")||"dark",a=localStorage.getItem("look-accent");if(a&&a!=="lime")d.dataset.accent=a;var l=t==="light"||(t==="auto"&&matchMedia("(prefers-color-scheme: light)").matches);d.dataset.theme=l?"light":"dark";if(t==="midnat"||t==="rod")d.dataset.bg=t;}catch(e){}})();</script>
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -563,13 +563,24 @@
     --bg: #070b16; --card: #0f1526; --card-2: #141b2f; --raise: #1a2238; --sep: rgba(160,180,255,0.09);
     --fill: rgba(160,180,255,0.07); --fill-2: rgba(160,180,255,0.12); --bar: rgba(10,14,28,0.88);
   }
+  :root[data-bg="rod"]:not([data-theme="light"]) {
+    --bg: #3a0609; --card: #3d080c; --card-2: #470a0f; --raise: #561116; --sep: rgba(255,210,210,0.09);
+    --fill: rgba(255,255,255,0.07); --fill-2: rgba(255,255,255,0.13); --bar: rgba(42,5,8,0.9);
+    --text: #fff6f5; --text-2: #f0cfcd; --muted: #cf9895;
+    --up: #4ade80; --up-bg: rgba(74,222,128,0.16); --down: #ffa4a0; --down-bg: rgba(255,164,160,0.16);
+  }
+  :root[data-bg="rod"]:not([data-theme="light"]) body { background: linear-gradient(180deg, #9a1119 0, #6a0b11 420px, #430709 980px, #2a0406 100%) !important; background-color: #2a0406 !important; }
+  :root[data-accent="hvid"] { --accent: #fff3f2; --accent-bg: rgba(255,243,242,0.14); --on-accent: #2a0406; }
+  :root[data-theme="light"][data-accent="hvid"] { --accent: #1c1c1e; --accent-bg: rgba(28,28,30,0.1); --on-accent: #ffffff; }
+  :root[data-accent="roed"] { --accent: #ff453a; --accent-bg: color-mix(in srgb, #ff453a 14%, transparent); --on-accent: #ffffff; }
+  :root[data-theme="light"][data-accent="roed"] { --accent: #d70015; --accent-bg: color-mix(in srgb, #d70015 12%, transparent); --on-accent: #ffffff; }
   .look { grid-column: 1 / -1; }
   .look .lbl { display: block; margin: 0 0 8px; color: var(--muted); font-size: 12.5px; font-weight: 600; }
-  .look-modes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-bottom: 12px; }
+  .look-modes { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; margin-bottom: 12px; }
   .look-modes button { height: 54px; border-radius: 13px; border: 1.5px solid transparent; background: var(--fill); color: var(--text); font: 600 12.5px var(--font); display: grid; place-items: center; gap: 2px; padding: 6px 2px; }
   .look-modes button i { width: 22px; height: 14px; border-radius: 4px; border: 1px solid var(--fill-2); }
   .look-modes button[aria-pressed="true"] { border-color: var(--accent); }
-  .look-colors { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 5px; max-width: 460px; }
+  .look-colors { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px 5px; max-width: 320px; }
   .look-colors button { aspect-ratio: 1; max-width: 40px; width: 100%; justify-self: center; border-radius: 50%; border: 0; padding: 0; background: var(--sw); position: relative; }
   .look-colors button[aria-pressed="true"]::after { content: ""; position: absolute; inset: -4px; border-radius: 50%; border: 2px solid var(--sw); }
   .look-colors button[aria-pressed="true"]::before { content: ""; position: absolute; inset: 35%; border-radius: 50%; background: #fff; }
@@ -879,8 +890,8 @@ const mini = (values, color) => {
 };
 
 // udseende (delt med Memebot, gemmes på enheden) og lyd
-const LOOK_MODES = [["dark", "Mørk", "#08080a"], ["midnat", "Midnat", "#070b16"], ["light", "Lys", "#eeeee9"], ["auto", "Telefon", "linear-gradient(135deg,#08080a 50%,#eeeee9 50%)"]];
-const LOOK_COLORS = [["lime", "Lime", "#c6ff3d"], ["blaa", "Blå", "#0a84ff"], ["indigo", "Indigo", "#5e5ce6"], ["lilla", "Lilla", "#bf5af2"], ["pink", "Pink", "#ff375f"], ["orange", "Orange", "#ff9f0a"], ["guld", "Guld", "#ffd60a"], ["groen", "Grøn", "#30d158"], ["mint", "Mint", "#66d4cf"], ["solana", "Solana", "linear-gradient(135deg,#9945ff,#14f195)"]];
+const LOOK_MODES = [["rod", "Rød", "linear-gradient(180deg,#9a1119,#3a0609)"], ["dark", "Mørk", "#08080a"], ["midnat", "Midnat", "#070b16"], ["light", "Lys", "#eeeee9"], ["auto", "Telefon", "linear-gradient(135deg,#08080a 50%,#eeeee9 50%)"]];
+const LOOK_COLORS = [["hvid", "Hvid", "#fff3f2"], ["lime", "Lime", "#c6ff3d"], ["roed", "Rød", "#ff453a"], ["blaa", "Blå", "#0a84ff"], ["indigo", "Indigo", "#5e5ce6"], ["lilla", "Lilla", "#bf5af2"], ["pink", "Pink", "#ff375f"], ["orange", "Orange", "#ff9f0a"], ["guld", "Guld", "#ffd60a"], ["groen", "Grøn", "#30d158"], ["mint", "Mint", "#66d4cf"], ["solana", "Solana", "linear-gradient(135deg,#9945ff,#14f195)"]];
 let lookMode = "dark", lookColor = "lime";
 const lookGet = (key, old, fallback) => { try { return localStorage.getItem(key) || (old && localStorage.getItem(old)) || fallback; } catch (e) { return fallback; } };
 const lookSet = (key, value) => { try { localStorage.setItem(key, value); } catch (e) {} };
@@ -889,7 +900,7 @@ function setTheme(mode, save = true) {
   const light = lookMode === "light" || (lookMode === "auto" && window.matchMedia && matchMedia("(prefers-color-scheme: light)").matches);
   const root = document.documentElement;
   root.dataset.theme = light ? "light" : "dark";
-  if (lookMode === "midnat") root.dataset.bg = "midnat"; else delete root.dataset.bg;
+  if (lookMode === "midnat" || lookMode === "rod") root.dataset.bg = lookMode; else delete root.dataset.bg;
   if (save) lookSet("look-theme", lookMode);
   renderLook();
 }

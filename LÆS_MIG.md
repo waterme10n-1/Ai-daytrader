@@ -72,11 +72,19 @@ python tests/meme_soak.py 50 250 hard
 
 ## Dashboardet
 
-**Udseende.** Under **Menu → Udseende** (Memebot) eller **Indstillinger → Udseende** (Handelsbordet) vælger du baggrund (Mørk, Midnat, Lys eller Telefon, som følger telefonens indstilling) og en af ti farver (lime, som er standard, blå, indigo, lilla, pink, orange, guld, grøn, mint og Solana). Valget gælder begge sider og huskes på enheden.
+**Udseende.** Under **Menu → Udseende** (Memebot) eller **Indstillinger → Udseende** (Handelsbordet) vælger du baggrund (Rød, Mørk, Midnat, Lys eller Telefon, som følger telefonens indstilling) og en af tolv farver (hvid, lime, rød, blå, indigo, lilla, pink, orange, guld, grøn, mint og Solana). Valget gælder begge sider og huskes på enheden. Har du ikke valgt noget, er Memebot rød med hvid, som terminalen, og Handelsbordet mørk med lime.
 
 Efter login lander du på `/meme`. Siden er bygget til mobilen først og opdaterer sig selv hvert 8. sekund. Memebot og Handelsbordet har nu samme udseende: de samme farver, skrifter og kort. Du skifter mellem lys og mørk tilstand i **Menu**, og valget huskes på telefonen. Navigationen ligger i bunden på telefonen og øverst på en computer, ligesom på handelsbordet.
 
-- **Hjem → Relæ** (det første, du ser) viser botten som fem agenter, der giver stafetten videre:
+- **Hjem → Terminal** (det første, du ser) er bottens terminal:
+  - Første gang i en session står Memebot-logoet med tre trin (*Forbinder til Solana*, *Henter handelsfeed*, *Agenterne er online*), som følger den rigtige indlæsning.
+  - Øverst kører et bånd med dine åbne positioner og de seneste handler. Derunder står egenkapitalen ("startede med …"), gange-faktoren og resultatet i dollar og procent.
+  - Grafen viser egenkapitalen med de seneste køb og salg sat på (*Købt PEPE*, *+12,40 $*). Vælg tidsrum med **Live** (30 min.), **1T**, **4T**, **1D**, **1U** eller **Alt**.
+  - **Agenter** viser Spejder, Analytiker, Køber og Risiko med det token, hver af dem arbejder med lige nu: antal puljer set, scoren på det seneste token, beløbet på det seneste køb og stoppet på den position, der bevæger sig mest.
+  - **Aktivitet** viser køb og salg (*Købt*, *Solgt*, *Stoppet*) med beløb og resultat. **Se alle** viser flere.
+  - Tryk på en handel eller en agent for **token-siden**: markedsværdi, hvor meget den er steget eller faldet siden købet, en lysgraf fra køb til nu (eller til salget, med *Solgt +… $*), stop-linjen, positionens værdi, hvad Risiko gør, link til DexScreener og **Sælg nu**. Logoerne kommer fra DexScreener. Lukkede handler gemmer deres kursforløb, så grafen også kan ses bagefter.
+  - **Startbeløb** åbner et tastatur med 20, 100, 250 og 500 $. På papir starter det kontoen forfra med beløbet (samme som Papirkonto nedenfor, du skal bekræfte), og læringen beholdes. Med rigtige penge viser knappen **Indskud** vejen til Wallet, for der bestemmer din wallet beløbet. Live-kravene er de samme som før.
+- **Hjem → Relæ** viser botten som fem agenter, der giver stafetten videre:
   - **Spejder** finder nye tokens (scanningen, sniperen og Top 10-signaler) og tæller, hvor mange den har set.
   - **Analytiker** tjekker hvert token: RugCheck (rug, mint/freeze, LP, ejerfordeling), Jupiters audit (mistænkelig, serie-udvikler, organisk score), insidere, X-omtale og sociale links. Tallet er andelen, der består.
   - **Køber** udfører købet for den strategi, tokenet kom fra (almindelig, sniper eller Top 10), inkl. prøvekøb.

@@ -1363,6 +1363,16 @@ class MemeEngine:
         self.store.add_path_point(position_id, now, round(ratio, 5))
 
     def _close(self, pos: dict, proceeds: float, fees: float, kind: str, reason: str, signatures: list) -> None:
+        # Gem et kort kursforløb på handlen, så token-siden kan vise grafen fra køb til salg bagefter.
+        raw_safety = pos.get("safety")
+        safety = dict((loads(raw_safety, {}) if isinstance(raw_safety, str) else raw_safety) or {})
+        try:
+            path = [float(value) for value in self._path_of(int(pos["id"]))]
+            if pos.get("last_ratio"):
+                path.append(round(float(pos["last_ratio"]), 5))
+            safety["path"] = path[-PATH_POINTS:]
+        except Exception as exc:  # grafen må aldrig stoppe et salg
+            logger.info("Kursforløb kunne ikke gemmes for %s: %s", pos.get("id"), exc)
         self._paths.pop(int(pos["id"]), None)
         self._path_at.pop(int(pos["id"]), None)
         self._priced_at.pop(int(pos["id"]), None)
@@ -1381,6 +1391,7 @@ class MemeEngine:
             pnl_pct=pnl_pct,
             exit_reason=kind,
             signatures=signatures,
+            safety=safety,
         )
         self._missing_price.pop(int(pos["id"]), None)
         label = EXIT_LABELS.get(kind, kind)
@@ -3258,6 +3269,7 @@ class MemeEngine:
                     "roundtrip_loss_pct": round((1 - sell_quote.out_amount / buy_quote.in_amount) * 100, 2) if buy_quote and sell_quote and buy_quote.in_amount else None,
                     "insiders": report.insiders if report else None,
                     "facts": self._facts(cand),
+                    "image": getattr(pair, "image_url", "") or "",
                     "watch": {
                         "dev": report.creator if report else "",
                         "holders": [owner for owner, _pct in (report.top_owners if report else []) if owner and owner != (report.creator if report else "")][:3],
@@ -3921,7 +3933,10 @@ class MemeEngine:
             "partial": bool(row["partial_taken"]),
             "strategy": row.get("strategy") or "momentum",
             "trial": bool(safety.get("trial")),
-            "path": list(self._path_of(int(row["id"]))) if row["status"] == "open" else [],
+            "path": list(self._path_of(int(row["id"]))) if row["status"] == "open" else list(safety.get("path") or []),
+            "image": safety.get("image") or "",
+            "mcap_entry": (safety.get("facts") or {}).get("mcap"),
+            "volume_h1": (safety.get("facts") or {}).get("vol_h1"),
             "priced_at": self._priced_at.get(int(row["id"])) if row["status"] == "open" else None,
             "watching": bool(self.settings.dev_watch and (watch.get("dev") or watch.get("holders"))),
             "stop_pct": stop_pct,
