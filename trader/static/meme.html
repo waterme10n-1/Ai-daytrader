@@ -1654,6 +1654,13 @@
       <div class="card">
         <div class="card-head"><h2 id="diag-title"></h2><button class="btn small primary" type="button" id="diag-run"></button></div>
         <div id="diag"></div>
+        <div class="field" id="rpc-box" style="margin-top:14px">
+          <div class="field-top"><span id="rpc-title">Solana RPC-adresse</span></div>
+          <p class="muted small-txt" id="rpc-now" style="margin:0 0 8px"></p>
+          <div class="row"><input type="text" id="rpc-url" inputmode="url" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="https://mainnet.helius-rpc.com/?api-key=…" aria-label="Solana RPC-adresse"></div>
+          <div class="row" style="margin-top:8px;gap:8px"><button class="btn small primary" type="button" id="rpc-save">Gem og test</button><button class="btn small" type="button" id="rpc-clear">Brug standard</button></div>
+          <p class="muted small-txt" style="margin:8px 0 0">Adressen gemmes kun på din server, og nøglen i den vises aldrig igen. Den virker med det samme, uden Railway.</p>
+        </div>
       </div>
       <div class="col">
         <div class="card"><div class="card-head"><h2 id="sec-title"></h2><span class="chip" id="sec-chip"></span></div><div id="sec"></div></div>
@@ -3546,6 +3553,7 @@ function render(data) {
   renderAnalysis(data);
   renderChanges(data);
   renderRelay(data);
+  renderRpc(data);
   renderTerminal(data);
   renderMomentum(data);
   renderTradeLimits(data);
@@ -3661,6 +3669,30 @@ document.getElementById("diag-run").addEventListener("click", async (ev) => {
     if (state) renderDiagnostics(state);
   }
 });
+function renderRpc(data) {
+  const r = data.rpc;
+  const el = document.getElementById("rpc-now");
+  if (!r || !el) return;
+  el.textContent = r.public ? "Bruger den gratis, offentlige adresse (langsom og rate-limited)." : `Bruger ${r.host}${r.from_page ? " (sat på siden)" : " (sat i Railway)"}.`;
+}
+async function saveRpc(url, okText) {
+  const input = document.getElementById("rpc-url");
+  try {
+    const b = await post("/api/meme/rpc", { url });
+    input.value = "";
+    if (b.status) render(b.status);
+    toast("up", okText, b.host);
+    document.getElementById("diag-run").click();
+  } catch (err) {
+    toast("down", "Adressen blev ikke gemt", err.message);
+  }
+}
+document.getElementById("rpc-save").addEventListener("click", () => {
+  const url = document.getElementById("rpc-url").value.trim();
+  if (!url) { toast("down", "Indsæt adressen først", "Den skal begynde med https://"); return; }
+  saveRpc(url, "Solana RPC er gemt");
+});
+document.getElementById("rpc-clear").addEventListener("click", () => saveRpc("", "Standardadressen bruges igen"));
 document.getElementById("report-now").addEventListener("click", async () => {
   try {
     const r = await post("/api/meme/report");

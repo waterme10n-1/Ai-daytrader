@@ -129,6 +129,8 @@ Alt, der flytter penge eller ændrer botten (sælg, nødstop, bloker, hæv, nuls
 
 **Hvilket mål ville have virket?** På Sniper-fanen bruger botten kursforløbene fra de tokens, den købte eller næsten købte, til at regne gevinstmål fra +25 % til +500 % mod stop fra -20 % til -50 % igennem. Fra 20 forløb og op viser den gennemsnittet efter gebyrer, og med én knap kan du bruge det bedste. Fortiden er ingen garanti, og kurserne måles kun én gang i minuttet.
 
+**Solana RPC-adressen kan indtastes på siden.** Under Mere → Indstillinger → **Forbindelser** står feltet *Solana RPC-adresse*. Indsæt hele adressen fra din udbyder (fx Helius: `https://mainnet.helius-rpc.com/?api-key=…`) og tryk **Gem og test**. Den virker med det samme, uden Railway og uden genstart, og testen kører straks. Adressen gemmes kun på din server, og nøglen i den vises aldrig igen, kun navnet på udbyderen (fx *mainnet.helius-rpc.com*). Adressen på siden vinder over `SOLANA_RPC_URL` i Railway. **Brug standard** fjerner den og går tilbage til Railway-variablen eller den gratis offentlige adresse.
+
 **Udvikler-alarm.** Ved hvert køb noterer botten udvikleren og de tre største holdere (fra RugCheck) og tjekker deres beholdning hvert minut. Sælger udvikleren mindst halvdelen eller topholderne tilsammen 40 %, sælger botten alt, og tokenet blokeres.
 
 **To-trins-login.** Kør `python -m trader.auth totp`, tilføj nøglen i en godkendelses-app (Google Authenticator, 1Password, Authy) og sæt `APP_TOTP_SECRET` i Railway. Så kræver login en kode, og siden spørger om en ny kode, før der hæves, og før rigtige penge slås til.

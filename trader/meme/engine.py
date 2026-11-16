@@ -350,6 +350,11 @@ class MemeEngine:
         self._env_settings = self.settings
         self.main_settings = main_settings
         self.store = store or MemeStore(self.settings.db_path)
+        self._rpc_from_env = self.settings.rpc_url
+        stored_rpc = (self.store.get_state("rpc_url", "") or "").strip()
+        if stored_rpc:  # adressen sat på siden vinder over Railway
+            self.settings = dataclasses.replace(self.settings, rpc_url=stored_rpc)
+            self._env_settings = self.settings
         if (self.store.get_state("mode", "paper") or "paper") != "live":
             self.settings = self._mode_settings("paper")
         self.clients = clients or MemeClients(self.settings)
@@ -446,6 +451,34 @@ class MemeEngine:
             self.run_diagnostics()
         except Exception:
             logger.exception("Forbindelsestesten fejlede")
+
+    def set_rpc_url(self, url: str) -> str:
+        """Gem Solana RPC-adressen fra siden (tom = brug Railway-variablen eller den offentlige). Nøglen i adressen vises aldrig igen."""
+        from urllib.parse import urlparse
+
+        url = (url or "").strip().strip("\"'").strip()
+        if url:
+            parsed = urlparse(url)
+            if parsed.scheme != "https" or not parsed.hostname or len(url) > 500 or " " in url:
+                raise ValueError("Adressen skal begynde med https:// og være hele adressen fra udbyderen, fx https://mainnet.helius-rpc.com/?api-key=…")
+        with self._lock:
+            self.store.set_state("rpc_url", url)
+            effective = url or self._rpc_from_env
+            self._env_settings = dataclasses.replace(self._env_settings, rpc_url=effective)
+            self.settings = dataclasses.replace(self.settings, rpc_url=effective)
+            old = self.clients.rpc
+            self.clients.rpc = SolanaRPC(effective)
+            self.copy.rpc = self.clients.rpc
+            self.top_copy.rpc = self.clients.rpc
+            closer = getattr(old, "close", None)
+            if callable(closer):
+                try:
+                    closer()
+                except Exception:  # den gamle forbindelse må aldrig stoppe skiftet
+                    pass
+            host = urlparse(effective).hostname or "ukendt"
+            self.store.add_event("info", f"Solana RPC er skiftet til {host}." if url else f"Solana RPC bruger igen {host}.")
+        return host
 
     def run_diagnostics(self) -> dict:
         from trader.meme.diagnostics import run_checks
@@ -3738,6 +3771,11 @@ class MemeEngine:
             "trades": [self._position_view(row, why_from=why_from) for row in self.store.list_positions(mode, 200) if row["status"] == "closed"],
             "candidates": [self._candidate_view(row) for row in candidate_rows],
             "relay": self._relay_view(mode, closed, candidate_rows, totals),
+            "rpc": {
+                "host": __import__("urllib.parse", fromlist=["urlparse"]).urlparse(self.settings.rpc_url).hostname or "",
+                "public": self.settings.rpc_url.startswith("https://api.mainnet-beta.solana.com"),
+                "from_page": bool((self.store.get_state("rpc_url", "") or "").strip()),
+            },
             "lessons": self.store.recent_lessons(60),
             "model": {
                 "bias": self.model.bias,
