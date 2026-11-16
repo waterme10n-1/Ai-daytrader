@@ -146,3 +146,30 @@ def test_rpc_url_survives_quotes_around_it_and_the_alert_shows_the_error(monkeyp
     engine.store.set_json("diagnostics", {"required_ok": False, "checks": [{"label": "Solana RPC", "ok": False, "detail": "RPC getBlockHeight: HTTP 401 [bruger mainnet.helius-rpc.com]"}]})
     text = [a["text"] for a in engine._alerts() if a["text"].startswith("Forbindelsestest")][0]
     assert "HTTP 401" in text and "mainnet.helius-rpc.com" in text
+
+
+def test_the_rpc_address_can_be_set_from_the_page_and_the_key_is_never_shown(tmp_path):
+    import dataclasses
+
+    import pytest
+    from fastapi.testclient import TestClient
+
+    from trader.app import create_app
+    from trader.config import Settings
+
+    engine, *_ = make_engine()
+    engine.start = lambda: None
+    engine.stop = lambda: None
+    settings = dataclasses.replace(Settings.from_env(), db_path=str(tmp_path / "t.db"), host="127.0.0.1", app_username="",
+                                   app_password="", app_password_hash="", session_secret="")
+    with TestClient(create_app(settings=settings, meme_engine=engine)) as client:
+        assert client.post("/api/meme/rpc", json={"url": "http://x.example"}).status_code == 400
+        assert client.post("/api/meme/rpc", json={"url": "mainnet.helius-rpc.com"}).status_code == 400
+        body = client.post("/api/meme/rpc", json={"url": '"https://mainnet.helius-rpc.com/?api-key=SECRETKEY"'}).json()
+        assert body["host"] == "mainnet.helius-rpc.com"
+        assert "SECRETKEY" not in str(body["status"]["rpc"]) and body["status"]["rpc"] == {"host": "mainnet.helius-rpc.com", "public": False, "from_page": True}
+        assert engine.settings.rpc_url.endswith("api-key=SECRETKEY") and engine.clients.rpc.url == engine.settings.rpc_url
+        assert engine.copy.rpc is engine.clients.rpc
+        back = client.post("/api/meme/rpc", json={"url": ""}).json()
+        assert back["status"]["rpc"]["from_page"] is False
+        assert engine.settings.rpc_url == engine._rpc_from_env
