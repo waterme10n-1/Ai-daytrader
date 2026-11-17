@@ -15,6 +15,7 @@ from fastapi import Request
 from fastapi.responses import JSONResponse, RedirectResponse, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from trader.ccapi import gate as cc_gate
 from trader.config import Settings
 
 SESSION_COOKIE = "dt_session"
@@ -26,6 +27,8 @@ LOCKOUT_LIMIT = 5
 LOCKOUT_SECONDS = 15 * 60
 MIN_SECRET_LENGTH = 32
 PBKDF2_ITERATIONS = 600_000
+
+CC_API_PREFIX = "/cc/"
 
 LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1", "[::1]"}
 
@@ -287,9 +290,13 @@ PUBLIC_PATHS = frozenset({"/healthz", "/login", "/manifest.webmanifest", "/apple
 class AuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         settings: Settings = request.app.state.settings
+        path = request.url.path
+        if path.startswith(CC_API_PREFIX):
+            # Command Center har sit eget Bearer-token (trader/ccapi.py): ingen session, og tokenet virker kun her.
+            blocked = cc_gate(request)
+            return blocked if blocked is not None else await call_next(request)
         if not auth_is_active(settings):
             return await call_next(request)
-        path = request.url.path
         if path in PUBLIC_PATHS or path.startswith("/icons/"):
             # Ikoner og manifest hentes af telefonen uden cookies, når appen lægges på hjemmeskærmen.
             return await call_next(request)

@@ -129,6 +129,12 @@ class DeskStore:
             (key, value),
         )
 
+    def states_with_prefix(self, prefix: str) -> dict[str, str]:
+        """Alle gemte værdier, hvis nøgle begynder med prefix (fx day_start:). Kun til læsning."""
+        escaped = prefix.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        rows = self._all("SELECT key, value FROM state WHERE key LIKE ? ESCAPE '\\'", (escaped + "%",))
+        return {str(row["key"]): str(row["value"]) for row in rows}
+
     def get_json(self, key: str, default: Any = None) -> Any:
         raw = self.get_state(key)
         if raw is None:
