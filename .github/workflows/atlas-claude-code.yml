@@ -1,0 +1,319 @@
+# ATLAS × Claude Code – udviklingsopgaver fra Command Center (Udvikling).
+# atlas-workflow-version: 1
+#
+# Startes KUN af Command Center via GitHub REST API (workflow_dispatch) med brugerens egen token.
+# Kører Anthropics officielle Claude Code GitHub Action (anthropics/claude-code-action@v1) på en GitHub-hostet runner.
+#
+# Sikkerhed:
+#  - Arbejder altid på en ny gren `atlas/<run-key>`; skubber aldrig til base-/standardgrenen.
+#  - Claude Code må ikke selv committe eller pushe – det gør workflowet bagefter, og kun til atlas/-grenen.
+#  - Ændringer i .github/workflows/ kasseres. I analyse-tilstand kasseres ALLE ændringer.
+#  - Pull requests oprettes som KLADDE (draft), når repoets plan tillader det. Fletning kræver godkendelse i Command Center.
+#  - Input læses via miljøvariabler (aldrig ${{ }} direkte i shell) og valideres først.
+#
+# Kræver repository-secret CLAUDE_CODE_OAUTH_TOKEN (fra `claude setup-token`, Pro/Max) eller ANTHROPIC_API_KEY.
+name: ATLAS Claude Code
+run-name: "ATLAS ${{ inputs.task_id }} (${{ inputs.mode }})"
+
+on:
+  workflow_dispatch:
+    inputs:
+      task_id:
+        description: "ATLAS run-nøgle (bruges i grennavn og run-navn)"
+        required: true
+        type: string
+      issue_number:
+        description: "Issue med den fulde opgavebeskrivelse"
+        required: true
+        type: string
+      base_branch:
+        description: "Gren der arbejdes ud fra, og som pull requesten peger på"
+        required: true
+        type: string
+      mode:
+        description: "analyse | fix | feature | review | revert"
+        required: true
+        type: choice
+        options: [analyse, fix, feature, review, revert]
+      max_turns:
+        description: "Maks. antal Claude Code-ture"
+        required: false
+        type: string
+        default: "40"
+      model:
+        description: "Valgfri Claude-model (tom = standard)"
+        required: false
+        type: string
+        default: ""
+      revert_sha:
+        description: "Kun revert: commit der skal fortrydes"
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  actions: read
+
+jobs:
+  atlas:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TASK_ID: ${{ inputs.task_id }}
+      ISSUE: ${{ inputs.issue_number }}
+      BASE: ${{ inputs.base_branch }}
+      MODE: ${{ inputs.mode }}
+      MAX_TURNS: ${{ inputs.max_turns }}
+      MODEL: ${{ inputs.model }}
+      REVERT_SHA: ${{ inputs.revert_sha }}
+      ACTOR: ${{ github.actor }}
+      BRANCH: atlas/${{ inputs.task_id }}
+    steps:
+      - name: Kontrollér input
+        id: validate
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$TASK_ID" =~ ^[a-z0-9][a-z0-9-]{5,39}$ ]] || { echo "::error::Ugyldigt task_id"; exit 1; }
+          [[ "$ISSUE" =~ ^[0-9]{1,9}$ ]] || { echo "::error::Ugyldigt issue_number"; exit 1; }
+          [[ "$BASE" =~ ^[A-Za-z0-9._/-]{1,200}$ && "$BASE" != atlas/* && "$BASE" != *..* ]] || { echo "::error::Ugyldig base_branch"; exit 1; }
+          [[ "$MAX_TURNS" =~ ^[0-9]{1,3}$ && "$MAX_TURNS" -ge 1 && "$MAX_TURNS" -le 200 ]] || { echo "::error::Ugyldig max_turns"; exit 1; }
+          [[ -z "$MODEL" || "$MODEL" =~ ^[a-z0-9.-]{3,60}$ ]] || { echo "::error::Ugyldig model"; exit 1; }
+          # shellcheck disable=SC2153
+          if [[ "$MODE" == "revert" ]]; then [[ "$REVERT_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::Ugyldig revert_sha"; exit 1; }; fi
+
+      - name: Hent opgaven
+        id: task
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/atlas"
+          gh issue view "$ISSUE" --repo "$GITHUB_REPOSITORY" --json title,body,author > "$RUNNER_TEMP/atlas/issue.json"
+          python3 - <<'PY'
+          import json, os, sys
+          d = json.load(open(os.path.join(os.environ["RUNNER_TEMP"], "atlas", "issue.json")))
+          if f"[{os.environ['TASK_ID'].split('-')[0]}]" not in d.get("title", ""):
+              sys.exit("::error::Issuet hører ikke til denne opgave")
+          if (d.get("author") or {}).get("login") != os.environ["ACTOR"]:
+              sys.exit("::error::Issuet er ikke oprettet af den, der startede kørslen")
+          open(os.path.join(os.environ["RUNNER_TEMP"], "atlas", "task.md"), "w").write(d.get("body") or "")
+          PY
+          gh issue comment "$ISSUE" --repo "$GITHUB_REPOSITORY" --body "<!-- atlas-progress -->
+          ATLAS-PROGRESS 5% | Kørslen er startet ($MODE) – ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.base_branch }}
+          fetch-depth: 0
+
+      - name: Forbered arbejdsgren
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "ATLAS (Claude Code)"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          mkdir -p .atlas-run
+          cp "$RUNNER_TEMP/atlas/task.md" .atlas-run/task.md
+          echo ".atlas-run/" >> .git/info/exclude
+          git checkout -b "$BRANCH"
+
+      - name: Opsætning (repoets eget script)
+        if: inputs.mode != 'revert' && hashFiles('.atlas/setup.sh') != ''
+        shell: bash
+        run: bash .atlas/setup.sh
+
+      - name: Node.js
+        if: inputs.mode != 'revert' && hashFiles('.atlas/setup.sh') == '' && hashFiles('package.json') != ''
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Installér Node-afhængigheder
+        if: inputs.mode != 'revert' && hashFiles('.atlas/setup.sh') == '' && hashFiles('package.json') != ''
+        shell: bash
+        run: |
+          if [ -f package-lock.json ]; then npm ci --no-audit --no-fund || npm install --no-audit --no-fund; else npm install --no-audit --no-fund; fi
+
+      - name: Python
+        if: inputs.mode != 'revert' && hashFiles('.atlas/setup.sh') == '' && hashFiles('requirements.txt') != ''
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Installér Python-afhængigheder
+        if: inputs.mode != 'revert' && hashFiles('.atlas/setup.sh') == '' && hashFiles('requirements.txt') != ''
+        shell: bash
+        run: python -m pip install -r requirements.txt
+
+      - name: Claude Code
+        id: claude
+        if: inputs.mode != 'revert'
+        continue-on-error: true
+        timeout-minutes: 55
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ github.token }}
+          prompt: |
+            You are Claude Code working as the developer for ATLAS, the repository owner's personal assistant.
+            Repository: ${{ github.repository }}. Base branch: ${{ inputs.base_branch }}. Work branch (already checked out): atlas/${{ inputs.task_id }}.
+            Mode: ${{ inputs.mode }}. Task issue: #${{ inputs.issue_number }}.
+
+            1. Read the full task in `.atlas-run/task.md` first. Then read CLAUDE.md / AGENTS.md / README.md (if present) and follow the project's own rules.
+            2. Post short progress updates (in Danish) to the task issue while you work, at most ~8 in total, exactly in this form:
+               gh issue comment ${{ inputs.issue_number }} --body "<!-- atlas-progress -->
+               ATLAS-PROGRESS <0-100>% | <what you are doing / what you found>"
+               Use the prefix "ATLAS-FINDING |" instead of "ATLAS-PROGRESS <n>% |" for an important finding (a bug, a root cause).
+            3. Rules:
+               - Never commit, push, merge, rebase, create branches or open pull requests – the workflow does that after you finish.
+               - Never modify files under .github/workflows/. Never print, read or change secrets, .env files or credentials.
+               - Mode "analyse" or "review": do NOT change any files. Investigate and write the report with a concrete plan.
+               - Modes "fix"/"feature": make focused, minimal changes; keep the project's style; add or update tests where it makes sense.
+               - Run the project's tests/lint/typecheck as described in CLAUDE.md or README (e.g. npm test, pytest). Never call production systems or deploy.
+               - Ask instead of guessing on anything destructive (deleting data, schema migrations on real data, money/betting/trading logic, auth): put the question in needs_user and stop.
+            4. Finally write `.atlas-run/report.json` (UTF-8 JSON, all human text in Danish) with exactly these fields:
+               {"summary": str, "problem": str, "changes": [str], "fixed": [str], "improvements": [str], "files": [str],
+                "tests": {"command": str|null, "passed": int|null, "failed": int|null, "output_excerpt": str|null},
+                "works": true|false|null, "remaining": [str], "needs_user": [str], "plan": [str], "risk": "small"|"normal"|"large"|null}
+               and a short human report in Danish in `.atlas-run/REPORT.md`. Be honest: if tests fail or you could not verify, say so (works=false/null).
+          claude_args: |
+            --max-turns ${{ inputs.max_turns }}
+            --allowedTools "Bash(gh issue comment:*)"
+            --disallowedTools "Bash(git push:*)" "Bash(git commit:*)" "Bash(git merge:*)" "Bash(git rebase:*)" "Bash(git reset:*)" "Bash(git checkout:*)" "Bash(git switch:*)" "Bash(git branch:*)" "Bash(gh pr:*)" "Bash(gh api:*)" "Bash(gh secret:*)" "Bash(gh workflow:*)" "Bash(gh run:*)"
+            ${{ inputs.model != '' && format('--model {0}', inputs.model) || '' }}
+
+      - name: Fortryd commit (revert)
+        id: revert
+        if: inputs.mode == 'revert'
+        shell: bash
+        run: |
+          set -euo pipefail
+          parents=$(git rev-list --parents -n 1 "$REVERT_SHA" | wc -w)
+          if [ "$parents" -gt 2 ]; then git revert --no-edit -m 1 "$REVERT_SHA"; else git revert --no-edit "$REVERT_SHA"; fi
+          printf '{"summary":"Fletningen er fortrudt med git revert af %s.","problem":"Brugeren bad om at fortryde ændringen.","changes":["git revert %s"],"fixed":[],"improvements":[],"files":[],"tests":{"command":null,"passed":null,"failed":null,"output_excerpt":null},"works":null,"remaining":[],"needs_user":[],"plan":[],"risk":"normal"}' "$REVERT_SHA" "$REVERT_SHA" > .atlas-run/report.json
+
+      - name: Sikkerhedstjek af ændringer
+        id: guard
+        if: always() && steps.task.outcome == 'success' && steps.revert.outcome != 'failure'
+        shell: bash
+        run: |
+          set -uo pipefail
+          notes=""
+          if [ "$MODE" = "analyse" ] || [ "$MODE" = "review" ]; then
+            if [ -n "$(git status --porcelain)" ]; then
+              git checkout -- . 2>/dev/null; git clean -fdq -e .atlas-run
+              notes="Ændringer i analyse-tilstand blev kasseret."
+            fi
+          fi
+          if [ -n "$(git status --porcelain -- .github/workflows)" ]; then
+            git checkout -- .github/workflows 2>/dev/null; git clean -fdq -- .github/workflows
+            notes="$notes Ændringer i .github/workflows blev kasseret."
+          fi
+          if [ "$MODE" != "revert" ] && [ -n "$(git status --porcelain)" ]; then
+            git add -A
+            title=$(python3 -c "import json;print(json.load(open('$RUNNER_TEMP/atlas/issue.json'))['title'][:180])")
+            git commit -q -m "$title" -m "Lavet af Claude Code for ATLAS (issue #$ISSUE)."
+          fi
+          echo "notes=$notes" >> "$GITHUB_OUTPUT"
+          if [ "$(git rev-list --count "origin/$BASE..HEAD")" -gt 0 ]; then echo "changed=true" >> "$GITHUB_OUTPUT"; else echo "changed=false" >> "$GITHUB_OUTPUT"; fi
+
+      - name: Projektets egne tests (.atlas/test.sh)
+        id: citest
+        if: always() && steps.guard.outputs.changed == 'true' && hashFiles('.atlas/test.sh') != ''
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          bash .atlas/test.sh 2>&1 | tail -c 4000 > .atlas-run/ci-test.txt
+
+      - name: Push og pull request
+        id: pr
+        if: always() && steps.guard.outputs.changed == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git push origin "HEAD:refs/heads/$BRANCH"
+          title=$(python3 -c "import json;print(json.load(open('$RUNNER_TEMP/atlas/issue.json'))['title'][:200])")
+          { [ -f .atlas-run/REPORT.md ] && head -c 50000 .atlas-run/REPORT.md || echo "Claude Code skrev ingen menneskelig rapport."; printf '\n\n---\nOpgave: #%s · Kørsel: %s/%s/actions/runs/%s\n\n> Oprettet af ATLAS. Må kun flettes efter godkendelse i Command Center.\n' "$ISSUE" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID"; } > "$RUNNER_TEMP/atlas/pr-body.md"
+          if url=$(gh pr create --draft --base "$BASE" --head "$BRANCH" --title "$title" --body-file "$RUNNER_TEMP/atlas/pr-body.md" 2>"$RUNNER_TEMP/atlas/pr-err.txt"); then
+            echo "draft=true" >> "$GITHUB_OUTPUT"
+          else
+            cat "$RUNNER_TEMP/atlas/pr-err.txt"
+            # Kladde-PR'er findes ikke i private repos på GitHub Free – opret en almindelig PR, der tydeligt afventer godkendelse.
+            url=$(gh pr create --base "$BASE" --head "$BRANCH" --title "[Afventer godkendelse] $title" --body-file "$RUNNER_TEMP/atlas/pr-body.md")
+            echo "draft=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      - name: Rapport til Command Center
+        if: always() && steps.task.outcome == 'success'
+        shell: bash
+        env:
+          CLAUDE_OUTCOME: ${{ steps.claude.outcome }}
+          REVERT_OUTCOME: ${{ steps.revert.outcome }}
+          GUARD_NOTES: ${{ steps.guard.outputs.notes }}
+          CHANGED: ${{ steps.guard.outputs.changed }}
+          PR_URL: ${{ steps.pr.outputs.url }}
+          PR_DRAFT: ${{ steps.pr.outputs.draft }}
+          CITEST_OUTCOME: ${{ steps.citest.outcome }}
+        run: |
+          set -uo pipefail
+          files=$(git diff --name-status "origin/$BASE...HEAD" 2>/dev/null | head -300 || true)
+          FILES="$files" python3 - <<'PY'
+          import json, os
+          run = ".atlas-run"
+          def clip(v, n):
+              return v[:n] if isinstance(v, str) else v
+          rep = {}
+          try:
+              rep = json.load(open(os.path.join(run, "report.json"), encoding="utf-8"))
+              if not isinstance(rep, dict): rep = {"summary": "Rapporten havde et ugyldigt format."}
+          except Exception:
+              rep = {"summary": "Claude Code skrev ingen gyldig rapport (.atlas-run/report.json mangler eller er ugyldig).", "works": None}
+          outcome = os.environ.get("CLAUDE_OUTCOME") or os.environ.get("REVERT_OUTCOME") or ""
+          ci = {"ran": False, "passed": None, "excerpt": None}
+          if os.path.exists(os.path.join(run, "ci-test.txt")):
+              ci = {"ran": True, "passed": os.environ.get("CITEST_OUTCOME") == "success", "excerpt": open(os.path.join(run, "ci-test.txt"), errors="replace").read()[-1500:]}
+          changed = []
+          for line in (os.environ.get("FILES") or "").splitlines():
+              parts = line.split("\t")
+              if len(parts) >= 2: changed.append({"status": parts[0][:1], "path": parts[-1][:300]})
+          rep["workflow"] = {
+              "claude_conclusion": outcome or None,
+              "changed": os.environ.get("CHANGED") == "true",
+              "files_changed": changed,
+              "pr_url": os.environ.get("PR_URL") or None,
+              "draft": {"true": True, "false": False}.get(os.environ.get("PR_DRAFT", ""), None),
+              "ci_test": ci,
+              "guard_notes": [n for n in (os.environ.get("GUARD_NOTES") or "").split(".") if n.strip()],
+          }
+          body = json.dumps(rep, ensure_ascii=False, indent=1)
+          # Issue-kommentarer må højst være 65536 tegn – forkort lange felter.
+          while len(body) > 60000:
+              for k in ("summary", "problem"):
+                  if isinstance(rep.get(k), str): rep[k] = rep[k][: max(200, len(rep[k]) // 2)]
+              for k in ("changes", "fixed", "improvements", "files", "remaining", "needs_user", "plan"):
+                  if isinstance(rep.get(k), list): rep[k] = [clip(x, 400) for x in rep[k][: max(5, len(rep[k]) // 2)]]
+              if isinstance(rep.get("tests"), dict): rep["tests"]["output_excerpt"] = clip(rep["tests"].get("output_excerpt"), 1000)
+              rep["workflow"]["files_changed"] = rep["workflow"]["files_changed"][:100]
+              body = json.dumps(rep, ensure_ascii=False, indent=1)
+          body = body.replace("```", "'''")
+          open(os.path.join(os.environ["RUNNER_TEMP"], "atlas", "report-comment.md"), "w", encoding="utf-8").write("<!-- atlas-report -->\nATLAS-RAPPORT (maskinlæsbar – bruges af Command Center)\n\n```json\n" + body + "\n```\n")
+          PY
+          gh issue comment "$ISSUE" --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/atlas/report-comment.md"
+
+      - name: Gem rapport som artefakt
+        if: always() && steps.task.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: atlas-report-${{ inputs.task_id }}
+          path: .atlas-run/
+          include-hidden-files: true
+          retention-days: 14
+          if-no-files-found: ignore
