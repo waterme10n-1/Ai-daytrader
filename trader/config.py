@@ -61,6 +61,8 @@ class Settings:
     app_totp_secret: str = ""
     telegram_bot_token: str = ""
     telegram_chat_id: str = ""
+    # Læseadgang for Command Center (/cc/v1/*). Tom eller under 32 tegn = API'et er slået fra (404).
+    cc_api_token: str = ""
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -76,4 +78,5 @@ class Settings:
             app_totp_secret=os.getenv("APP_TOTP_SECRET", "").strip().replace(" ", "").upper(),
             telegram_bot_token=os.getenv("TELEGRAM_BOT_TOKEN", "").strip(),
             telegram_chat_id=os.getenv("TELEGRAM_CHAT_ID", "").strip(),
+            cc_api_token=_login_text(os.getenv("CC_API_TOKEN")),
         )

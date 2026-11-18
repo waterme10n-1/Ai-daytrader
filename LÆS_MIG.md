@@ -56,6 +56,17 @@ Cookie sættes med `HttpOnly` og `SameSite=Strict`. Bag Railway (HTTPS) sættes 
 
 Anbefalet: `JUPITER_API_KEY` (gratis fra portal.jup.ag) og `SOLANA_RPC_URL` (gratis Helius-nøgle). Valgfrit: `ANTHROPIC_API_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `APP_TOTP_SECRET` og alle `MEME_*`-variabler i `.env.example`.
 
+### Command Center (valgfri)
+
+Dit Personal AI Command Center kan læse status, økonomi, kapitalkurve og handler herfra. Sæt `CC_API_TOKEN` i Railway (mindst 32 tegn, lav det med kommandoen ovenfor) og det samme token i Command Center. Uden tokenet er API'et slået helt fra og svarer 404.
+
+- Ruterne er `/cc/v1/status`, `/cc/v1/performance`, `/cc/v1/equity?book=…&from=…&to=…&interval=hour|day`, `/cc/v1/ledger?book=…&since=…&cursor=…&limit=…` (højst 1000 pr. side) og `/cc/v1/metrics`. Kun GET, med headeren `Authorization: Bearer <token>`.
+- De kan kun læse. Intet kan købe, sælge, sætte på pause eller ændre indstillinger. Tokenet giver ikke adgang til dashboardet, og dit login giver ikke adgang til `/cc/v1`.
+- Tre bøger: `meme` (memebotten i USD, papir eller rigtige penge efter tilstanden på /meme), `desk-us` (Alpacas papirkonto i USD) og `desk-dk` (bordets papirkonto i kroner, kun når Københavns børs er slået til).
+- Tallene er de samme som på /meme og /desk og kommer fra databasen og det, motorerne allerede har hentet. Der kaldes ikke ud til Alpaca, DexScreener eller Yahoo. USA-kontoens egenkapital er den, bordet sidst hentede fra Alpaca (`as_of` siger hvornår).
+- Beløb er decimaltal med punktum (fx `12.5`), tider i UTC. Gebyrer står for sig, og resultatet er efter gebyrer. Memebottens gebyrer er Solanas netværks- og prioritetsgebyrer (eller Jito-tip), også på mislykkede køb og salg. Slippage ligger i købs- og salgskurserne og dermed i resultatet. Bordet i København regner kurtagen som gebyr; Alpaca tager ingen. Kapitalkurven bruger de gemte målinger (memebotten hvert 5. minut, bordet ved hver åbning) og bygges ellers op fra de lukkede handler (`"reconstructed": true`).
+- Fejlbeskeder sendes uden adresser, nøgler og wallet-adresser.
+
 Skaler ikke tjenesten til mere end ét replika. Et nyt replika ville åbne sin egen motor mod samme databasefil.
 
 ## Test

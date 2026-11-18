@@ -37,6 +37,8 @@ from trader.auth import (
     _delete_cookie,
     _set_cookie,
 )
+from trader.ccapi import build_router as build_cc_router
+from trader.ccapi import mark_started as mark_cc_started
 from trader.config import Settings
 from trader.desk.alpaca import BrokerError as DeskBrokerError
 from trader.desk.config import DeskSettings
@@ -181,6 +183,9 @@ def create_app(
     app = FastAPI(title="Memebot", lifespan=lifespan)
     app.state.settings = chosen
     app.state.login_guard = LoginGuard()
+    mark_cc_started(app)
+    # Command Center (/cc/v1/*): kun GET med Bearer-token fra CC_API_TOKEN. Uden token svarer ruterne 404.
+    app.include_router(build_cc_router())
     app.add_middleware(AuthMiddleware)
     # Dashboardet henter status ofte. Komprimering gør svaret ca. 9 gange mindre (vigtigt på mobil).
     app.add_middleware(GZipMiddleware, minimum_size=2000)
