@@ -1226,6 +1226,40 @@
   .tm-bc svg { width: 100%; height: 26px; display: block; }
   .tm-bc svg path { fill: none; stroke: var(--up); stroke-width: 1.6; stroke-linejoin: round; stroke-linecap: round; }
   .tm-best .none { color: var(--muted); font-size: 13.5px; padding: 4px 0 8px; }
+  /* Ydelse: regime, ydelse, risikocenter, systemhelbred og de bedste idéer */
+  .yd { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  @media (min-width: 1000px) { .yd { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; } .yd .yd-wide { grid-column: 1 / -1; } }
+  .yd .card h2 { display: flex; align-items: center; gap: 8px; }
+  .yd-regime { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .yd-badge { display: inline-flex; align-items: center; height: 30px; padding: 0 12px; border-radius: 999px; font-weight: 750; font-size: 14px; background: var(--raised); }
+  .yd-badge.ok { background: var(--up-soft); color: var(--up); } .yd-badge.bad { background: var(--down-soft); color: var(--down); } .yd-badge.warn { background: var(--warn-soft); color: var(--warn); }
+  .yd-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 10px 0; }
+  .yd-kpis div { padding: 9px 10px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--border); min-width: 0; }
+  .yd-kpis small { display: block; color: var(--muted); font-size: 11.5px; } .yd-kpis b { font-size: 15px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .yd-tbl { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; margin: 4px 0 10px; }
+  .yd-tbl th { text-align: left; color: var(--muted); font-weight: 600; font-size: 11.5px; padding: 4px 6px 4px 0; }
+  .yd-tbl td { padding: 6px 6px 6px 0; border-top: 1px solid var(--border); }
+  .yd-tbl td.num, .yd-tbl th.num { text-align: right; }
+  .yd-tbl .up { color: var(--up); } .yd-tbl .down { color: var(--down); }
+  .yd-sub { margin: 12px 0 2px; font-size: 12.5px; font-weight: 700; color: var(--text-2); }
+  .yd-bar { height: 6px; border-radius: 6px; background: var(--raised); overflow: hidden; margin-top: 5px; }
+  .yd-bar i { display: block; height: 100%; width: 0; background: var(--up); border-radius: 6px; transition: width 0.6s ease; }
+  .yd-bar.warn i { background: var(--warn); } .yd-bar.hit i { background: var(--down); }
+  .yd-lim { padding: 8px 0; border-top: 1px solid var(--border); } .yd-lim:first-child { border-top: 0; }
+  .yd-lim .top { display: flex; justify-content: space-between; gap: 10px; font-size: 13.5px; } .yd-lim .top span:last-child { color: var(--text-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .yd-lim.off .top { color: var(--muted); }
+  .yd-health { display: grid; gap: 2px; }
+  .yd-h { display: grid; grid-template-columns: 12px minmax(0, 8.5rem) minmax(0, 1fr); gap: 10px; align-items: baseline; padding: 6px 0; border-top: 1px solid var(--border); font-size: 13px; }
+  .yd-h:first-child { border-top: 0; } .yd-h i { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); transform: translateY(0); }
+  .yd-h.ok i { background: var(--up); } .yd-h.bad i { background: var(--down); } .yd-h.warn i { background: var(--warn); }
+  .yd-h span:last-child { color: var(--text-2); overflow-wrap: anywhere; }
+  .yd-idea { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 9px 0; border-top: 1px solid var(--border); }
+  .yd-idea:first-child { border-top: 0; } .yd-idea b { font-size: 14.5px; } .yd-idea small { display: block; color: var(--muted); font-size: 12px; line-height: 1.35; }
+  .yd-idea .sc { text-align: right; font-variant-numeric: tabular-nums; } .yd-idea .sc b { font-size: 18px; } .yd-idea .sc small { white-space: nowrap; }
+  .yd-note { color: var(--muted); font-size: 12.5px; margin: 6px 0 0; }
+  .tk-score { display: grid; gap: 4px; padding: 12px; border-radius: 16px; background: var(--surface-2); border: 1px solid var(--border); margin-bottom: 10px; }
+  .tk-score .row1 { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; font-size: 14.5px; font-weight: 700; }
+  .tk-score ul { margin: 2px 0 0; padding-left: 18px; color: var(--text-2); font-size: 12.5px; line-height: 1.45; }
   @media (prefers-reduced-motion: reduce) { .tm-big, .tm-chart .ln.draw, .tm-chart svg.drawing *, .tm-stats div, .tm-bub, .tm-ag.on::before, .tm-bc { animation: none !important; } .tm-chart .ln.draw { stroke-dasharray: none; stroke-dashoffset: 0; } }
   @media (prefers-reduced-motion: reduce) { .tm-tape-in, .tm-chart .ping, .tm-ag.on .ic::after, .boot-logo, .dp-go .spin { animation: none !important; } .boot { transition: none; } }
 </style>
@@ -1321,6 +1355,16 @@
         <div class="track" id="rl-track"></div>
         <p class="muted small-txt" style="margin:14px 0 0">Alle tre strategier (almindelig, sniper og Top 10) går gennem de samme fem agenter. Analytikeren tjekker altid RugCheck, Jupiters audit (mistænkelig, serie-udvikler, organisk score), insidere, ejerfordeling, X og sociale links, før Køberen må handle.</p>
       </div>
+    </div>
+  </section>
+
+  <section class="panel" id="panel-ydelse" role="tabpanel" hidden>
+    <div class="yd">
+      <div class="card yd-wide"><div class="card-head"><h2 id="yd-regime-title"></h2><span class="chip" id="yd-mode"></span></div><div id="yd-regime"></div></div>
+      <div class="card"><div class="card-head"><h2 id="yd-perf-title"></h2></div><div id="yd-perf"></div></div>
+      <div class="card"><div class="card-head"><h2 id="yd-risk-title"></h2></div><div id="yd-risk"></div></div>
+      <div class="card"><div class="card-head"><h2 id="yd-health-title"></h2><span class="chip" id="yd-health-chip"></span></div><div id="yd-health" class="yd-health"></div></div>
+      <div class="card"><div class="card-head"><h2 id="yd-ideas-title"></h2></div><div id="yd-ideas"></div></div>
     </div>
   </section>
 
@@ -1775,10 +1819,10 @@ const NAV = [
   ["handler", "Handler", "trades", ["positioner", "journal"]],
   ["snipe", "Strategi", "target", ["almindelig", "sniper", "top", "radar"]],
   ["wallet", "Wallet", "wallet", ["wallets"]],
-  ["mere", "Mere", "more", ["laering", "krav"]],
+  ["mere", "Mere", "more", ["ydelse", "laering", "krav"]],
 ];
-const VIEWS = { terminal: ["Terminal", "stocks"], relae: ["Relæ", "zap"], oversigt: ["Kontrolrum", "grid"], positioner: ["Åbne", "coins"], journal: ["Historik", "book"], almindelig: ["Almindelig", "activity"], sniper: ["Sniper", "target"], top: ["Top 10", "trophy"], radar: ["Radar", "radar"], wallets: ["Wallet", "wallet"], laering: ["Læring", "brain"], krav: ["Indstillinger", "shield"] };
-const VIEW_ORDER = ["terminal", "relae", "oversigt", "positioner", "almindelig", "sniper", "journal", "laering", "wallets", "krav"];
+const VIEWS = { ydelse: ["Ydelse", "bars"], terminal: ["Terminal", "stocks"], relae: ["Relæ", "zap"], oversigt: ["Kontrolrum", "grid"], positioner: ["Åbne", "coins"], journal: ["Historik", "book"], almindelig: ["Almindelig", "activity"], sniper: ["Sniper", "target"], top: ["Top 10", "trophy"], radar: ["Radar", "radar"], wallets: ["Wallet", "wallet"], laering: ["Læring", "brain"], krav: ["Indstillinger", "shield"] };
+const VIEW_ORDER = ["ydelse", "terminal", "relae", "oversigt", "positioner", "almindelig", "sniper", "journal", "laering", "wallets", "krav"];
 const TITLES = { handler: "Handler", snipe: "Strategier", wallet: "Wallet", mere: "Mere" };
 const lastView = {};
 const STAGES = { "købt": "Købt", sniper: "Sniper-filter", marked: "Markedsfilter", rug: "Rug-tjek", score: "Score", rute: "Exit-rute", claude: "Claude", risiko: "Risiko", "køb": "Køb fejlede" };
@@ -3161,6 +3205,15 @@ function tmCandles(p, w) {
   const end = tag(w - pr + 4, ly, endText, good ? "var(--up)" : "var(--down)", "#1a0203", "start");
   return `<svg viewBox="0 0 ${w} ${h}" role="img" aria-label="Kursen siden købet: ${esc(spct(change))}">${grid}${stopLine}${bars}${bought}${end}</svg>`;
 }
+function tmScoreBox(p) {
+  const sf = p.safety_score, ai = p.ai;
+  if (!sf && !(ai && ai.score != null)) return "";
+  const cls = !sf ? "" : sf.score >= 80 ? "up" : sf.score >= 60 ? "" : "down";
+  const factors = sf && sf.factors && sf.factors.length ? `<ul>${sf.factors.slice(0, 5).map((f) => `<li>−${f.points}: ${esc(f.label)}</li>`).join("")}</ul>` : sf ? '<small class="muted">Ingen kendte problemer.</small>' : "";
+  return `<div class="tk-score">
+    ${sf ? `<div class="row1"><span>Sikkerhed</span><span class="${cls}">${sf.score}/100 · ${esc(sf.grade)}${sf.known ? "" : " (uden rug-tjek)"}</span></div>${factors}` : ""}
+    ${ai && ai.score != null ? `<div class="row1" style="margin-top:6px"><span>AI-score (bottens lærte model)</span><span>${ai.score}/100 · ${esc(ai.band)}</span></div><small class="muted">Forslag da botten købte: ${esc(ai.action)}. Scoren styrer ikke positionens størrelse.</small>` : ""}</div>`;
+}
 function tmTokenHtml(p) {
   const open = p.status === "open";
   const path = (p.path || []).map(Number).filter((v) => v > 0);
@@ -3184,6 +3237,7 @@ function tmTokenHtml(p) {
       <div><small>${open ? "Holdt i" : "Holdt"}</small><b>${esc(minutes(open ? p.minutes : p.hold_minutes))}</b></div>
     </div>
     <div class="tk-box" style="--c:var(--accent)"><span class="ic">${icon("coins")}</span><span><b>Position</b><small>${esc(money(p.cost_usd))} inde · ${mode}</small></span><span class="v"><b>${esc(money(value))}</b><small class="${tone(pnl)}">${esc(signed(pnl))}</small></span></div>
+    ${tmScoreBox(p)}
     ${open
       ? `<div class="tk-box" style="--c:#ffb547"><span class="ic">${icon("shield")}</span><span><b>Risiko holder øje</b><small>${esc(riskBits.join(" · ") || "følger kursen")}</small></span><span class="v"><small>${p.watching ? "dev og topholdere overvåges" : ""}</small></span></div>`
       : `<div class="tk-box ${pnl >= 0 ? "sold" : "lost"}" style="--c:${pnl >= 0 ? "var(--up)" : "var(--down)"}"><span class="ic">${icon(pnl >= 0 ? "check" : "shield")}</span><span><b>Risiko solgte ${esc(p.symbol)}</b><small>${esc(p.exit_reason || "solgt")} · ${esc(tmTime(p.closed_at))}</small></span><span class="v"><b class="${tone(p.pnl_pct)}">${esc(spct(p.pnl_pct))}</b></span></div>`}
@@ -3339,6 +3393,59 @@ const boot = (() => {
     done() { if (over) return; this.step("Agenterne er online", 1); clearTimeout(fail); setTimeout(finish, 650); },
   };
 })();
+
+/* ---------- Ydelse: regime, ydelse, risikocenter, systemhelbred og de bedste idéer ---------- */
+const YD_STRAT = { momentum: "Almindelig", sniper: "Sniper", toptrader: "Top 10" };
+function ydRow(item, nameOf) {
+  return `<tr><td>${esc(nameOf(item.key))}</td><td class="num">${item.trades}</td><td class="num">${item.win_rate == null ? "—" : esc(pct(item.win_rate))}</td><td class="num ${tone(item.pnl)}">${esc(signed(item.pnl))}</td><td class="num">${item.profit_factor == null ? "—" : esc(fmtNum.format(item.profit_factor))}</td></tr>`;
+}
+function ydTable(title, rows, nameOf) {
+  if (!rows || !rows.length) return "";
+  return `<div class="yd-sub">${esc(title)}</div><table class="yd-tbl"><thead><tr><th></th><th class="num">Handler</th><th class="num">Vinder</th><th class="num">Resultat</th><th class="num">PF</th></tr></thead><tbody>${rows.slice(0, 8).map((r) => ydRow(r, nameOf)).join("")}</tbody></table>`;
+}
+function renderYdelse(data) {
+  if (!data.performance || !document.getElementById("yd-perf")) return;
+  const live = data.mode === "live";
+  document.getElementById("yd-regime-title").innerHTML = icon("radar") + "Marked og regime";
+  document.getElementById("yd-mode").textContent = live ? "Rigtige penge" : "Papir";
+  const rg = data.regime || {};
+  const ok = rg.label === "Ukendt" ? "" : rg.trade ? "ok" : "bad";
+  put("yd-regime", `<div class="yd-regime"><span class="yd-badge ${ok}">${esc(rg.label || "Ukendt")}</span><span>${esc(rg.detail || "")}</span></div>
+    <p class="yd-note">${rg.trade === false ? "Risk-off: på rigtige penge stopper SOL-filteret nye køb, mens markedet falder." : "Regimet kommer fra SOL-kurserne, botten selv har målt de seneste 80 minutter. Lange tendenser over dage ser den ikke endnu."} Tallene her er kun ${live ? "rigtige penge" : "papir"}, så de to blandes aldrig.</p>`);
+  const p = data.performance, o = p.overall;
+  document.getElementById("yd-perf-title").innerHTML = icon("bars") + "Ydelse";
+  const k = (label, value, cls) => `<div><small>${esc(label)}</small><b class="${cls || ""}">${esc(value)}</b></div>`;
+  const hour = (h) => `${pad2(h.key)}:00 UTC (${h.trades} handler, ${signed(h.pnl)})`;
+  put("yd-perf", o.trades ? `<div class="yd-kpis">
+      ${k("Vinderandel", o.win_rate == null ? "—" : pct(o.win_rate))}${k("Profit factor", o.profit_factor == null ? "—" : fmtNum.format(o.profit_factor))}${k("Forventning pr. handel", o.expectancy == null ? "—" : signed(o.expectancy), tone(o.expectancy))}
+      ${k("Gns. gevinst", o.avg_win == null ? "—" : signed(o.avg_win), "up")}${k("Gns. tab", o.avg_loss == null ? "—" : signed(o.avg_loss), "down")}${k("Handler", fmtInt.format(o.trades))}
+      ${k("Nuværende drawdown", `${fmtNum.format(p.current_drawdown_pct)} %`)}${k("Største drawdown", `${fmtNum.format(p.max_drawdown_pct)} %`)}${k("Resultat", signed(o.pnl), tone(o.pnl))}</div>
+    ${ydTable("Efter strategi", p.by_strategy, (key) => YD_STRAT[key] || key)}${ydTable("Efter kilde", p.by_source, (key) => key)}${ydTable("Efter salgsgrund", p.by_exit, (key) => key)}
+    <div class="yd-sub">Bedste og værste tidspunkter</div>
+    <p class="yd-note">${p.best_hours.length ? "Bedst: " + p.best_hours.map(hour).join(" · ") : "For få handler til at sige noget om tidspunkter."}${p.worst_hours.length ? "<br>Værst: " + p.worst_hours.map(hour).join(" · ") : ""}<br>${esc(p.hour_note)}</p>
+    <p class="yd-note">Sammenligning med en benchmark (fx bare at holde SOL) mangler endnu: botten gemmer ikke SOL-kursen over længere tid.</p>` : empty("Ingen lukkede handler endnu. Ydelsen vises, når botten har solgt de første.", "bars"));
+
+  const r = data.risk || { limits: [] };
+  document.getElementById("yd-risk-title").innerHTML = icon("shield") + "Risikocenter";
+  const unit = (v, u) => (u === "USD" ? money(v) : u === "%" ? `${fmtNum.format(v)} %` : fmtNum.format(v));
+  put("yd-risk", `${r.entries_blocked ? `<div class="yd-badge bad" style="height:auto;padding:6px 12px;border-radius:12px;margin-bottom:8px">${esc(r.reason || "Nye køb er stoppet.")}</div>` : `<div class="yd-badge ok" style="margin-bottom:8px">Botten må købe</div>`}
+    ${r.limits.map((l) => {
+      const ratio = l.used != null && l.limit ? Math.max(0, Math.min(1, l.used / l.limit)) : 0;
+      return `<div class="yd-lim${l.applies ? "" : " off"}"><div class="top"><span>${esc(l.label)}${l.applies ? "" : " (gælder ikke på papir)"}</span><span>${l.used == null ? "—" : esc(unit(l.used, l.unit))} / ${esc(unit(l.limit, l.unit))}</span></div><div class="yd-bar ${l.state === "hit" ? "hit" : l.state === "warn" ? "warn" : ""}"><i style="width:${(ratio * 100).toFixed(0)}%"></i></div></div>`;
+    }).join("")}
+    <p class="yd-note">Tab i træk: ${r.streak && r.streak.max ? `${r.streak.max} tab giver ${r.streak.cooldown_minutes} min. pause${r.streak.paused ? " (pause nu)" : ""}` : "fra"}. Stop-loss er ${esc(pct(r.stop_loss_pct || 0))} pr. position. ${esc(r.sizing_note || "")}${r.paper_free ? " På papir stopper botten ikke ved tabsgrænser (MEME_PAPER_LOSS_STOPS)." : ""}</p>`);
+
+  const h = data.health || { items: [] };
+  document.getElementById("yd-health-title").innerHTML = icon("plug") + "Systemhelbred";
+  const chip = document.getElementById("yd-health-chip");
+  chip.textContent = h.overall === "ok" ? "Alt i orden" : h.overall === "bad" ? "Fejl" : "Opmærksomhed";
+  chip.className = "chip " + (h.overall === "ok" ? "ok" : h.overall === "bad" ? "bad" : "warn");
+  put("yd-health", h.items.map((i) => `<div class="yd-h ${i.state}"><i></i><span>${esc(i.label)}</span><span>${esc(i.detail)}</span></div>`).join(""));
+
+  document.getElementById("yd-ideas-title").innerHTML = icon("trophy") + "De 10 bedste idéer lige nu";
+  put("yd-ideas", (data.top_ideas || []).length ? data.top_ideas.map((t) => `<div class="yd-idea">${tmAv(t.symbol, "")}<div><b>${esc(t.symbol)}</b><small>${esc(t.why)}</small></div><div class="sc"><b>${t.score}</b><small>${esc(t.band)}<br>${esc(t.action)}</small></div></div>`).join("")
+    + `<p class="yd-note">Kun tokens, der bestod markeds- og rug-filtrene. Scoren er bottens egen lærte model, ikke et gæt fra et sprogmodel. Handlingen kræver også en brugbar sikkerhedsscore.</p>` : empty("Ingen kandidater har bestået filtrene den seneste tid.", "trophy"));
+}
 
 /* ---------- Antal handler og prøvekøb ---------- */
 let tlKey = "";
@@ -3554,6 +3661,7 @@ function render(data) {
   renderChanges(data);
   renderRelay(data);
   renderRpc(data);
+  renderYdelse(data);
   renderTerminal(data);
   renderMomentum(data);
   renderTradeLimits(data);

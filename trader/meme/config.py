@@ -114,6 +114,10 @@ class MemeSettings:
     # når SOL er faldet så mange procent den seneste time (0 = fra). Salg fortsætter altid.
     max_losses_per_day: int = 3
     paper_loss_stops: bool = False
+    weekly_loss_pct: float = 0.4  # ugentligt tab (af bankroll), der stopper nye køb. 0 = fra
+    max_loss_streak: int = 4  # så mange tab i træk giver en pause. 0 = fra
+    loss_cooldown_minutes: int = 30
+    max_data_age_seconds: int = 180  # ældre SOL-kurs end det = ingen nye køb (forældede data)
     sol_filter_pct: float = 5.0
     sniper_max_open: int = 3
     sniper_max_per_day: int = 15
@@ -177,6 +181,10 @@ class MemeSettings:
             max_drawdown_pct=min(0.95, max(0.1, _float(os.getenv("MEME_MAX_DRAWDOWN_PCT"), 0.5))),
             max_losses_per_day=max(0, min(50, _int(os.getenv("MEME_MAX_LOSSES_PER_DAY"), 3))),
             paper_loss_stops=_flag(os.getenv("MEME_PAPER_LOSS_STOPS"), False),
+            weekly_loss_pct=min(0.95, max(0.0, _float(os.getenv("MEME_WEEKLY_LOSS_PCT"), 0.4))),
+            max_loss_streak=max(0, min(30, _int(os.getenv("MEME_MAX_LOSS_STREAK"), 4))),
+            loss_cooldown_minutes=max(1, min(720, _int(os.getenv("MEME_LOSS_COOLDOWN_MINUTES"), 30))),
+            max_data_age_seconds=max(60, min(3600, _int(os.getenv("MEME_MAX_DATA_AGE_SECONDS"), 180))),
             sol_filter_pct=min(30.0, max(0.0, _float(os.getenv("MEME_SOL_FILTER_PCT"), 5.0))),
             # Ingen daglig tabsgrænse som standard. Den samlede tabsgrænse er slået til.
             daily_loss_limit=_flag(os.getenv("MEME_DAILY_LOSS_LIMIT"), False),

@@ -110,6 +110,7 @@ from trader.meme.safety import (
     sniper_rejections,
     token_quality_rejections,
 )
+from trader.meme.scores import ai_score, market_regime, performance, safety_score
 from trader.meme.store import MemeStore, loads, now_iso, utc_day
 from trader.meme.wallet import MAX_DEPOSIT_SOL, PaperWallet, SolanaWallet, b58encode, build_transfer_message, fee_sol, load_keypair
 
@@ -1157,6 +1158,10 @@ class MemeEngine:
     def _entry_halt(self, day: str) -> str:
         """Hvorfor botten ikke køber nye tokens lige nu. Tom streng, hvis den må købe. Salg berøres aldrig.
         På papir køber botten hele tiden: tabsstop og SOL-filteret er for rigtige penge, og papir skal lære af sine tab."""
+        # Forældede data stopper altid nye køb, også på papir: en gammel kurs giver forkerte beslutninger og forkert læring.
+        stale = self._stale_data()
+        if stale:
+            return stale
         if self._paper_runs_free():
             return ""
         drop = sol_drop_pct(self._sol_hist, time.time())
@@ -1168,6 +1173,46 @@ class MemeEngine:
         losses = self.store.losses_closed_on(self.mode, day)
         if losses_halt(losses, self.settings):
             return f"Der er lukket {losses} handler med tab i dag (grænsen er {self.settings.max_losses_per_day}). Botten køber ikke flere nye tokens i dag."
+        weekly = self._weekly_halt()
+        if weekly:
+            return weekly
+        return self._streak_halt()
+
+    def _stale_data(self) -> str:
+        """Tom streng, hvis kursdata er friske. Før første kurs er hentet, afgør de øvrige kontroller."""
+        price, stamp = self._sol_usd
+        if price <= 0 or stamp <= 0:
+            return ""
+        age = time.time() - stamp
+        if age > self.settings.max_data_age_seconds:
+            return f"Kursdata er forældede ({int(age // 60)} min. gamle, grænsen er {self.settings.max_data_age_seconds // 60} min.). Botten køber ikke, før kurserne er friske igen."
+        return ""
+
+    def _weekly_halt(self) -> str:
+        pct = self.settings.weekly_loss_pct
+        if pct <= 0 or self.settings.bankroll_usd <= 0:
+            return ""
+        since = max(
+            (datetime.now(timezone.utc) - timedelta(days=7)).isoformat(timespec="seconds"),
+            self.store.get_state(f"loss_reset:{self.mode}", "") or "",
+        )
+        pnl = self.store.pnl_since(self.mode, since)
+        limit = pct * self.settings.bankroll_usd
+        if pnl <= -limit:
+            return f"Ugens tab ({_dk(pnl)} USD) har ramt grænsen på {_dk(pct * 100, 0)} % af bankroll. Botten køber ikke nye tokens, før ugens tab er under grænsen igen."
+        return ""
+
+    def _streak_halt(self) -> str:
+        n, cooldown = self.settings.max_loss_streak, self.settings.loss_cooldown_minutes
+        if n <= 0:
+            return ""
+        reset = self.store.get_state(f"loss_reset:{self.mode}", "") or ""
+        rows = [row for row in self.store.last_closed(self.mode, n) if str(row["closed_at"] or "") > reset]
+        if len(rows) < n or any(float(row["pnl_usd"]) >= 0 for row in rows):
+            return ""
+        left = cooldown - _minutes_since(rows[0]["closed_at"])
+        if left > 0:
+            return f"{n} tab i træk. Botten holder pause i {int(left) + 1} min. mere, før den køber igen."
         return ""
 
     def _why_no_entries(self, halted_day: bool, halted_dd: bool, entry_halt: str) -> str:
@@ -3302,6 +3347,9 @@ class MemeEngine:
             why = "strategien holder pause hos strategi-vagten" if self._on_hold(strategy) else "scoren var lige under grænsen"
             reasoning = f"Prøvekøb for {_dk(trial_usd)} USD i stedet for {_dk(base_usd)} USD ({why}). " + reasoning
         report = cand.get("report")
+        round_trip = round((1 - sell_quote.out_amount / buy_quote.in_amount) * 100, 2) if buy_quote and sell_quote and buy_quote.in_amount else None
+        safety_info = safety_score(report, cand.get("token"), pair, roundtrip_loss_pct=round_trip)
+        ai_info = ai_score(cand.get("score"), safety_info["score"])
         position_id = self.store.open_position(
             {
                 "strategy": strategy,
@@ -3325,6 +3373,7 @@ class MemeEngine:
                 "features": cand["features"],
                 "safety": {
                     "trial": bool(trial),
+                    "scores": {"safety": safety_info, "ai": ai_info},
                     "rug_risk": report.risk if report else None,
                     "top10_pct": report.top10_pct if report else None,
                     "lp_locked_pct": report.lp_locked_pct if report else None,
@@ -3444,6 +3493,8 @@ class MemeEngine:
         totals = self._totals()
         self.store.set_state(f"dd_reset:{self.mode}", repr(totals["total_pnl"]))
         self.store.set_state(f"halt_dd:{self.mode}", "0")
+        # Genoptag nulstiller også ugens tabsgrænse og pausen efter tab i træk: de måles fra nu.
+        self.store.set_state(f"loss_reset:{self.mode}", now_iso())
         self.kill_switch = False
         self.store.set_state("kill_switch", "0")
         self.store.add_event("info", "Genoptaget. Drawdown måles fra nu. Dagens tabsgrænse gælder stadig.")
@@ -3771,6 +3822,11 @@ class MemeEngine:
             "trades": [self._position_view(row, why_from=why_from) for row in self.store.list_positions(mode, 200) if row["status"] == "closed"],
             "candidates": [self._candidate_view(row) for row in candidate_rows],
             "relay": self._relay_view(mode, closed, candidate_rows, totals),
+            "regime": market_regime(self._sol_hist, time.time(), sol_filter_pct=self.settings.sol_filter_pct),
+            "performance": performance(closed, series),
+            "risk": self._risk_view(mode, totals, today, closed),
+            "health": self._health_view(),
+            "top_ideas": self._top_ideas(candidate_rows),
             "rpc": {
                 "host": __import__("urllib.parse", fromlist=["urlparse"]).urlparse(self.settings.rpc_url).hostname or "",
                 "public": self.settings.rpc_url.startswith("https://api.mainnet-beta.solana.com"),
@@ -4006,6 +4062,8 @@ class MemeEngine:
             "trial": bool(safety.get("trial")),
             "path": list(self._path_of(int(row["id"]))) if row["status"] == "open" else list(safety.get("path") or []),
             "image": safety.get("image") or "",
+            "safety_score": ((safety.get("scores") or {}).get("safety")),
+            "ai": ((safety.get("scores") or {}).get("ai")),
             "mcap_entry": (safety.get("facts") or {}).get("mcap"),
             "volume_h1": (safety.get("facts") or {}).get("vol_h1"),
             "priced_at": self._priced_at.get(int(row["id"])) if row["status"] == "open" else None,
@@ -4044,6 +4102,116 @@ class MemeEngine:
         except Exception as exc:  # en forklaring må aldrig vælte siden
             logger.info("Forklaring fejlede for %s: %s", row.get("id"), exc)
             return []
+
+    # ------------------------------------------------------------------ risikocenter, systemhelbred og de bedste idéer
+    def _risk_view(self, mode: str, totals: dict, today: str, closed: list[dict]) -> dict:
+        """Alle grænser med hvad der er brugt lige nu. Intet er pyntet: hvert tal kommer fra grænserne og handlerne."""
+        s = self.settings
+        bankroll = float(s.bankroll_usd or 0.0)
+        week_since = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat(timespec="seconds")
+        week_pnl = self.store.pnl_since(mode, week_since)
+        drop = sol_drop_pct(self._sol_hist, time.time())
+        free = self._paper_runs_free()
+        open_n = len(self.store.open_positions(mode))
+        exposure = sum(float(p["cost_usd"]) for p in self.store.open_positions(mode))
+
+        def row(key: str, label: str, used: float | None, limit: float | None, unit: str, *, applies: bool = True, loss: bool = False) -> dict:
+            if loss and used is not None:
+                used = max(0.0, -float(used))  # et tab vises som et positivt tal, og en gevinst er 0 brugt
+            if used is None or limit is None or limit <= 0:
+                state = "off" if not limit else "unknown"
+            elif not applies:
+                state = "off"
+            else:
+                ratio = used / limit
+                state = "hit" if ratio >= 1 else "warn" if ratio >= 0.7 else "ok"
+            return {"key": key, "label": label, "used": None if used is None else round(float(used), 4), "limit": limit, "unit": unit, "state": state, "applies": applies}
+
+        rows = [
+            row("daily", "Dagens tab", totals.get("today_pnl"), s.daily_loss_pct * bankroll, "USD", applies=self.loss_limits["daily"] and not free, loss=True),
+            row("weekly", "Ugens tab", week_pnl, s.weekly_loss_pct * bankroll, "USD", applies=not free, loss=True),
+            row("drawdown", "Samlet tab", totals.get("total_pnl"), s.max_drawdown_pct * bankroll, "USD", applies=self.loss_limits["drawdown"] and not free, loss=True),
+            row("open", "Åbne positioner", open_n, s.max_open, "stk."),
+            row("exposure", "Penge i spil", exposure, bankroll, "USD"),
+            row("trades", "Køb i dag", self.store.trades_opened_on(mode, today), s.max_trades_per_day, "stk."),
+            row("losses", "Tabsgivende handler i dag", self.store.losses_closed_on(mode, today), s.max_losses_per_day, "stk.", applies=not free),
+            row("sol", "SOL falder den seneste time", None if drop is None else max(0.0, -drop), s.sol_filter_pct, "%", applies=not free),
+        ]
+        reason = self._entry_halt(today) if not (self.kill_switch or self.paused) else ""
+        return {
+            "limits": rows,
+            "paper_free": free,
+            "position_usd": s.position_usd,
+            "stop_loss_pct": self.params.stop_loss_pct,
+            "streak": {"max": s.max_loss_streak, "cooldown_minutes": s.loss_cooldown_minutes, "paused": bool(self._streak_halt()) and not free},
+            "entries_blocked": bool(self.kill_switch or self.paused or reason),
+            "reason": ("Nødstop er slået til." if self.kill_switch else "Botten er sat på pause." if self.paused else reason),
+            "sizing_note": "Størrelsen på en handel afgøres af bankroll og grænserne ovenfor. En høj score giver aldrig en større position.",
+        }
+
+    def _health_view(self) -> dict:
+        """Systemets tilstand ud fra målinger: hvornår motoren sidst kørte, hvor gamle kurserne er, og hvad forbindelsestesten sidst sagde."""
+        items: list[dict] = []
+
+        def add(key: str, label: str, state: str, detail: str) -> None:
+            items.append({"key": key, "label": label, "state": state, "detail": detail})
+
+        tick_age = _minutes_since(self.last_tick) * 60 if self.last_tick else None
+        alive = bool(getattr(self._thread, "is_alive", lambda: False)()) if getattr(self, "_thread", None) else False
+        if tick_age is None:
+            add("engine", "Handelsmotor", "bad" if not alive else "warn", "Har ikke kørt en runde endnu.")
+        elif tick_age > 60:
+            add("engine", "Handelsmotor", "bad", f"Sidste runde for {int(tick_age)} sekunder siden.")
+        else:
+            add("engine", "Handelsmotor", "ok", f"Sidste runde for {int(tick_age)} sekunder siden. {self.consecutive_errors} fejl i træk." if self.consecutive_errors else f"Sidste runde for {int(tick_age)} sekunder siden.")
+        price, stamp = self._sol_usd
+        if price <= 0:
+            add("data", "Kursdata", "warn", "Ingen SOL-kurs hentet endnu.")
+        else:
+            age = time.time() - stamp
+            stale = age > self.settings.max_data_age_seconds
+            add("data", "Kursdata", "bad" if stale else "ok", f"SOL-kursen er {int(age)} sekunder gammel." + (" Forældet: ingen nye køb." if stale else ""))
+        scan_age = _minutes_since(self.last_scan_at) * 60 if getattr(self, "last_scan_at", None) else None
+        add("scan", "Scanning", "warn" if scan_age is None or scan_age > self.settings.scan_seconds * 6 else "ok",
+            "Ingen scanning endnu." if scan_age is None else f"Sidste scanning for {int(scan_age)} sekunder siden.")
+        try:
+            self.store.get_state("mode", "paper")
+            add("db", "Database", "ok", "Svarer.")
+        except Exception as exc:  # en defekt database skal kunne ses
+            add("db", "Database", "bad", str(exc)[:120])
+        diag = self.store.get_json("diagnostics", None) or {}
+        by_id = {c.get("id"): c for c in diag.get("checks", [])}
+        for key, label in (("dex_pairs", "DexScreener"), ("rugcheck", "RugCheck"), ("jup_price", "Jupiter"), ("rpc", "Solana RPC")):
+            c = by_id.get(key)
+            if c is None:
+                add(key, label, "unknown", "Ikke testet endnu. Tryk Test forbindelser.")
+            else:
+                add(key, label, "ok" if c.get("ok") else "bad", str(c.get("detail") or "")[:140])
+        if self.mode == "live":
+            add("wallet", "Bot-wallet", "ok" if self.settings.wallet_configured else "bad", "Nøgle sat." if self.settings.wallet_configured else "Ingen wallet-nøgle.")
+        add("kill", "Automatisk handel", "bad" if self.kill_switch else "warn" if self.paused else "ok", "Nødstop" if self.kill_switch else "På pause" if self.paused else "Kører")
+        worst = "bad" if any(i["state"] == "bad" for i in items) else "warn" if any(i["state"] in {"warn", "unknown"} for i in items) else "ok"
+        return {"overall": worst, "items": items, "checked_at": now_iso()}
+
+    def _top_ideas(self, candidate_rows: list[dict]) -> list[dict]:
+        """De 10 bedste kandidater botten har set for nylig, med scoren og grunden. Kun tokens, der bestod filtrene."""
+        passed_stages = {"score", "rute", "claude", "risiko", "købt", "køb"}
+        best: dict[str, dict] = {}
+        for row in candidate_rows:
+            if row["stage"] not in passed_stages or row["score"] is None:
+                continue
+            kept = best.get(row["mint"])
+            if kept is None or float(row["score"]) > float(kept["score"]):
+                best[row["mint"]] = row
+        ideas = []
+        for row in sorted(best.values(), key=lambda r: float(r["score"]), reverse=True)[:10]:
+            info = ai_score(float(row["score"]))
+            ideas.append({
+                "symbol": row["symbol"], "mint": row["mint"], "source": source_label(str(row["source"])), "stage": row["stage"],
+                "score": info["score"], "band": info["band"], "action": info["action"], "ts": row["ts"], "pair_url": row["pair_url"],
+                "why": f"Bestod markeds- og rug-filtrene via {source_label(str(row['source']))}. " + (str(row["reason"]) if row["reason"] else ""),
+            })
+        return ideas
 
     # ------------------------------------------------------------------ relæet: fem agenter
     def _relay_view(self, mode: str, closed: list[dict], candidates: list[dict], totals: dict) -> dict:
