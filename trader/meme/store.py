@@ -407,6 +407,20 @@ class MemeStore:
         )
         return int(row["n"]) if row else 0
 
+    def pnl_since(self, mode: str, since_iso: str) -> float:
+        """Realiseret resultat for lukkede handler siden et tidspunkt (til ugentlig tabsgrænse)."""
+        row = self._one(
+            "SELECT COALESCE(SUM(pnl_usd), 0) AS pnl FROM positions WHERE mode = ? AND status = 'closed' AND closed_at > ?",
+            (mode, since_iso),
+        )
+        return float(row["pnl"]) if row else 0.0
+
+    def last_closed(self, mode: str, limit: int) -> list[dict[str, Any]]:
+        return self._all(
+            "SELECT id, pnl_usd, closed_at FROM positions WHERE mode = ? AND status = 'closed' AND pnl_usd IS NOT NULL ORDER BY closed_at DESC, id DESC LIMIT ?",
+            (mode, int(limit)),
+        )
+
     def closed_positions(self, mode: str) -> list[dict[str, Any]]:
         return self._all(
             "SELECT * FROM positions WHERE mode = ? AND status = 'closed' AND pnl_usd IS NOT NULL ORDER BY id",
