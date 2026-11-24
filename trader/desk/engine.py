@@ -34,6 +34,7 @@ from trader.desk.config import (
     parse_watchlist,
 )
 from trader.desk.store import DeskStore
+from trader.desk.hub import StrategyHub
 from trader.notify import send as notify
 
 logger = logging.getLogger("trader.desk")
@@ -98,6 +99,7 @@ class DeskEngine:
         self._broker = broker
         self._injected_broker = broker is not None
         self.brain = brain or DeskBrain(settings, self.store, settings.anthropic_api_key)
+        self.hub = StrategyHub(self.store, self.market, lambda: self._now())
         self._now = now_fn or (lambda: datetime.now(self.tz))
         self._background = background_replies
         self._order_lock = threading.Lock()
@@ -414,6 +416,10 @@ class DeskEngine:
             self._sync(broker, now)
             flatten = self.market.flatten_at(now.date())
             if (now.hour, now.minute) >= flatten:
+                try:
+                    self.hub.flatten(broker, now, session_minutes=self.market.session_minutes)
+                except Exception as exc:
+                    logger.info("Turneringen kunne ikke lukkes ved lukketid: %s", exc)
                 self._flatten(
                     broker, now, f"Klokken er {self.market.local_hint(flatten, now.date())}. Bordets positioner lukkes. Intet holdes natten over."
                 )
@@ -563,6 +569,12 @@ class DeskEngine:
                 "items": rules.quotes(everything, intraday, daily, now, flags["all"], session_minutes=minutes),
             }
             self.last_scan = now.isoformat(timespec="seconds")
+            # Strategi-systemet kigger med på de samme kurser: signaler til siden og virtuelle papirkonti. Fejl her stopper aldrig scanningen.
+            try:
+                self.hub.on_scan(intraday, daily, now, benchmark=self.market.benchmark, flatten=(now.hour, now.minute) >= self.market.flatten_at(now.date()),
+                                 entries=not self.paused, session_minutes=minutes)
+            except Exception as exc:
+                logger.info("Strategi-scanning fejlede: %s", exc)
             if left_move <= 0 and left_volume <= 0:
                 return 0
             # En ticker, der kun er markeret på volumen, kan markeres igen, når kursen faktisk flytter sig.
@@ -617,6 +629,24 @@ class DeskEngine:
                     break
                 self._pipeline(flag, intraday.get(flag.symbol, []), now, cfg)
                 done += 1
+            # Godkendte strategi-signaler (kun hvis du har slået det til) går gennem bordets almindelige flow, stadig kun papir.
+            if not halt and not self.paused:
+                room = left_move - len([f for f in chosen if f.by_move])
+                taken = {f.symbol for f in chosen} | set(self.store.flagged_today(day))
+                for row in self.hub.pipeline_candidates():
+                    if room <= 0 or row["symbol"] in taken:
+                        continue
+                    read = rules._read(row["symbol"], intraday.get(row["symbol"], []), daily.get(row["symbol"], []), now, minutes)
+                    if read is None:
+                        continue
+                    flag = read[0]
+                    flag.by_move = True
+                    flag.to_close_min = int((self.market.at(now.date(), self.market.close_on(now.date())) - now).total_seconds() // 60)
+                    self.store.post("system", "info", f"Strategi-signal: {row['name']} på {row['symbol']} ({row['independent']} uafhængige bekræftelser) sendt til bordets flow.")
+                    self._pipeline(flag, intraday.get(row["symbol"], []), now, cfg)
+                    taken.add(row["symbol"])
+                    room -= 1
+                    done += 1
             marked = set(self.store.flagged_today(day))
             for item in self._quotes["items"]:
                 item["flagged"] = item["symbol"] in marked
@@ -1318,6 +1348,16 @@ class DeskEngine:
         if key == "executor":
             return prefix + f"Åbne handler: {context['open']}. Lukket i alt: {context['closed']} med {self.market.money(context['pnl'])}."
         return prefix
+
+    def strategies_view(self) -> dict:
+        view = self.hub.view(self._now().astimezone(self.tz).date().isoformat(), self.last_scan)
+        view["market"] = self.market.key
+        view["can_backtest"] = not self.own_ledger
+        return view
+
+    def start_backtest(self, days: int) -> None:
+        cfg = self.cfg
+        self.hub.start_backtest(self.broker(), list(cfg.watchlist), days, self.market.benchmark, self.market.session_minutes)
 
     def test_claude(self) -> dict:
         self.brain.settings = self.cfg
