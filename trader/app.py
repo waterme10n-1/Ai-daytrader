@@ -623,6 +623,45 @@ def create_app(
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         return {"ok": True}
 
+    @app.get("/api/desk/strategies")
+    def desk_strategies(market: str = "us") -> dict:
+        return desk(market).strategies_view()
+
+    @app.post("/api/desk/strategies/toggle")
+    async def desk_strategy_toggle(request: Request, market: str = "us") -> dict:
+        try:
+            body = await request.json()
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Ugyldig JSON.") from exc
+        body = body if isinstance(body, dict) else {}
+        try:
+            desk(market).hub.set_enabled(str(body.get("id") or ""), bool(body.get("enabled")))
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return {"ok": True}
+
+    @app.post("/api/desk/strategies/pipeline")
+    async def desk_strategy_pipeline(request: Request, market: str = "us") -> dict:
+        try:
+            body = await request.json()
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Ugyldig JSON.") from exc
+        desk(market).hub.set_pipeline(bool((body or {}).get("on")) if isinstance(body, dict) else False)
+        return {"ok": True}
+
+    @app.post("/api/desk/strategies/backtest")
+    async def desk_strategy_backtest(request: Request, market: str = "us") -> dict:
+        try:
+            body = await request.json()
+        except ValueError:
+            body = {}
+        try:
+            days = int((body or {}).get("days") or 10) if isinstance(body, dict) else 10
+            desk(market).start_backtest(days)
+        except (ValueError, TypeError) as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return {"ok": True}
+
     @app.post("/api/desk/scan")
     def desk_scan(market: str = "us") -> dict:
         engine_ = desk(market)

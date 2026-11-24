@@ -112,6 +112,27 @@
 
   /* ---------- kort ---------- */
   .card { background: var(--card); border-radius: var(--r-card); padding: 18px 20px 20px; box-shadow: var(--shadow); min-width: 0; position: relative; }
+  /* Strategier */
+  .st-notes { margin: 6px 0 0; padding-left: 18px; color: var(--text-2); font-size: 13px; line-height: 1.5; }
+  .st-sig { padding: 12px 0; border-top: 1px solid var(--sep); } .st-sig:first-child { border-top: 0; }
+  .st-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 15px; } .st-top .num { color: var(--text-2); }
+  .st-grid { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 6px 0; font-size: 12.5px; font-variant-numeric: tabular-nums; color: var(--text-2); }
+  .st-tag { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 7px; font-size: 11.5px; font-weight: 600; background: var(--fill); color: var(--text-2); }
+  .st-tag.ok { background: var(--up-bg); color: var(--up); } .st-tag.bad { background: var(--down-bg); color: var(--down); }
+  .st-best { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 12px; } .st-best div { padding: 9px 10px; border-radius: 12px; background: var(--fill); min-width: 0; } .st-best b { display: block; font-size: 13.5px; }
+  .st-tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; font-variant-numeric: tabular-nums; } .st-tbl th { color: var(--muted); font-weight: 600; text-align: left; padding: 4px 4px 6px 0; font-size: 11.5px; } .st-tbl td { padding: 7px 4px 7px 0; border-top: 1px solid var(--sep); } .st-tbl .r { text-align: right; } .st-tbl .up { color: var(--up); } .st-tbl .down { color: var(--down); } .st-tbl td, .st-tbl th { white-space: normal; } .st-tbl td:nth-child(2) { word-break: break-word; }
+  @media (max-width: 640px) { .st-tbl .opt { display: none; } .st-tbl { table-layout: fixed; } .st-tbl th:nth-child(1) { width: 22px; } .st-tbl th:nth-child(3) { width: 78px; } .st-tbl th:nth-child(4) { width: 58px; } .st-tbl th:nth-child(9) { width: 48px; } .st-tbl td { overflow-wrap: anywhere; } }
+  .st-lib { display: grid; gap: 10px; }
+  .st-card { padding: 12px; border-radius: 16px; background: var(--card-2); border: 1px solid var(--sep); } .st-card.off { opacity: 0.6; }
+  .st-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .st-name { flex: 1; min-width: 0; text-align: left; background: none; border: 0; color: inherit; font: inherit; padding: 0; display: grid; gap: 2px; cursor: pointer; } .st-name b { font-size: 15px; } .st-name .cap { white-space: normal; }
+  .st-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .st-sw { position: relative; width: 46px; height: 28px; flex: none; } .st-sw input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; z-index: 1; }
+  .st-sw i { position: absolute; inset: 0; border-radius: 99px; background: var(--fill-2); transition: background 0.2s; } .st-sw i::after { content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; transition: transform 0.2s; }
+  .st-sw input:checked + i { background: var(--accent); } .st-sw input:checked + i::after { transform: translateX(18px); background: var(--on-accent, #fff); }
+  .st-body { margin-top: 10px; font-size: 13.5px; line-height: 1.5; } .st-body p { margin: 0 0 6px; }
+  .st-body dl { display: grid; grid-template-columns: 9em minmax(0, 1fr); gap: 4px 10px; margin: 8px 0; } .st-body dt { color: var(--muted); font-size: 12.5px; } .st-body dd { margin: 0; overflow-wrap: anywhere; }
+  .st-m { display: grid; gap: 2px; padding: 8px 0; border-top: 1px solid var(--sep); font-size: 12.5px; } .st-m b { font-size: 12.5px; }
   .card-h { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
   .card-h h2 { margin: 0; font: 600 17px var(--display); letter-spacing: -0.015em; }
   .card-h .right { margin-left: auto; }
@@ -727,6 +748,37 @@
     <article class="card"><div class="card-h"><h2>Lektioner</h2></div><div id="lessons" class="list"></div></article>
   </section>
 
+  <section id="tab-strat" class="stack" hidden>
+    <article class="card">
+      <div class="card-h"><h2>Elite Strategy Library</h2><span class="right chip" id="st-regime"></span></div>
+      <p class="cap" id="st-wait" style="margin:0 0 6px" hidden></p>
+      <p class="cap" id="st-regime-detail" style="margin:0 0 6px"></p>
+      <ul class="st-notes" id="st-notes"></ul>
+    </article>
+    <article class="card">
+      <div class="card-h"><h2>Signaler lige nu</h2><span class="right cap" id="st-sig-note"></span></div>
+      <div id="st-signals" class="list"></div>
+    </article>
+    <article class="card">
+      <div class="card-h"><h2>Turnering</h2><span class="right cap">virtuelle papirkonti</span></div>
+      <div id="st-best" class="st-best"></div>
+      <div id="st-board"></div>
+      <p class="cap" id="st-tour-note" style="margin:10px 0 0"></p>
+    </article>
+    <article class="card">
+      <div class="card-h"><h2>Backtest</h2><button class="btn primary right" type="button" id="st-bt-run">Kør backtest</button></div>
+      <div id="st-bt"></div>
+    </article>
+    <article class="card">
+      <div class="card-h"><h2>Strategier</h2></div>
+      <div id="st-lib" class="st-lib"></div>
+    </article>
+    <article class="card">
+      <div class="card-h"><h2>Send til bordets flow</h2></div>
+      <label class="wide toggle"><span class="tx">Send godkendte signaler til bordet<span id="st-pipe-rule"></span></span><input autocomplete="off" id="st-pipe" type="checkbox"></label>
+    </article>
+  </section>
+
   <section id="tab-bots" class="stack" hidden>
     <article class="card"><div class="card-h"><h2>Status</h2></div><div class="sysl" id="sys"></div></article>
     <article class="card">
@@ -810,8 +862,92 @@ const TABS = [
   ["chat", "Gruppen", '<path d="M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H9l-5 4z"/>'],
   ["trades", "Handler", '<path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/>'],
   ["learn", "Læring", '<path d="M12 3l9 5-9 5-9-5z"/><path d="M7 10.5V16c3 2.5 7 2.5 10 0v-5.5"/>'],
+  ["strat", "Strategier", '<path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/><path d="M4 7l6-3 6 5 5-4"/>'],
   ["bots", "Bots", '<rect x="5" y="8" width="14" height="11" rx="3"/><path d="M12 4v4M9.5 13h.01M14.5 13h.01"/>'],
 ];
+/* ---------- Strategier: bibliotek, signaler, turnering, backtest ---------- */
+let stData = null, stOpen = null, stTimer = null;
+const REG = { bullish: "Bullish", bearish: "Bearish", sideways: "Sidelæns", strong_momentum: "Stærkt momentum", high_vol: "Høj volatilitet", low_vol: "Lav volatilitet", low_liquidity: "Lav likviditet" };
+const fx = (v, d = 2) => (v === null || v === undefined || isNaN(v) ? "–" : new Intl.NumberFormat("da-DK", { maximumFractionDigits: d, minimumFractionDigits: d }).format(v));
+const fr = (v) => (v === null || v === undefined || isNaN(v) ? "–" : `${v > 0 ? "+" : ""}${fx(v)} R`);
+const fp = (v) => (v === null || v === undefined || isNaN(v) ? "–" : `${fx(v * 100, 0)} %`);
+function stMetrics(m, label) {
+  if (!m) return "";
+  if (!m.trades) return `<div class="st-m"><b>${esc(label)}</b><span class="cap">Ingen handler endnu.</span></div>`;
+  return `<div class="st-m"><b>${esc(label)}</b><span>${m.trades} handler${m.reliable ? "" : " (for få til at stole på)"} · vinder ${fp(m.win_rate)} · PF ${m.profit_factor === null ? "–" : fx(m.profit_factor)} · forventning ${fr(m.expectancy_r)} · gns. gevinst ${fr(m.avg_win_r)} · gns. tab ${fr(m.avg_loss_r)} · største drawdown ${fx(m.max_drawdown_r)} R${m.sharpe === null ? "" : " · Sharpe " + fx(m.sharpe)}</span></div>`;
+}
+function stFit(row) {
+  return row.fits === true ? '<span class="st-tag ok">passer nu</span>' : row.fits === false ? '<span class="st-tag bad">passer ikke nu</span>' : '<span class="st-tag">marked ukendt</span>';
+}
+function renderStrategies(d) {
+  stData = d;
+  const rg = d.regime || {};
+  $("st-regime").textContent = rg.label || "Ukendt";
+  $("st-regime-detail").textContent = (rg.detail || "") + " " + (rg.note || "");
+  $("st-wait").hidden = !d.wait; $("st-wait").textContent = d.wait || "";
+  $("st-notes").innerHTML = (d.notes || []).map((t) => `<li>${esc(t)}</li>`).join("");
+  // signaler
+  const sig = d.signals || [];
+  $("st-sig-note").textContent = sig.length ? `${sig.length} lige nu` : d.tournament && d.tournament.last_step ? "ingen lige nu" : "venter på første scanning";
+  $("st-signals").innerHTML = sig.length ? sig.slice(0, 30).map((s) => `<div class="st-sig">
+    <div class="st-top"><b>${esc(s.symbol)}</b><span class="num">${fx(s.price)} ${CUR}</span><span class="st-tag ${s.side === "long" ? "ok" : "bad"}">${s.side === "long" ? "køb" : "short"}</span>${s.executable ? "" : '<span class="st-tag">kun målt</span>'}${stFit(s)}</div>
+    <div class="cap">${esc(s.name)} · inspireret af ${esc(s.origin)}</div>
+    <div class="st-grid"><span>Entry ${fx(s.entry)}</span><span>Stop ${fx(s.stop)}</span><span>Mål ${fx(s.target)}</span><span>R/R ${fx(s.rr, 1)}</span><span>RVOL ${fx(s.rvol, 1)}</span><span>Gap ${s.gap_pct === null ? "–" : pct(s.gap_pct)}</span><span>Signalkvalitet ${s.quality}/100</span><span>${s.independent} uafhængig${s.independent === 1 ? "" : "e"} bekræftelse${s.independent === 1 ? "" : "r"}</span></div>
+    <div class="cap">${s.reasons.map(esc).join(" · ")}${s.also && s.also.length ? `<br>Samme aktie fanget af: ${s.also.map((x) => esc((d.library.find((l) => l.id === x) || {}).name || x)).join(", ")}` : ""}${s.fits === false ? `<br>${esc(s.fit_why)}` : ""}</div></div>`).join("")
+    : '<div class="cap">Ingen strategier har et signal lige nu. Float er ikke tilgængelig fra datakilden, så den vises ikke. Signalkvalitet er hvor mange af strategiens tjek, der er opfyldt, ikke en sandsynlighed.</div>';
+  // turnering
+  const best = d.best || {};
+  $("st-best").innerHTML = ["day", "week", "month"].map((p) => `<div><span class="cap">Bedste ${p === "day" ? "i dag" : p === "week" ? "denne uge" : "denne måned"}</span><b>${best[p] ? esc(best[p].name) + " " + money(best[p].pnl, true) : "–"}</b></div>`).join("");
+  const board = d.leaderboard || [];
+  $("st-board").innerHTML = board.length ? `<table class="st-tbl"><thead><tr><th>#</th><th>Strategi</th><th class="r">Konto</th><th class="r">Handler</th><th class="r opt">Vinder</th><th class="r opt">PF</th><th class="r opt">Forv.</th><th class="r opt">DD</th><th class="r">Score</th></tr></thead><tbody>${board.map((r, i) => `<tr><td>${i + 1}</td><td>${esc(r.name)}${r.approval.approved ? ' <span class="st-tag ok">godkendt</span>' : ""}</td><td class="r num ${r.pnl >= 0 ? "up" : "down"}">${money(r.pnl, true)}</td><td class="r">${r.trades}</td><td class="r opt">${fp(r.win_rate)}</td><td class="r opt">${r.profit_factor === null ? "–" : fx(r.profit_factor)}</td><td class="r opt">${fr(r.expectancy_r)}</td><td class="r opt">${fx(r.drawdown_pct, 1)} %</td><td class="r">${r.score.score === null ? "–" : r.score.score}</td></tr>`).join("")}</tbody></table>` : '<div class="cap">Turneringen har ingen handler endnu. Hver strategi har en virtuel konto og handler de samme live-kurser, så snart bordet scanner i åbningstiden.</div>';
+  const t = d.tournament || {};
+  $("st-tour-note").textContent = `Virtuelle konti på ${money(t.start)} ${CUR} med ${t.risk_pct} % risiko pr. handel (højst ${t.cap_pct} % af kontoen i én aktie), ${t.costs ? t.costs.slippage_bps : 5} bps slippage pr. side. Score vises først efter 20 handler og bygger på forventning, profit factor og drawdown, ikke win rate. Bordet sender ingen ordrer herfra.`;
+  // backtest
+  const b = d.backtest || {};
+  $("st-bt-run").disabled = !d.can_backtest || (b.job && b.job.running);
+  $("st-bt-run").textContent = b.job && b.job.running ? "Kører …" : "Kør backtest";
+  $("st-bt").innerHTML = (d.can_backtest ? "" : '<div class="cap">Backtest findes kun for USA (Alpacas historiske minutkurser).</div>')
+    + (b.job && b.job.message ? `<div class="cap">${esc(b.job.message)}</div>` : "")
+    + (b.ran_at ? `<div class="cap">Kørt ${esc(ago(b.ran_at))}: ${b.days} symbol-dage ${b.dates && b.dates.length ? "(" + esc(b.dates[0]) + " til " + esc(b.dates[b.dates.length - 1]) + ")" : ""}, ${esc((b.symbols || []).join(", "))}. Omkostninger: ${b.costs.slippage_bps} bps slippage pr. side, ${b.costs.short_borrow_bps_per_day} bps short-lån pr. dag. ${esc(b.data || "")}. ${esc(b.regime_note || "")}</div>` : `<div class="cap">${esc(b.empty || "")}</div>`)
+    + '<div class="cap" style="margin-top:6px">Ingen parametre optimeres, så der er intet at overfitte. Out-of-sample er de sidste 40 % af dagene. Få handler giver tilfældige tal: under 30 handler er markeret.</div>';
+  // bibliotek
+  $("st-lib").innerHTML = d.library.map((s) => `<div class="st-card ${s.enabled ? "" : "off"}" data-id="${esc(s.id)}">
+    <div class="st-head"><button type="button" class="st-name" data-open="${esc(s.id)}"><b>${esc(s.name)}</b><span class="cap">${esc(s.origin)}</span></button>
+      <label class="st-sw"><input type="checkbox" data-toggle="${esc(s.id)}" ${s.enabled ? "checked" : ""} aria-label="Slå ${esc(s.name)} til eller fra"><i></i></label></div>
+    <div class="st-tags">${stFit(s)}<span class="st-tag">${s.side === "long" ? "long" : "short"}</span>${s.executable ? "" : '<span class="st-tag">kun målt</span>'}<span class="st-tag ${s.approval.approved ? "ok" : ""}">${s.approval.approved ? "godkendt til bordets flow" : "ikke godkendt"}</span><span class="st-tag">score ${s.score.score === null ? "–" : s.score.score}</span></div>
+    ${stOpen === s.id ? `<div class="st-body"><p>${esc(s.description)}</p><p class="cap">${esc(s.how)}</p>
+      <dl><dt>Markeder</dt><dd>${esc(s.markets)}</dd><dt>Timeframe</dt><dd>${esc(s.timeframes)}</dd><dt>Entry</dt><dd>${esc(s.entry)}</dd><dt>Exit</dt><dd>${esc(s.exit)}</dd><dt>Stop-loss</dt><dd>${esc(s.stop)}</dd><dt>Take-profit</dt><dd>${esc(s.target)}</dd><dt>Risk/reward</dt><dd>${esc(s.rr)}</dd>
+      <dt>Passer til</dt><dd>${s.suits.length ? s.suits.map((x) => esc(REG[x] || x)).join(", ") : "alle forhold"}</dd><dt>Bruges ikke ved</dt><dd>${s.avoid.length ? s.avoid.map((x) => esc(REG[x] || x)).join(", ") : "–"}</dd>
+      <dt>Svaghed</dt><dd>${esc(s.weakness)}</dd><dt>Kilde</dt><dd>${esc(s.source)}</dd>${s.combo.length ? `<dt>Bygger på</dt><dd>${s.combo.map((x) => esc((d.library.find((l) => l.id === x) || {}).name || x)).join(", ")}</dd>` : ""}
+      <dt>Uafhængige beviser</dt><dd>${s.families.map(esc).join(", ")}</dd></dl>
+      ${stMetrics(s.paper && { ...s.paper, trades: s.paper.trades }, "Papirturnering")}
+      ${s.backtest ? stMetrics(s.backtest.metrics, "Backtest, alle dage") + stMetrics(s.backtest.in_sample, "Backtest, første del") + stMetrics(s.backtest.out_sample, "Backtest, out-of-sample (sidste del)") : '<div class="st-m"><b>Backtest</b><span class="cap">Ikke kørt endnu.</span></div>'}
+      ${Object.keys(s.paper_by_regime || {}).length ? `<div class="st-m"><b>Papirturnering efter marked</b><span>${Object.entries(s.paper_by_regime).map(([k, m]) => `${esc(REG[k] || k)}: ${m.trades} handler, forventning ${fr(m.expectancy_r)}`).join(" · ")}</span></div>` : ""}
+      ${s.approval.approved ? "" : `<div class="st-m"><b>Mangler for godkendelse</b><span>${s.approval.missing.map(esc).join("; ")}</span></div>`}</div>` : ""}</div>`).join("");
+  $("st-pipe").checked = !!d.pipeline.on;
+  $("st-pipe-rule").textContent = d.pipeline.rule + (d.pipeline.on ? ` (${d.pipeline.candidates} kandidat${d.pipeline.candidates === 1 ? "" : "er"} lige nu)` : "");
+}
+async function loadStrategies() {
+  try {
+    renderStrategies(await (await fetch(api("/api/desk/strategies"), { cache: "no-store", credentials: "same-origin" })).json());
+  } catch (e) { /* siden prøver igen */ }
+  clearTimeout(stTimer);
+  if (tab === "strat") stTimer = setTimeout(loadStrategies, (stData && stData.backtest && stData.backtest.job && stData.backtest.job.running) ? 3000 : 15000);
+}
+document.addEventListener("click", async (e) => {
+  const open = e.target.closest("[data-open]");
+  if (open) { stOpen = stOpen === open.dataset.open ? null : open.dataset.open; if (stData) renderStrategies(stData); return; }
+  if (e.target.id === "st-bt-run") {
+    try { await post("/api/desk/strategies/backtest", { days: 10 }); toast("Backtest startet. Det tager et par minutter."); loadStrategies(); } catch (err) { toast(err.message); }
+  }
+});
+document.addEventListener("change", async (e) => {
+  if (e.target.dataset && e.target.dataset.toggle) {
+    try { await post("/api/desk/strategies/toggle", { id: e.target.dataset.toggle, enabled: e.target.checked }); toast(e.target.checked ? "Strategien er slået til." : "Strategien er slået fra."); loadStrategies(); } catch (err) { toast(err.message); e.target.checked = !e.target.checked; }
+  } else if (e.target.id === "st-pipe") {
+    try { await post("/api/desk/strategies/pipeline", { on: e.target.checked }); toast(e.target.checked ? "Godkendte signaler sendes nu til bordets flow (kun papir)." : "Strategi-signaler sendes ikke længere til bordet."); loadStrategies(); } catch (err) { toast(err.message); e.target.checked = !e.target.checked; }
+  }
+});
 const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
 // Børsen: ?m=dk eller det, du valgte sidst. Hver børs har sin egen motor, papirkonto og chat på serveren.
 const MKT = (() => {
@@ -1006,6 +1142,7 @@ function showTab(name) {
   try { localStorage.setItem("desk-tab", name); } catch (e) {}
   if (state) renderTab(true);
   if (name === "learn") loadCompare();
+  if (name === "strat") loadStrategies();
   if (name === "chat") scrollDown(true);
   else scrollTo(0, 0);
 }
